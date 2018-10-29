@@ -189,6 +189,9 @@ struct rr_collection
 uint8_t *
 dns_domain_to_name(char *domain);
 
+char *
+dns_name_to_readable(uint8_t *name);
+
 /**
  * Parses a DNS packet contained in PKT_BUFF into a dns_packet
  * structure.

@@ -61,6 +61,58 @@ dns_compare_names(uint8_t *a, uint8_t *b)
 	return (r);;
 }
 
+char *
+dns_name_to_readable(uint8_t *name)
+{
+	assert(name);
+
+	size_t name_len = strlen(name), remaining = name_len;
+	char *readable = NULL, *readable_pos = NULL;
+	uint8_t *label_ptr = name;
+	size_t label_len = 0;
+
+	if (name_len > MAX_NAME_LEN) goto error;
+
+	readable = malloc(name_len);
+	if (!readable) goto error;
+	readable_pos = readable;
+
+	label_len = *label_ptr;
+	if (label_len > MAX_LABEL_LEN) goto error;
+
+	label_ptr++;
+
+	while (label_len && label_len <= remaining)
+	{
+		/* Move to position after length byte */
+		strncpy(readable_pos, label_ptr, label_len);
+
+		/* Move to next length byte */
+		readable_pos += label_len;
+		label_ptr += label_len;
+		remaining -= label_len + 1;
+
+		/* Get length byte */
+		label_len = *label_ptr;
+		label_ptr++;
+
+		/* Add '.' */
+		if (label_len)
+		{
+			*readable_pos = '.';
+			readable_pos++;
+		}
+	}
+
+	*readable_pos = 0;
+
+	return (readable);
+
+error:
+	if (readable) free(readable);
+	return (NULL);
+}
+
 uint8_t *
 dns_domain_to_name(char *domain)
 {
