@@ -16,6 +16,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/idsmain
   SECTION:=ids
   CATEGORY:=IDS
+  DEPENDS:=+libpcap
   TITLE:=NetStinky
 endef
 

@@ -156,7 +156,7 @@ dns_parse(uint8_t *pkt_buff, size_t pkt_len)
 
 error:
 	/* reverse any operations done so far, free all structures */
-	free_dns_packet(pkt_parsed);
+	free_dns_packet(&pkt_parsed);
 	return (NULL);
 }
 
@@ -1017,16 +1017,18 @@ void free_dns_answer(struct dns_answer *ans)
 	}
 }
 
-void free_dns_packet(struct dns_packet *packet)
+void free_dns_packet(struct dns_packet **packet)
 {
-	if (packet)
+	assert(packet);
+	if (*packet)
 	{
-		free_dns_question(packet->questions);
-		free_dns_answer(packet->answers);
-		free_dns_answer(packet->authority);
-		free_dns_answer(packet->additional);
+		free_dns_question((*packet)->questions);
+		free_dns_answer((*packet)->answers);
+		free_dns_answer((*packet)->authority);
+		free_dns_answer((*packet)->additional);
 
-		free(packet);
+		free(*packet);
+		*packet = NULL;
 	}
 }
 

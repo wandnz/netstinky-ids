@@ -328,7 +328,7 @@ void
 free_dns_answer(struct dns_answer *ans);
 
 void
-free_dns_packet(struct dns_packet *packet);
+free_dns_packet(struct dns_packet **packet);
 
 /*
  * Destroys a dns question and all substructures appropriately.

@@ -2,7 +2,7 @@ all: idsmain
 
 CC = gcc
 CFLAGS = -Wall
-LDFLAGS = 
+LDFLAGS = -lpcap
 
 DEPS = $(wildcard *.h)
 SRC = $(wildcard *.c)

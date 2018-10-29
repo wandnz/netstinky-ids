@@ -14,6 +14,7 @@
 #include "linked_list.h"
 #include "io_task.h"
 #include "mdns_io_task.h"
+#include "pcap_io_task.h"
 
 /* -- DEBUGGING -- */
 #define DEBUG 1
@@ -29,6 +30,9 @@ struct linked_list *iface_list = NULL;
 /* Server port which will send clients a list of recent detected intrusions */
 static int server_port = -1;
 
+/* IO tasks to be performed in event loop. */
+struct io_task *tasks = NULL;
+
 /*
  * Free all the global variables prior to exiting the program.
  */
@@ -37,8 +41,10 @@ on_exit_callback()
 {
 	DPRINT("Performing graceful exit.\n");
 
-	/* Interface names are from the argv array and do not need to be freed */
-	if (iface_list) free_linked_list(&iface_list, NULL);
+	/* These functions to free structures will handle NULL arguments, so this
+	 * doesn't need to be checked. */
+	free_linked_list(&iface_list, NULL);
+	free_io_task(&tasks);
 }
 
 int
@@ -133,6 +139,9 @@ parse_args(int argc, char **argv)
 int
 main(int argc, char **argv)
 {
+	struct io_task *mdns_task = NULL, *pcap_task = NULL;
+	struct linked_list *iter = NULL;
+
 	if (atexit(on_exit_callback))
 	{
 		DPRINT("atexit() failed to register on_exit_callback\n");
@@ -147,10 +156,16 @@ main(int argc, char **argv)
 
 	print_network_interfaces(stdout);
 
-	struct io_task *tasks = NULL;
-	struct io_task *mdns_task = mdns_io_task_setup();
+	mdns_task = mdns_io_task_setup();
 	if (mdns_task && !io_task_add(&tasks, mdns_task))
 		DPRINT("io_task_add() failed\n");
+
+	for (iter = iface_list; iter; iter = iter->next)
+	{
+		pcap_task = pcap_io_task_setup((char *)iter->item);
+		if (!pcap_task || !io_task_add(&tasks, pcap_task))
+			DPRINT("io_task_add() failed\n");
+	}
 
 	DPRINT("Waiting for MDNS packets.\n");
 	while (1)
