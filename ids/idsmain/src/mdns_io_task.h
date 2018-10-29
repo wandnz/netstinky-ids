@@ -12,6 +12,11 @@
 
 struct mdns_io_task_state;
 
+/*
+ * Gets an io_task structure that will listen for MDNS packets on the MDNS
+ * multicast IP address and respond with an advertisement for the IDS server.
+ *
+ * The result may be NULL if the socket could not be initialized. */
 struct io_task *
 mdns_io_task_setup();
 

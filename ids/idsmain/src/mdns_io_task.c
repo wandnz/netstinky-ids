@@ -33,7 +33,7 @@ struct mdns_io_task_state
 };
 
 void
-free_mdns_io_task(TASK_STRUCT *task_state)
+free_mdns_io_task_state(TASK_STRUCT *task_state)
 {
 	assert(task_state);
 
@@ -96,13 +96,13 @@ mdns_io_task_setup()
 		if (!(mdns->packet_buffer)) goto error;
 
 		if (!(task = new_io_task(mdns->fd, mdns, mdns_io_task_read,
-				NULL, free_mdns_io_task))) goto error;
+				NULL, free_mdns_io_task_state))) goto error;
 	}
 
 	return (task);
 
 error:
-	free_mdns_io_task((void *)&mdns);
+	free_mdns_io_task_state((void *)&mdns);
 	return (task);
 }
 
