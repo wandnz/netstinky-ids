@@ -113,5 +113,7 @@ mdns_io_task_write(TASK_STRUCT task_state)
 
 	/* TODO: Implement */
 
+	/* TODO: Do I care if I only do multicast replies? */
+
 	return (0);
 }

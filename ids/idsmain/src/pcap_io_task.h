@@ -18,6 +18,6 @@ struct pcap_io_task_state;
  * The result may be NULL if the device could not be set up for packet capture.
  */
 struct io_task *
-pcap_io_task_setup();
+pcap_io_task_setup(const char *if_name);
 
 #endif /* PCAP_IO_TASK_H_ */

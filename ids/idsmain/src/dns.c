@@ -339,17 +339,32 @@ dns_parse_name(uint8_t **buf_pos, size_t *remaining_len)
 		{
 			/* Hop along string only checking the label lengths */
 			label_len = (*buf_pos)[buf_index];
-			if (label_len > MAX_LABEL_LEN) goto error;
+			if (label_len > MAX_LABEL_LEN)
+			{
+				DPRINT("dns_parse_name(): label length exceeds MAX_LABEL_LEN\n");
+				goto error;
+			}
 
 			buf_index += label_len + 1;
-			if (buf_index >= *remaining_len) goto error;
-			if (buf_index >= MAX_NAME_LEN) goto error;
+			if (buf_index >= *remaining_len)
+			{
+				DPRINT("dns_parse_name(): parsing label would overflow buffer\n");
+				goto error;
+			}
+			if (buf_index >= MAX_NAME_LEN)
+			{
+				DPRINT("dns_parse_name(): name length exceeds MAX_NAME_LEN\n");
+			}
 		} while (label_len != 0);
 	}
 
 	/* buf_index now contains the length (including \x0 byte) */
 	out = malloc(buf_index);
-	if (NULL == out) goto error;
+	if (NULL == out)
+	{
+		DPRINT("dns_parse_name(): malloc() failed\n");
+		goto error;
+	}
 
 	strncpy((char *)out, (char *)(*buf_pos), buf_index);
 
@@ -403,13 +418,30 @@ dns_parse_question(uint8_t **qn_start, size_t *max_len)
 	assert(max_len);
 
 	struct dns_question *qn = new_dns_question();
-	if (!qn) return (NULL);
+	if (!qn)
+	{
+		DPRINT("dns_parse_question(): new_dns_question() failed\n");
+		return (NULL);
+	}
 
 	qn->qname = dns_parse_name(qn_start, max_len);
-	if (!qn->qname) goto error;
+	if (!qn->qname)
+	{
+		DPRINT("dns_parse_question(): dns_parse_name() failed\n");
+		goto error;
+	}
 
-	if (!byte_array_read_uint16(&(qn->qtype), qn_start, max_len)) goto error;
-	if (!byte_array_read_uint16(&(qn->qclass), qn_start, max_len)) goto error;
+	if (!byte_array_read_uint16(&(qn->qtype), qn_start, max_len))
+	{
+		DPRINT("dns_parse_question(): byte_array_read_uint16() failed\n");
+		goto error;
+	}
+
+	if (!byte_array_read_uint16(&(qn->qclass), qn_start, max_len))
+	{
+		DPRINT("dns_parse_question(): byte_array_read_uint16() failed\n");
+		goto error;
+	}
 
 	return (qn);
 
@@ -433,7 +465,11 @@ dns_parse_question_section(uint16_t qn_num,
 	for (i = 0; i < qn_num; i++)
 	{
 		struct dns_question *new_qn = dns_parse_question(buf_pos, remaining_len);
-		if (!new_qn) goto error;
+		if (!new_qn)
+		{
+			DPRINT("dns_parse_question_section(): dns_parse_question() failed\n");
+			goto error;
+		}
 
 		if (!qn_list)
 		{
