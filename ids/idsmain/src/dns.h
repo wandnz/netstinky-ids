@@ -210,7 +210,7 @@ dns_parse(uint8_t *pkt_buff, size_t pkt_len);
  */
 int
 dns_parse_answer(struct dns_answer **out, uint8_t **buf_pos,
-		size_t *remaining_len);
+		size_t *remaining_len, uint8_t *buf_start);
 
 /**
  * Parse NUM_ANSWERS dns answers from a buffer, beginning at
@@ -221,14 +221,15 @@ dns_parse_answer(struct dns_answer **out, uint8_t **buf_pos,
  */
 struct dns_answer *
 dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
-		size_t *remaining_len);
+		size_t *remaining_len, uint8_t *buf_start);
 
 /*
  * Puts the next answer section into *OUT and returns 1 if successful.
  */
 int
 dns_parse_answer_section_into(struct dns_answer **out,
-		uint16_t num_answers, uint8_t **buf_pos, size_t *remaining_len);
+		uint16_t num_answers, uint8_t **buf_pos, size_t *remaining_len,
+		uint8_t *buf_start);
 
 /**
  * Parses the header of a DNS packet into OUT. Updates *BUF_POS to

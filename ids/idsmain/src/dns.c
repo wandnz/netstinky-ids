@@ -17,6 +17,10 @@
 #include "dns.h"
 #include "byte_array.h"
 
+/* -- DEBUGGING -- */
+#define DEBUG 1
+#define DPRINT(...) do { if (DEBUG) fprintf(stdout, __VA_ARGS__); } while (0)
+
 static const size_t MAX_PKT_SIZE = 65535;
 static const size_t DNS_HEADER_LEN = 12;
 
@@ -112,16 +116,41 @@ dns_parse(uint8_t *pkt_buff, size_t pkt_len)
 	size_t remaining_len = pkt_len;
 
 	struct dns_packet *pkt_parsed = malloc(sizeof(*pkt_parsed));
-	if (NULL == pkt_parsed) goto error;
+	if (NULL == pkt_parsed)
+	{
+		DPRINT("dns_parse(): malloc() failed\n");
+		goto error;
+	}
 	memset(pkt_parsed, 0, sizeof(*pkt_parsed));
 
-	if (!dns_parse_header(pkt_parsed, &pkt_pos, &pkt_len)) goto error;
+	if (!dns_parse_header(pkt_parsed, &pkt_pos, &pkt_len))
+	{
+		DPRINT("dns_parse(): dns_parse_header() failed\n");
+		goto error;
+	}
 
 	pkt_parsed->questions = dns_parse_question_section(pkt_parsed->header.qdcount, &pkt_pos, &remaining_len);
-	if (!pkt_parsed->questions) goto error;
-	if (!dns_parse_answer_section_into(&pkt_parsed->answers, pkt_parsed->header.ancount, &pkt_pos, &remaining_len)) goto error;
-	if (!dns_parse_answer_section_into(&pkt_parsed->authority, pkt_parsed->header.nscount, &pkt_pos, &remaining_len)) goto error;
-	if (!dns_parse_answer_section_into(&pkt_parsed->additional, pkt_parsed->header.arcount, &pkt_pos, &remaining_len)) goto error;
+	if (!pkt_parsed->questions)
+	{
+		DPRINT("dns_parse(): dns_parse_question_section() failed\n");
+		goto error;
+	}
+
+	if (!dns_parse_answer_section_into(&pkt_parsed->answers, pkt_parsed->header.ancount, &pkt_pos, &remaining_len, pkt_buff))
+	{
+		DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
+		goto error;
+	}
+	if (!dns_parse_answer_section_into(&pkt_parsed->authority, pkt_parsed->header.nscount, &pkt_pos, &remaining_len, pkt_buff))
+	{
+		DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
+		goto error;
+	}
+	if (!dns_parse_answer_section_into(&pkt_parsed->additional, pkt_parsed->header.arcount, &pkt_pos, &remaining_len, pkt_buff))
+	{
+		DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
+		goto error;
+	}
 
 	return (pkt_parsed);
 
@@ -133,7 +162,7 @@ error:
 
 int
 dns_parse_answer(struct dns_answer **out, uint8_t **buf_pos,
-		size_t *remaining_len)
+		size_t *remaining_len, uint8_t *buf_start)
 {
 	assert(out);
 
@@ -154,37 +183,46 @@ dns_parse_answer(struct dns_answer **out, uint8_t **buf_pos,
 		ans = new_dns_answer();
 		if (NULL == ans) goto error;
 
+		/* Check if name is a literal string or a pointer */
 		if (*buf_pos[0] & 0xC0)
 		{
-			/* TODO: Handle PTR */
+			uint16_t ptr;
+			if (!byte_array_read_uint16(&ptr, buf_pos, remaining_len)) goto error;
+			ptr &= 0x3FFF;	/* Clear top two bits */
+
+			/* Don't want to increment our main buffer pointer, etc because
+			 * label is located in an area we have read previously */
+			uint8_t *ptr_ptr = &(buf_start[ptr]);
+			size_t buf_len = MAX_PKT_SIZE;
+
+			ans->name = dns_parse_name(&ptr_ptr, &buf_len);
+			if (!(ans->name)) goto error;
+
 		}
 		else
 		{
 			ans->name = dns_parse_name(buf_pos, remaining_len);
 			if (NULL == ans->name) goto error;
-
-			if (!byte_array_read_uint16(&(ans->type), buf_pos, remaining_len)) goto error;
-			if (!byte_array_read_uint16(&(ans->class), buf_pos, remaining_len)) goto error;
-			if (!byte_array_read_uint32(&(ans->ttl), buf_pos, remaining_len)) goto error;
-			if (!byte_array_read_uint16(&(ans->rdlength), buf_pos, remaining_len)) goto error;
-
-			if (ans->rdlength > *remaining_len) goto error;
-
-			/* TODO: RDATA is one of the few places where a failure
-			 * to parse could be ignored, as the length is known. */
-
-			/* rdata has a separate length field so set up a smaller
-			 * limit for it */
-			uint8_t *rdata_pos = *buf_pos;
-			size_t rdata_remaining_len = ans->rdlength;
-
-			if (!dns_parse_rdata(&ans, ans->type, &rdata_pos, &rdata_remaining_len)) goto error;
-
-			/* since everything worked out, now update the "master"
-			 * pointer and remainder */
-			(*buf_pos) += ans->rdlength;
-			(*remaining_len) -= ans->rdlength;
 		}
+
+		if (!byte_array_read_uint16(&(ans->type), buf_pos, remaining_len)) goto error;
+		if (!byte_array_read_uint16(&(ans->class), buf_pos, remaining_len)) goto error;
+		if (!byte_array_read_uint32(&(ans->ttl), buf_pos, remaining_len)) goto error;
+		if (!byte_array_read_uint16(&(ans->rdlength), buf_pos, remaining_len)) goto error;
+
+		if (ans->rdlength > *remaining_len) goto error;
+
+		/* rdata has a separate length field so set up a smaller
+		 * limit for it */
+		uint8_t *rdata_pos = *buf_pos;
+		size_t rdata_remaining_len = ans->rdlength;
+
+		if (!dns_parse_rdata(&ans, ans->type, &rdata_pos, &rdata_remaining_len)) goto error;
+
+		/* since everything worked out, now update the "master"
+		 * pointer and remainder */
+		(*buf_pos) += ans->rdlength;
+		(*remaining_len) -= ans->rdlength;
 	}
 
 	*out = ans;
@@ -199,7 +237,7 @@ error:
 
 struct dns_answer *
 dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
-		size_t *remaining_len)
+		size_t *remaining_len, uint8_t *buf_start)
 {
 	assert(buf_pos);
 	assert(*buf_pos);
@@ -212,7 +250,7 @@ dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
 	for (i = 0; i < num_answers; i++)
 	{
 		struct dns_answer *new_answer = NULL;
-		if (!dns_parse_answer(&new_answer, buf_pos, remaining_len)) goto error;
+		if (!dns_parse_answer(&new_answer, buf_pos, remaining_len, buf_start)) goto error;
 
 		if (NULL == last_answer)
 			first_answer = last_answer = new_answer;
@@ -232,7 +270,8 @@ error:
 
 int
 dns_parse_answer_section_into(struct dns_answer **out,
-		uint16_t num_answers, uint8_t **buf_pos, size_t *remaining_len)
+		uint16_t num_answers, uint8_t **buf_pos, size_t *remaining_len,
+		uint8_t *buf_start)
 {
 	assert(out);
 	assert(buf_pos);
@@ -241,7 +280,8 @@ dns_parse_answer_section_into(struct dns_answer **out,
 
 	if (num_answers > 0)
 	{
-		*out = dns_parse_answer_section(num_answers, buf_pos, remaining_len);
+		*out = dns_parse_answer_section(num_answers, buf_pos, remaining_len,
+				buf_start);
 		if (NULL == *out) goto error;
 	}
 
