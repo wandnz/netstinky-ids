@@ -22,13 +22,14 @@
 #ifndef IO_TASK_H_
 #define IO_TASK_H_
 
-/* Represents tasks that require reading or writing of the file descriptor. */
-typedef int (*ids_io_read)(struct io_task *task_state);
-typedef int (*ids_io_write)(struct io_task *task_state);
-
 /* Any information required about the state of the task. This will be passed to
  * the on_read and on_write callbacks. */
 typedef void *TASK_STRUCT;
+
+/* Represents tasks that require reading or writing of the file descriptor. */
+typedef int (*ids_io_read)(TASK_STRUCT task_state);
+typedef int (*ids_io_write)(TASK_STRUCT task_state);
+typedef void (*ids_io_free)(TASK_STRUCT *task_state);
 
 /* Linked list of tasks. */
 struct io_task;
@@ -44,8 +45,7 @@ void
 free_io_task_fdsets(struct io_task_fdsets **fdsets);
 
 int
-io_task_add(struct io_task **list, int fd, TASK_STRUCT task,
-		ids_io_read on_read, ids_io_write on_write);
+io_task_add(struct io_task **list, struct io_task *task);
 
 struct io_task *
 io_task_contains(struct io_task *first, int fd);
@@ -67,7 +67,8 @@ struct io_task_fdsets *
 io_task_select(struct io_task *task);
 
 struct io_task *
-new_io_task();
+new_io_task(int fd, TASK_STRUCT task_state, ids_io_read do_read, ids_io_write do_write,
+		ids_io_free do_free);
 
 struct io_task_fdsets *
 new_io_task_fdsets();

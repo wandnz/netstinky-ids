@@ -8,7 +8,10 @@
 #include "io_task.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/select.h>
+
 #include <assert.h>
 #include <errno.h>
 
@@ -26,6 +29,7 @@ struct io_task
 	/* functions to perform read/write tasks */
 	ids_io_read on_read;
 	ids_io_write on_write;
+	ids_io_free on_free;
 	struct io_task *next;
 };
 
@@ -42,6 +46,9 @@ struct io_task_fdsets
  * so they are not available to users */
 static inline int
 io_task_set_fd(struct io_task *task, int fd);
+
+static inline void
+io_task_set_on_free(struct io_task *task, ids_io_free on_free);
 
 static inline void
 io_task_set_on_read(struct io_task *task, ids_io_read on_read);
@@ -64,6 +71,7 @@ free_io_task(struct io_task **task)
 		/* iterate through the list */
 		struct io_task *temp = task_iter;
 		task_iter = task_iter->next;
+		if (temp->on_free) temp->on_free(&(temp->task_state));
 		free(temp);
 	}
 
@@ -85,7 +93,7 @@ io_task_add(struct io_task **list, struct io_task *task)
 	assert(task);
 
 	/* check for duplicates */
-	if (!io_task_contains(*list, task->fd))
+	if (io_task_contains(*list, task->fd))
 	{
 		DPRINT("add_ids_io_task: list already contains task with fd=%d\n", task->fd);
 		goto error;
@@ -144,10 +152,11 @@ io_task_do_io(struct io_task *task, struct io_task_fdsets *fdsets)
 			if (task->on_read && FD_ISSET(task->fd, &(fdsets->read_fdset))) task->on_read(task->task_state);
 			if (task->on_write && FD_ISSET(task->fd, &(fdsets->write_fdset))) task->on_write(task->task_state);
 
-			if (FD_ISSET(task->fd, &(fdsets->except_fdset)))
+			/*if (FD_ISSET(task->fd, &(fdsets->except_fdset)))
 			{
 				DPRINT("An exceptional condition occurred for fd: %d\n", task->fd);
-			}
+			}*/
+			task = task->next;
 		}
 	}
 }
@@ -162,10 +171,10 @@ io_task_get_fdsets(struct io_task *task)
 		{
 			/* Add to read/write set if there is a function to handle that
 			 * operation */
-			if (task->on_read) FD_SET(task->fd, fdsets->read_fdset);
-			if (task->on_write) FD_SET(task->fd, fdsets->write_fdset);
+			if (task->on_read) FD_SET(task->fd, &(fdsets->read_fdset));
+			if (task->on_write) FD_SET(task->fd, &(fdsets->write_fdset));
 
-			FD_SET(task->fd, fdsets->except_fdset);
+			/*FD_SET(task->fd, &(fdsets->except_fdset));*/
 
 			task = task->next;
 		}
@@ -185,6 +194,7 @@ io_task_max_fd(struct io_task *task)
 	while (task)
 	{
 		if (task->fd > max_fd) max_fd = task->fd;
+		task = task->next;
 	}
 
 	return (max_fd);
@@ -195,7 +205,7 @@ struct io_task_fdsets *
 io_task_select(struct io_task *task)
 {
 	int max_fd = -1, select_result;
-	struct io_task_fdsets fdsets = NULL;
+	struct io_task_fdsets *fdsets = NULL;
 	struct timeval tv;
 
 	/* task may be NULL if list is empty */
@@ -268,13 +278,21 @@ io_task_set_fd(struct io_task *task, int fd)
 }
 
 static inline void
+io_task_set_on_free(struct io_task *task, ids_io_free on_free)
+{
+	assert(task);
+
+	if (task) task->on_free = on_free;
+}
+
+static inline void
 io_task_set_on_read(struct io_task *task, ids_io_read on_read)
 {
 	assert(task);
 
 	/* on_read may be NULL */
 
-	task->on_read = on_read;
+	if (task) task->on_read = on_read;
 }
 
 static inline void
@@ -284,7 +302,7 @@ io_task_set_on_write(struct io_task *task, ids_io_write on_write)
 
 	/* on_write may be NULL */
 
-	task->on_write = on_write;
+	if (task) task->on_write = on_write;
 }
 
 static inline void
@@ -301,18 +319,20 @@ io_task_set_task(struct io_task *task, TASK_STRUCT task_state)
 /* Get a point to a new zeroed ids_io_task structure or NULL if memory
  * allocation failed. */
 struct io_task *
-new_io_task(int fd, TASK_STRUCT task_state, ids_io_read read, ids_io_write write)
+new_io_task(int fd, TASK_STRUCT task_state, ids_io_read do_read, ids_io_write do_write,
+		ids_io_free do_free)
 {
 	/* At least one of read or write must be non-NULL */
-	assert(read || write);
+	assert(do_read || do_write);
 
 	struct io_task *task = malloc(sizeof(*task));
 	if (task)
 	{
 		if (!io_task_set_fd(task, fd)) goto error;
 		io_task_set_task(task, task_state);
-		io_task_set_on_read(read);
-		io_task_set_on_write(write);
+		io_task_set_on_read(task, do_read);
+		io_task_set_on_write(task, do_write);
+		io_task_set_on_free(task, do_free);
 		task->next = NULL;
 	}
 	return (task);
@@ -328,9 +348,9 @@ new_io_task_fdsets()
 	struct io_task_fdsets *fdsets = malloc(sizeof(*fdsets));
 	if (fdsets)
 	{
-		FD_ZERO(fdsets->read_fdset);
-		FD_ZERO(fdsets->write_fdset);
-		FD_ZERO(fdsets->except_fdset);
+		FD_ZERO(&(fdsets->read_fdset));
+		FD_ZERO(&(fdsets->write_fdset));
+		FD_ZERO(&(fdsets->except_fdset));
 	}
 	return (fdsets);
 }

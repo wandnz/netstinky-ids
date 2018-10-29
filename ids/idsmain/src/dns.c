@@ -53,7 +53,7 @@ dns_compare_names(uint8_t *a, uint8_t *b)
 {
 	/* domain names must be compared case-insensitively */
 	/* TODO: Determine if this is safe to use */
-	int r = strcasecmp(a, b);
+	int r = strcasecmp((char *)a, (char *)b);
 	return (r);;
 }
 
@@ -73,7 +73,7 @@ dns_domain_to_name(char *domain)
 	name = malloc(name_len);
 	if (!name) goto error;
 
-	uint8_t *name_pos = name;
+	uint8_t *name_pos = (uint8_t *)name;
 	cpy = strdup(domain);
 	if (!cpy) goto error;
 
@@ -85,7 +85,7 @@ dns_domain_to_name(char *domain)
 
 		*name_pos = token_len;
 		name_pos++, name_len--;
-		int r = snprintf(name_pos, name_len, "%s", token);
+		int r = snprintf((char *)name_pos, name_len, "%s", token);
 		if (r < 0) goto error;
 
 		/* the NULL terminator should be written over with the next
@@ -95,7 +95,7 @@ dns_domain_to_name(char *domain)
 	}
 
 	free(cpy);
-	return (name);
+	return ((uint8_t *)name);
 
 error:
 	if (name) free(name);
@@ -440,13 +440,13 @@ dns_parse_rdata(struct dns_answer **out, enum dns_qtype type,
 	case(SOA):
 		(*out)->rdata.soa.mname = dns_parse_name(pos_ptr, remaining_len);
 		if (!(*out)->rdata.soa.mname) return (0);
-		size_t name_len = strlen((*out)->rdata.soa.mname);
+		size_t name_len = strlen((char *)((*out)->rdata.soa.mname));
 		pos_ptr += name_len;
 		remaining_len -= name_len;
 
 		(*out)->rdata.soa.rname = dns_parse_name(pos_ptr, remaining_len);
 		if (!(*out)->rdata.soa.rname) return (0);
-		name_len = strlen((*out)->rdata.soa.rname);
+		name_len = strlen((char *)((*out)->rdata.soa.rname));
 		pos_ptr += name_len;
 		remaining_len -= name_len;
 

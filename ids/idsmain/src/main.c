@@ -10,7 +10,10 @@
 #include <stdio.h>
 #include <ctype.h>
 
+#include "iface.h"
 #include "linked_list.h"
+#include "io_task.h"
+#include "mdns_io_task.h"
 
 /* -- DEBUGGING -- */
 #define DEBUG 1
@@ -20,7 +23,11 @@
 const static char *getopt_args = "hp:i:";
 const static char *getopt_usage = "\nRun as: %s -p port -i device1 -i device2 -i devicen.\n\n";
 
+/* A list of interface names taken from the command line */
 struct linked_list *iface_list = NULL;
+
+/* Server port which will send clients a list of recent detected intrusions */
+static int server_port = -1;
 
 /*
  * Free all the global variables prior to exiting the program.
@@ -38,9 +45,8 @@ int
 parse_args(int argc, char **argv)
 {
 	char *program = NULL;
-	int option_char, port, iface_num = 0, success = 1;
+	int option_char, iface_num = 0, success = 1;
 
-	if (argv) DPRINT("parse_args(%d, %x)\n", argc, argv);
 	if (argc < 1) return (0);
 
 	program = argv[0];
@@ -76,15 +82,15 @@ parse_args(int argc, char **argv)
 				}
 
 				/* -p must be given a port number > 0 */
-				port = atoi(optarg);
-				if (port <= 0)
+				server_port = atoi(optarg);
+				if (server_port <= 0)
 				{
 					fprintf(stderr, "-p was given an invalid argument: %s\n",
 							optarg);
 					success = 0;
 				}
 
-				DPRINT("Argument -p (port number): %d\n", port);
+				DPRINT("Argument -p (port number): %d\n", server_port);
 				break;
 
 			/* in case option that was not expected arrives or last option did
@@ -115,7 +121,7 @@ parse_args(int argc, char **argv)
 	}
 
 	/* check every required option has been received */
-	if (port <= 0)
+	if (server_port <= 0)
 	{
 		fprintf(stderr, "Required argument -p not received\n");
 		success = 0;
@@ -137,6 +143,20 @@ main(int argc, char **argv)
 	{
 		DPRINT("parse_args() failed\n");
 		exit(EXIT_FAILURE);
+	}
+
+	print_network_interfaces(stdout);
+
+	struct io_task *tasks = NULL;
+	struct io_task *mdns_task = mdns_io_task_setup();
+	if (mdns_task && !io_task_add(&tasks, mdns_task))
+		DPRINT("io_task_add() failed\n");
+
+	DPRINT("Waiting for MDNS packets.\n");
+	while (1)
+	{
+		struct io_task_fdsets *fdset = io_task_select(tasks);
+		io_task_do_io(tasks, fdset);
 	}
 
 	exit(EXIT_SUCCESS);
