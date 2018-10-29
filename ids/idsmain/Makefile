@@ -24,6 +24,8 @@ define Package/idsmain/description
   The NetStinky main process.
 endef
 
+CONFIGURE_ARGS+= --enable-getifaddrs
+
 # Package preparation instructions; create the build directory and copy the source code.
 # The last command is necessary to ensure our preparation instructions remain compatible with the patching system.
 define Build/Prepare
