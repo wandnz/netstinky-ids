@@ -18,6 +18,7 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
+#include "ip_blacklist.h"
 #include "dns.h"
 #include "ids_pcap.h"
 
@@ -109,7 +110,14 @@ error:
 }
 
 int
-ids_pcap_read_packet(pcap_t *p)
+ids_pcap_lookup_ip(ip_blacklist *b, ip4_addr a)
+{
+	assert(b);
+	return (ip_blacklist_lookup(b, a));
+}
+
+int
+ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
 {
 	struct pcap_pkthdr *pcap_hdr = NULL;
 	const u_char *pcap_data = NULL;
@@ -123,8 +131,6 @@ ids_pcap_read_packet(pcap_t *p)
 
 	uint8_t *payload_pos = NULL;
 	struct in_addr ip_addr;
-
-	int data_iter;
 
 	/* Get next packet */
 	if (PCAP_ERROR == pcap_next_ex(p, &pcap_hdr, &pcap_data))
@@ -176,6 +182,13 @@ ids_pcap_read_packet(pcap_t *p)
 
 				DPRINT("ids_pcap_read_packet(): checking blacklist for IP address %s\n",
 						inet_ntoa(ip_addr));
+
+				/* Convert to host byte order */
+				ip4_addr ip4 = ntohl(ip_addr.s_addr);
+				if (ip_blacklist_lookup(b, ip4))
+				{
+					DPRINT("WARNING: DANGEROUS IP\n");
+				}
 
 				break;
 			case 17:

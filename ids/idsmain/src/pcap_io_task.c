@@ -12,6 +12,7 @@
 #include "ids_pcap.h"
 #include "io_task.h"
 #include "pcap_io_task.h"
+#include "ip_blacklist.h"
 
 /* -- DEBUGGING -- */
 #define DEBUG 1
@@ -21,6 +22,7 @@ struct pcap_io_task_state
 {
 	int fd;
 	pcap_t *p;
+	ip_blacklist *ip_bl;
 };
 
 int
@@ -48,7 +50,7 @@ int
 pcap_io_task_read(TASK_STRUCT state)
 {
 	struct pcap_io_task_state *s = (struct pcap_io_task_state *)state;
-	if (!ids_pcap_read_packet(s->p))
+	if (!ids_pcap_read_packet(s->p, s->ip_bl))
 	{
 		DPRINT("pcap_io_task_read(): ids_pcap_read_packet() failed\n");
 		return (0);
@@ -58,11 +60,15 @@ pcap_io_task_read(TASK_STRUCT state)
 }
 
 struct io_task *
-pcap_io_task_setup(const char *if_name)
+pcap_io_task_setup(const char *if_name, ip_blacklist *b)
 {
+	assert(if_name);
+	assert(b);
+
 	int pcap_fd = -1;
 	struct pcap_io_task_state *state = NULL;
 	struct io_task *task = NULL;
+
 
 	if (!(state = malloc(sizeof(*state))))
 	{
@@ -89,6 +95,8 @@ pcap_io_task_setup(const char *if_name)
 		DPRINT("pcap_io_task_setup(): new_io_task() failed\n");
 		goto error;
 	}
+
+	state->ip_bl = b;
 
 	return (task);
 

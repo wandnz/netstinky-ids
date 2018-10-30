@@ -15,6 +15,7 @@
 #include "io_task.h"
 #include "mdns_io_task.h"
 #include "pcap_io_task.h"
+#include "ip_blacklist.h"
 
 /* -- DEBUGGING -- */
 #define DEBUG 1
@@ -33,6 +34,9 @@ static int server_port = -1;
 /* IO tasks to be performed in event loop. */
 struct io_task *tasks = NULL;
 
+/* Blacklist */
+ip_blacklist *ip_bl = NULL;
+
 /*
  * Free all the global variables prior to exiting the program.
  */
@@ -45,6 +49,7 @@ on_exit_callback()
 	 * doesn't need to be checked. */
 	free_linked_list(&iface_list, NULL);
 	free_io_task(&tasks);
+	free_ip_blacklist(&ip_bl);
 }
 
 int
@@ -137,6 +142,17 @@ parse_args(int argc, char **argv)
 }
 
 int
+setup_blacklists()
+{
+	ip_bl = new_ip_blacklist();
+	if (!ip_bl) return (0);
+
+
+
+	return (1);
+}
+
+int
 main(int argc, char **argv)
 {
 	struct io_task *mdns_task = NULL, *pcap_task = NULL;
@@ -155,6 +171,11 @@ main(int argc, char **argv)
 	}
 
 	print_network_interfaces(stdout);
+	if (!setup_blacklists())
+	{
+		DPRINT("setup_blacklists() failed\n");
+		exit(EXIT_FAILURE);
+	}
 
 	mdns_task = mdns_io_task_setup();
 	if (mdns_task && !io_task_add(&tasks, mdns_task))
@@ -162,7 +183,7 @@ main(int argc, char **argv)
 
 	for (iter = iface_list; iter; iter = iter->next)
 	{
-		pcap_task = pcap_io_task_setup((char *)iter->item);
+		pcap_task = pcap_io_task_setup((char *)iter->item, ip_bl);
 		if (!pcap_task || !io_task_add(&tasks, pcap_task))
 			DPRINT("io_task_add() failed\n");
 	}
