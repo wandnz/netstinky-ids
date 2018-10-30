@@ -5,6 +5,7 @@
  *      Author: mfletche
  */
 
+#include <stdlib.h>
 #include <assert.h>
 #include <pcap/pcap.h>
 
@@ -24,7 +25,7 @@
 #define DEBUG 1
 #define DPRINT(...) do { if (DEBUG) fprintf(stdout, __VA_ARGS__); } while (0)
 
-static const char *pcap_filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0)";
+static const char *pcap_filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0 and tcp[tcpflags] & tcp-ack == 0)";
 static const int promisc_enabled = 0;
 static const int immediate_mode_enabled = 1;
 
@@ -123,6 +124,8 @@ ids_pcap_read_packet(pcap_t *p)
 	uint8_t *payload_pos = NULL;
 	struct in_addr ip_addr;
 
+	int data_iter;
+
 	/* Get next packet */
 	if (PCAP_ERROR == pcap_next_ex(p, &pcap_hdr, &pcap_data))
 	{
@@ -164,17 +167,10 @@ ids_pcap_read_packet(pcap_t *p)
 		{
 			case 6:
 				DPRINT("ids_pcap_read_packet(): tcp packet\n");
-				tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*ip_hdr));
+				tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*eth_hdr) + sizeof(*ip_hdr));
 
-				/* This assert was failing so allow packets through
-				 * while I work out what is wrong */
-				/* assert(tcp_hdr->th_flags & TH_SYN); */
-				if (!(tcp_hdr->th_flags & TH_SYN))
-				{
-					DPRINT("ids_pcap_read_packet(): tcp packet did not have SYN flag set\n");
-					goto error;
-				}
-
+				/* Check header is correct */
+				assert((tcp_hdr->th_flags & TH_SYN) && !(tcp_hdr->th_flags & TH_ACK));
 				ip_addr = ip_hdr->ip_dst;
 				/* TODO: Send to blacklist */
 
