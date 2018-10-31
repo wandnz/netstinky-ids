@@ -14,6 +14,8 @@
 #include "pcap_io_task.h"
 #include "ip_blacklist.h"
 
+#include "ids_event_queue.h"
+
 /* -- DEBUGGING -- */
 #define DEBUG 1
 #define DPRINT(...) do { if (DEBUG) fprintf(stdout, __VA_ARGS__); } while (0)
@@ -22,7 +24,10 @@ struct pcap_io_task_state
 {
 	int fd;
 	pcap_t *p;
+	char *iface;
 	ip_blacklist *ip_bl;
+	/* TODO: Add dns blacklist */
+	struct ids_event_list *event_queue;
 };
 
 int
@@ -50,17 +55,21 @@ int
 pcap_io_task_read(TASK_STRUCT state)
 {
 	struct pcap_io_task_state *s = (struct pcap_io_task_state *)state;
-	if (!ids_pcap_read_packet(s->p, s->ip_bl))
+	struct ids_pcap_fields f;
+	f.iface = s->iface;
+	if (!ids_pcap_read_packet(s->p, &f))
 	{
 		DPRINT("pcap_io_task_read(): ids_pcap_read_packet() failed\n");
 		return (0);
 	}
 
+	ids_pcap_check(&f, s->ip_bl, s->event_queue);
+
 	return (1);
 }
 
 struct io_task *
-pcap_io_task_setup(const char *if_name, ip_blacklist *b)
+pcap_io_task_setup(char *if_name, ip_blacklist *b)
 {
 	assert(if_name);
 	assert(b);
@@ -75,6 +84,8 @@ pcap_io_task_setup(const char *if_name, ip_blacklist *b)
 		DPRINT("pcap_io_task_setup(%s): malloc() failed\n", if_name);
 		goto error;
 	}
+
+	state->iface = if_name;
 
 	if (!(state->p = ids_pcap_get_pcap(if_name)))
 	{
