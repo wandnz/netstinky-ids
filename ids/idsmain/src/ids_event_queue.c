@@ -40,6 +40,7 @@ struct ids_event
 	uint32_t src_ip;
 	char *ioc;	/* may be a stringify-ed IP address or domain */
 	struct ids_event *next;
+	struct ids_event *previous;
 };
 
 void
@@ -138,6 +139,7 @@ ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
 				/* Add to head of list */
 				list->head = e;
 				e->next = head;
+				head->previous = e;
 
 				ids_event_list_remove_old_events(list);
 			}
@@ -225,6 +227,9 @@ new_ids_event(char *iface, uint32_t src_ip, char *ioc)
 		e->iface = iface;
 		e->src_ip = src_ip;
 		e->ioc = ioc;
+
+		e->next = NULL;
+		e->previous = NULL;
 	}
 
 	return (e);
