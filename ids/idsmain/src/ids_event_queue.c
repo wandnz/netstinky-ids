@@ -41,6 +41,21 @@ struct ids_event
 	struct ids_event *previous;
 };
 
+/**
+ * Add a timestamp to the front of a list of times.
+ * @param list The address of a pointer to the head of the list. May not be
+ * NULL but *list may be NULL.
+ * @param tm The timestamp to add to the list.
+ * @return 1 if successful, 0 if unsuccessful.
+ */
+int
+ids_event_time_list_add(struct ids_event_list *list, struct ids_event *event,
+		struct ids_event_time *tm);
+
+void
+ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
+		struct ids_event_time *tm_list);
+
 void
 free_ids_event(struct ids_event **e)
 {
@@ -119,7 +134,7 @@ ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
 		{
 			/* Don't add a completely new entry, just add the timestamp to the
 			 * list inside the existing event */
-			if (ids_event_time_list_add(&(existing->times_seen), e->times_seen))
+			if (ids_event_time_list_add(list, existing, e->times_seen))
 			{
 				/* Move existing event to the front of the queue. */
 				existing->previous->next = existing->next;
@@ -174,7 +189,7 @@ ids_event_list_enforce_max_events(struct ids_event_list *list)
 	{
 		tail = list->head;
 
-		for (i = 0; i < list->max_events; i++)
+		for (i = 0; i < num_steps; i++)
 		{
 			if (!tail) return;
 			tail = tail->next;
@@ -186,29 +201,21 @@ ids_event_list_enforce_max_events(struct ids_event_list *list)
 }
 
 int
-ids_event_time_list_add(struct ids_event_time **list, struct ids_event_time *tm)
+ids_event_time_list_add(struct ids_event_list *list, struct ids_event *event,
+		struct ids_event_time *tm)
 {
 	assert(list);
+	assert(event);
 	assert(tm);
 
-	struct ids_event_time *head = *list;
 	int result = 0;
 
-	if (list && tm)
+	if (list && event && tm)
 	{
-		if (*list)
-		{
-			*list = tm;
-			tm->next = head;
+		tm->next = event->times_seen;
+		event->times_seen = tm;
 
-			ids_event_time_list_enforce_max_timestamps(*list);
-
-			result = 1;
-		}
-		else
-		{
-			*list = tm;
-		}
+		ids_event_time_list_enforce_max_timestamps(list, event->times_seen);
 
 		result = 1;
 	}

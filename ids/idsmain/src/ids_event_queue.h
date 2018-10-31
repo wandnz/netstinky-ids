@@ -63,16 +63,6 @@ void
 ids_event_list_enforce_max_events(struct ids_event_list *list);
 
 /**
- * Add a timestamp to the front of a list of times.
- * @param list The address of a pointer to the head of the list. May not be
- * NULL but *list may be NULL.
- * @param tm The timestamp to add to the list.
- * @return 1 if successful, 0 if unsuccessful.
- */
-int
-ids_event_time_list_add(struct ids_event_time **list, struct ids_event_time *tm);
-
-/**
  * Creates a new IDS event with the attributes provided and a current
  * timestamp.
  * @param iface The name of the network interface which observed this event.

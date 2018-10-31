@@ -3,22 +3,22 @@
 size_t
 calcOffset (ELEMENT_SZ size, size_t numElements)
 {
-    return (size * numElements);
+    return size * numElements;
 }
 
-element_ptr
-getElement (void *array, ELEMENT_SZ size, element_index i)
+ELEMENT_PTR
+getElement (void *array, ELEMENT_SZ size, ELEMENT_INDEX i)
 {
     assert(array != NULL);
     assert(size > 0);
     
     char *element = (char *)array + calcOffset(size, i);
-    return ((element_ptr)element);
+    return (ELEMENT_PTR)element;
 }
 
 bool
 quicksort (void *array, ELEMENT_SZ size, COMPARE_F_PTR compare,
-           element_index lo, element_index hi)
+           ELEMENT_INDEX lo, ELEMENT_INDEX hi)
 {
     assert(array != NULL);
     assert(size > 0);
@@ -28,7 +28,7 @@ quicksort (void *array, ELEMENT_SZ size, COMPARE_F_PTR compare,
     
     if (lo < hi)
     {
-        element_index p = partition(array, size, compare, lo, hi);
+        ELEMENT_INDEX p = partition(array, size, compare, lo, hi);
         
         // possible for sort to fail if swapping doesn't have enough memory
         if (p == -1 || !quicksort(array, size, compare, lo, p) ||
@@ -36,19 +36,19 @@ quicksort (void *array, ELEMENT_SZ size, COMPARE_F_PTR compare,
             result = false;
     }
     
-    return (result);
+    return result;
 }
 
 bool
-swapElements (void *array, ELEMENT_SZ size, element_index a, element_index b)
+swapElements (void *array, ELEMENT_SZ size, ELEMENT_INDEX a, ELEMENT_INDEX b)
 {
     bool success = false;
-    element_ptr t = malloc(size);
+    ELEMENT_PTR t = malloc(size);
     
     if (t != NULL)
     {
-        element_ptr aPtr = getElement(array, size, a);
-        element_ptr bPtr = getElement(array, size, b);
+        ELEMENT_PTR aPtr = getElement(array, size, a);
+        ELEMENT_PTR bPtr = getElement(array, size, b);
         memcpy(t, aPtr, size);
         memcpy(aPtr, bPtr, size);
         memcpy(bPtr, t, size);
@@ -56,12 +56,12 @@ swapElements (void *array, ELEMENT_SZ size, element_index a, element_index b)
         success = true;
     }
     
-    return (success);
+    return success;
 }
 
-element_index
-partition(void *array, ELEMENT_SZ size, COMPARE_F_PTR compare, element_index lo,
-          element_index hi)
+ELEMENT_INDEX
+partition(void *array, ELEMENT_SZ size, COMPARE_F_PTR compare, ELEMENT_INDEX lo,
+          ELEMENT_INDEX hi)
 {
     assert(array != NULL);
     assert(size > 0);
@@ -69,11 +69,11 @@ partition(void *array, ELEMENT_SZ size, COMPARE_F_PTR compare, element_index lo,
     void *pivotValue = malloc(size);
     memcpy(pivotValue, getElement(array, size, lo), size);
     
-    element_index i, j;
+    ELEMENT_INDEX i, j;
     i = lo - 1;
     j = hi + 1;
     
-    element_index result;
+    ELEMENT_INDEX result;
     
     // find out of order elements on each side of the pivot and swap them
     while (1)
@@ -96,7 +96,7 @@ partition(void *array, ELEMENT_SZ size, COMPARE_F_PTR compare, element_index lo,
             break;
         } else
         {        
-            element_index swapResult = swapElements(array, size, i, j);
+            ELEMENT_INDEX swapResult = swapElements(array, size, i, j);
 
             // check swap was successful
             if (swapResult == -1)
@@ -108,5 +108,5 @@ partition(void *array, ELEMENT_SZ size, COMPARE_F_PTR compare, element_index lo,
     }
     
     free(pivotValue);
-    return (result);
+    return result;
 }

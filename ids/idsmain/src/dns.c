@@ -66,7 +66,7 @@ dns_name_to_readable(uint8_t *name)
 {
 	assert(name);
 
-	size_t name_len = strlen(name), remaining = name_len;
+	size_t name_len = strlen((char *)name), remaining = name_len;
 	char *readable = NULL, *readable_pos = NULL;
 	uint8_t *label_ptr = name;
 	size_t label_len = 0;

@@ -9,11 +9,11 @@
 #include <string.h>
 #include <assert.h>
 
-typedef void *element_ptr;
+typedef void *ELEMENT_PTR;
 typedef size_t ELEMENT_SZ;  // Size of each element in bytes
-typedef unsigned int element_index;   // Index of element within the array
+typedef int ELEMENT_INDEX;   // Index of element within the array
 
-typedef int (*COMPARE_F_PTR)(element_ptr, element_ptr);
+typedef int (*COMPARE_F_PTR)(ELEMENT_PTR, ELEMENT_PTR);
 
 /**
  * Quicksorts an array. If the user is calling this function lo should be the
@@ -35,7 +35,7 @@ typedef int (*COMPARE_F_PTR)(element_ptr, element_ptr);
  */
 bool
 quicksort (void *array, ELEMENT_SZ size, COMPARE_F_PTR compare,
-           element_index lo, element_index hi);
+           ELEMENT_INDEX lo, ELEMENT_INDEX hi);
 
 /**
  * Using the element at LO as the pivot point, sorts the partition into elements
@@ -48,9 +48,9 @@ quicksort (void *array, ELEMENT_SZ size, COMPARE_F_PTR compare,
  * @param hi        Index of the last element in this partition
  * @return          True if the sort succeeded
  */
-element_index
+ELEMENT_INDEX
 partition (void *array, ELEMENT_SZ size, COMPARE_F_PTR compare,
-           element_index lo, element_index hi);
+           ELEMENT_INDEX lo, ELEMENT_INDEX hi);
 
 /**
  * Calculates the offset from a pointer (in bytes) given the size of the

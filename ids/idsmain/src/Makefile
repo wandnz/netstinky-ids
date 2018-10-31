@@ -1,14 +1,16 @@
-all: idsmain
-
 CC = gcc
 CFLAGS = -Wall
 LDFLAGS = -lpcap
 
 TARGET_CFLAGS += -ggdb3
 
-DEPS = $(wildcard *.h)
-SRC = $(wildcard *.c)
+SUBDIRS = data_structures/ebvbl
+
+DEPS = $(wildcard *.h) $(wildcard $(SUBDIRS)/*.h)
+SRC = $(wildcard *.c) $(wildcard $(SUBDIRS)/*.c)
 OBJ = $(patsubst %.c, %.o, $(SRC))
+
+all: idsmain $(SUBDIRS)
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -16,7 +18,7 @@ OBJ = $(patsubst %.c, %.o, $(SRC))
 idsmain: $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 	
-.PHONY: clean
+.PHONY: clean $(SUBDIRS)
 
 clean:
 	rm -f idsmain *.o
