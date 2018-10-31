@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-typedef uint32_t ip4_addr;
+#include "firehol_ip_blacklist.h"
 
 /* Do not want other modules to depend on ebvbl */
 typedef struct ebvbl ip_blacklist;
@@ -18,7 +18,11 @@ typedef struct ebvbl ip_blacklist;
 void
 free_ip_blacklist(ip_blacklist **b);
 
-int ip_blacklist_lookup(ip_blacklist *b, ip4_addr a);
+int
+ip_blacklist_add(ip_blacklist *b, uint32_t a);
+
+int
+ip_blacklist_lookup(ip_blacklist *b, uint32_t addr);
 
 ip_blacklist *
 new_ip_blacklist();
