@@ -62,10 +62,12 @@ sa_free(struct sorted_array **sa, element_free e_free)
 	assert(NULL != *sa);
 	/* e_free can be NULL */
 
+	int i = 0;
+
     /* Free elements first, if required. */
     if (e_free != NULL)
     {
-        for (int i = 0; i < (*sa)->element_num; i++)
+        for (i = 0; i < (*sa)->element_num; i++)
         {
             e_free(sa_get_element(*sa, i));
         }
