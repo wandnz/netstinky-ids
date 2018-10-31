@@ -8,7 +8,10 @@ PKG_RELEASE:=1
 
 # Source settings (i.e. where to find the source codes)
 # This is a custom variable, used below
-SOURCE_DIR:=/packages/ids/idsmain/src
+#PKG_SOURCE:=/packages/idsmain.tar.gz
+
+# Try to force recursive copying
+SOURCE_DIR:= -r /packages/ids/idsmain/src
 
 include $(INCLUDE_DIR)/package.mk
 
