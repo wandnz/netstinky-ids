@@ -110,14 +110,14 @@ error:
 }
 
 int
-ids_pcap_lookup_ip(ip_blacklist *b, ip4_addr a)
+ids_pcap_lookup_ip(ip_blacklist *b, uint32_t a)
 {
 	assert(b);
 	return (ip_blacklist_lookup(b, a));
 }
 
 int
-ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
+ids_pcap_read_packet(pcap_t *p, struct ids_pcap_fields *out)
 {
 	struct pcap_pkthdr *pcap_hdr = NULL;
 	const u_char *pcap_data = NULL;
@@ -127,10 +127,8 @@ ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
 	struct tcphdr *tcp_hdr = NULL;
 	struct udphdr *udp_hdr = NULL;
 	struct dns_packet *dns_pkt = NULL;
-	struct dns_question *query = NULL;
 
 	uint8_t *payload_pos = NULL;
-	struct in_addr ip_addr;
 
 	/* Get next packet */
 	if (PCAP_ERROR == pcap_next_ex(p, &pcap_hdr, &pcap_data))
@@ -158,7 +156,7 @@ ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
 		eth_hdr = (struct ether_header *)pcap_data;
 
 		/* Not an error if not IP but not interested in it. */
-		if (ntohs(eth_hdr->ether_type) != ETHERTYPE_IP) return (1);
+		if (ntohs(eth_hdr->ether_type) != ETHERTYPE_IP) return (0);
 
 		if (pcap_hdr->len < (sizeof(*eth_hdr) + sizeof(*ip_hdr)))
 		{
@@ -168,6 +166,9 @@ ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
 		}
 		ip_hdr = (struct ip *)(pcap_data + sizeof(*eth_hdr));
 		DPRINT("ids_pcap_read_packet(): destination IP: %s\n", inet_ntoa(ip_hdr->ip_dst));
+		DPRINT("ids_pcap_read_packet(): source IP: %s\n", inet_ntoa(ip_hdr->ip_src));
+		out->dest_ip = ntohl(ip_hdr->ip_dst.s_addr);
+		out->src_ip = ntohl(ip_hdr->ip_src.s_addr);
 
 		switch (ip_hdr->ip_p)
 		{
@@ -177,19 +178,8 @@ ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
 
 				/* Check header is correct */
 				assert((tcp_hdr->th_flags & TH_SYN) && !(tcp_hdr->th_flags & TH_ACK));
-				ip_addr = ip_hdr->ip_dst;
-				/* TODO: Send to blacklist */
 
-				DPRINT("ids_pcap_read_packet(): checking blacklist for IP address %s\n",
-						inet_ntoa(ip_addr));
-
-				/* Convert to host byte order */
-				ip4_addr ip4 = ntohl(ip_addr.s_addr);
-				if (ip_blacklist_lookup(b, ip4))
-				{
-					DPRINT("WARNING: DANGEROUS IP\n");
-				}
-
+				out->domain = NULL;
 				break;
 			case 17:
 				DPRINT("ids_pcap_read_packet(): udp packet\n");
@@ -207,17 +197,8 @@ ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
 				/* Check if this is a query */
 				if (dns_pkt->header.qdcount)
 				{
-					for (query = dns_pkt->questions; query; query = query->next)
-					{
-						/* TODO: Look up query in blacklist */
-						char *readable_domain = dns_name_to_readable(query->qname);
-						if (readable_domain)
-						{
-							DPRINT("ids_pcap_read_packet(): checking blacklist for domain name: %s\n",
-									readable_domain);
-							free(readable_domain);
-						}
-					}
+					/* TODO: Check multiple questions */
+					out->domain = dns_name_to_readable(dns_pkt->questions->qname);
 				}
 
 				free_dns_packet(&dns_pkt);
@@ -234,4 +215,39 @@ ids_pcap_read_packet(pcap_t *p, ip_blacklist *b)
 error:
 	free_dns_packet(&dns_pkt);
 	return (0);
+}
+
+void
+ids_pcap_check(struct ids_pcap_fields *f, ip_blacklist *ip_bl, struct ids_event_list *events)
+{
+	struct in_addr src_ip_buf, dst_ip_buf;
+	src_ip_buf.s_addr = htonl(f->src_ip);
+	dst_ip_buf.s_addr = htonl(f->dest_ip);
+
+	char *src = strdup(inet_ntoa(src_ip_buf));
+
+	/* Can only have one inet_ntoa call per line because it will over-write the buffer */
+	DPRINT("%s -> %s: %s ", src, inet_ntoa(dst_ip_buf), f->domain);
+	free(src);
+
+	if (f->domain)
+	{
+		DPRINT("unchecked\n");
+	}
+	else
+	{
+		/* Convert to host byte order */
+		if (ip_blacklist_lookup(ip_bl, f->dest_ip))
+		{
+			DPRINT("DANGEROUS IP!!!\n");
+			if (!ids_event_list_add(events, new_ids_event(f->iface, f->src_ip, inet_ntoa(dst_ip_buf))))
+			{
+				DPRINT("Could not add address %s to the events list\n", inet_ntoa(dst_ip_buf));
+			}
+		}
+		else
+		{
+			DPRINT("safe\n");
+		}
+	}
 }
