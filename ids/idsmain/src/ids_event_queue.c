@@ -123,7 +123,15 @@ ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
 			 * list inside the existing event */
 			if (ids_event_time_list_add(&(existing->times_seen), e->times_seen))
 			{
-				/* TODO: Move event to the head of the list */
+				/* Move existing event to the front of the queue. */
+				existing->previous->next = existing->next;
+				existing->next->previous = existing->previous;
+
+				existing->previous = NULL;
+				existing->next = list->head;
+
+				list->head = existing;
+
 				/* Most of the ids_event is no longer needed, but don't free
 				 * the time */
 
