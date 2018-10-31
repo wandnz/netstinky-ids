@@ -16,8 +16,6 @@
 
 /* Both of these structures are linked lists. */
 
-/* TODO: Make sure that the max_lengths are enforced */
-
 struct ids_event_list
 {
 	struct ids_event *head;
@@ -149,7 +147,7 @@ ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
 				e->next = head;
 				head->previous = e;
 
-				ids_event_list_remove_old_events(list);
+				ids_event_list_enforce_max_events(list);
 			}
 			else
 			{
@@ -165,26 +163,25 @@ ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
 }
 
 void
-ids_event_list_remove_old_events(struct ids_event_list *list)
+ids_event_list_enforce_max_events(struct ids_event_list *list)
 {
 	assert(list);
 
-	int i = 0;
-	struct ids_event *it, *tail;
+	/* num_steps is number of next pointers to follow to get to tail */
+	int i = 0, num_steps = list->max_events - 1;
+	struct ids_event *tail;
 	if (list)
 	{
-		it = list->head;
-		if (list->num_events > list->max_events)
-		{
-			for (i = 0; i < list->max_events; i++)
-			{
-				tail = it;
-				it = it->next;
-			}
+		tail = list->head;
 
-			/* Remove all events older than tail */
-			free_ids_event(&(tail->next));
+		for (i = 0; i < list->max_events; i++)
+		{
+			if (!tail) return;
+			tail = tail->next;
 		}
+
+		/* Remove all events older than tail */
+		free_ids_event(&(tail->next));
 	}
 }
 
@@ -204,6 +201,8 @@ ids_event_time_list_add(struct ids_event_time **list, struct ids_event_time *tm)
 			*list = tm;
 			tm->next = head;
 
+			ids_event_time_list_enforce_max_timestamps(*list);
+
 			result = 1;
 		}
 		else
@@ -215,6 +214,32 @@ ids_event_time_list_add(struct ids_event_time **list, struct ids_event_time *tm)
 	}
 
 	return (result);
+}
+
+void
+ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
+		struct ids_event_time *tm_list)
+{
+	assert(list);
+	assert(tm_list);
+
+	int iter;
+	struct ids_event_time *tail = tm_list;
+
+	/* How many times to follow the next pointer */
+	unsigned int num_steps = list->max_timestamps - 1;
+
+	if (list && tm_list)
+	{
+		for (iter = 0; iter < num_steps; iter++)
+		{
+			if (!tail) return;
+			tail = tail->next;
+		}
+
+		/* Remove all timestamps after tail */
+		free_ids_event_time(&(tail->next));
+	}
 }
 
 struct ids_event *
@@ -251,12 +276,19 @@ error:
 struct ids_event_list *
 new_ids_event_list(unsigned int max_events, unsigned int max_timestamps)
 {
+	assert(max_events > 0);
+	assert(max_timestamps > 0);
+
 	struct ids_event_list *list;
-	if (NULL != (list = malloc(sizeof(*list))))
+
+	if (max_events > 0 && max_timestamps > 0)
 	{
-		list->head = NULL;
-		list->max_events = max_events;
-		list->max_timestamps = max_timestamps;
+		if (NULL != (list = malloc(sizeof(*list))))
+		{
+			list->head = NULL;
+			list->max_events = max_events;
+			list->max_timestamps = max_timestamps;
+		}
 	}
 
 	return (list);

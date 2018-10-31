@@ -60,7 +60,7 @@ struct ids_event *
 ids_event_list_contains(struct ids_event_list *list, struct ids_event *e);
 
 void
-ids_event_list_remove_old_events(struct ids_event_list *list);
+ids_event_list_enforce_max_events(struct ids_event_list *list);
 
 /**
  * Add a timestamp to the front of a list of times.
