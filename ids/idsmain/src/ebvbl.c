@@ -180,7 +180,7 @@ _set_bv_index(struct ebvbl *e, unsigned int i)
 {
     assert(e);
     assert(e->bv);
-    assert(i < ebvbl_get_bit_vector_size(e->bff));
+    assert(i < 8 * ebvbl_get_bit_vector_size(e->bff));
     
     unsigned int byte_i, bit_i;
     DIVIDEND_REMAINDER(byte_i, bit_i, i);
