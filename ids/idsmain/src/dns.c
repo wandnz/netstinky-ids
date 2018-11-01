@@ -52,6 +52,41 @@ count_questions(struct dns_question *qn_list)
 	return (count);
 }
 
+struct dns_answer *
+dns_answer_copy(struct dns_answer *a)
+{
+	struct dns_answer *copy = NULL;
+	if (a && (copy = malloc(sizeof(*copy))))
+	{
+		memcpy(copy, a, sizeof(*copy));
+		copy->next = NULL;
+	}
+
+	return (copy);
+}
+
+struct dns_answer *
+dns_answer_list_copy(struct dns_answer *a)
+{
+	struct dns_answer *copy_head = NULL, *copy_tail = NULL, *tmp = NULL;
+	while (a)
+	{
+		if (!(tmp = dns_answer_copy(a))) goto error;
+
+		if (!copy_head) copy_head = tmp;
+		if (copy_tail) copy_tail->next = tmp;
+		copy_tail = tmp;
+
+		a = a->next;
+	}
+
+	return (copy_head);
+
+error:
+	free_dns_answer(copy_head);
+	return (NULL);
+}
+
 int
 dns_compare_names(uint8_t *a, uint8_t *b)
 {
@@ -738,14 +773,17 @@ size_t dns_write(uint8_t *buf_ptr, size_t buf_len,
 	uint8_t *buf_pos = buf_ptr;
 	size_t remaining_len = buf_len;
 
-	if (!dns_write_header(&buf_pos, &remaining_len, pkt)) return (0);
+	if (!dns_write_header(&buf_pos, &remaining_len, pkt)) goto error;
 
-	dns_write_question_section(&buf_pos, &remaining_len, pkt);
-	dns_write_answer_section(&buf_pos, &remaining_len, pkt->answers, pkt->header.ancount);
-	dns_write_answer_section(&buf_pos, &remaining_len, pkt->authority, pkt->header.nscount);
-	dns_write_answer_section(&buf_pos, &remaining_len, pkt->additional, pkt->header.arcount);
+	if (!dns_write_question_section(&buf_pos, &remaining_len, pkt)) goto error;
+	if (!dns_write_answer_section(&buf_pos, &remaining_len, pkt->answers, pkt->header.ancount)) goto error;
+	if (!dns_write_answer_section(&buf_pos, &remaining_len, pkt->authority, pkt->header.nscount)) goto error;
+	if (!dns_write_answer_section(&buf_pos, &remaining_len, pkt->additional, pkt->header.arcount)) goto error;
 	ptrdiff_t packet_len = buf_pos - buf_ptr;
 	return (packet_len);
+
+error:
+	return (0);
 }
 
 int

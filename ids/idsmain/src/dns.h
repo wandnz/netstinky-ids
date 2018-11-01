@@ -186,6 +186,23 @@ struct rr_collection
  * would be easy to forget so I made that automatic.
  */
 
+/**
+ * Copy one or the entire linked list of DNS answers.
+ *
+ * @param a The answer to copy. If a single answer is to be copied
+ * the NEXT pointer of the output will be NULL.
+ * @return The copied answer or list of answers. NULL if the operation
+ * failed.
+ */
+struct dns_answer *
+dns_answer_copy(struct dns_answer *a);
+
+struct dns_answer *
+dns_answer_list_copy(struct dns_answer *a);
+
+int
+dns_compare_names(uint8_t *a, uint8_t *b);
+
 uint8_t *
 dns_domain_to_name(char *domain);
 
