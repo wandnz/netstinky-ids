@@ -56,14 +56,30 @@ pcap_io_task_read(TASK_STRUCT state)
 {
 	struct pcap_io_task_state *s = (struct pcap_io_task_state *)state;
 	struct ids_pcap_fields f;
+	struct in_addr ip;
+
 	f.iface = s->iface;
-	if (!ids_pcap_read_packet(s->p, &f))
+	int read_result;
+	if (-1 == (read_result = ids_pcap_read_packet(s->p, &f)))
 	{
 		DPRINT("pcap_io_task_read(): ids_pcap_read_packet() failed\n");
 		return (0);
 	}
+	else if (1 == read_result)
+	{
+		if (ids_pcap_is_blacklisted(&f, s->ip_bl))
+		{
+			ip.s_addr = htonl(f.dest_ip);
+			if (!ids_event_list_add(s->event_queue, new_ids_event(s->iface, f.src_ip,
+					f.domain ? f.domain : strdup(inet_ntoa(ip)))))
+			{
+				DPRINT("pcap_io_task_read(): ids_event_list_add() failed\n");
+				return (0);
+			}
 
-	ids_pcap_check(&f, s->ip_bl, s->event_queue);
+			DPRINT("pcap_io_task_read(): NEW DETECTED INTRUSION\n");
+		}
+	}
 
 	return (1);
 }

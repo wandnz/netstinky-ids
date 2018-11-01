@@ -216,11 +216,11 @@ ids_pcap_read_packet(pcap_t *p, struct ids_pcap_fields *out)
 
 error:
 	free_dns_packet(&dns_pkt);
-	return (0);
+	return (-1);
 }
 
-void
-ids_pcap_check(struct ids_pcap_fields *f, ip_blacklist *ip_bl, struct ids_event_list *events)
+int
+ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl)
 {
 	struct in_addr src_ip_buf, dst_ip_buf;
 	src_ip_buf.s_addr = htonl(f->src_ip);
@@ -234,22 +234,10 @@ ids_pcap_check(struct ids_pcap_fields *f, ip_blacklist *ip_bl, struct ids_event_
 
 	if (f->domain)
 	{
+		/* Check domain blacklist */
 		DPRINT("unchecked\n");
 	}
-	else
-	{
-		/* Convert to host byte order */
-		if (ip_blacklist_lookup(ip_bl, f->dest_ip))
-		{
-			DPRINT("DANGEROUS IP!!!\n");
-			if (!ids_event_list_add(events, new_ids_event(f->iface, f->src_ip, inet_ntoa(dst_ip_buf))))
-			{
-				DPRINT("Could not add address %s to the events list\n", inet_ntoa(dst_ip_buf));
-			}
-		}
-		else
-		{
-			DPRINT("safe\n");
-		}
-	}
+	else return (ip_blacklist_lookup(ip_bl, f->dest_ip));
+
+	return (0);
 }
