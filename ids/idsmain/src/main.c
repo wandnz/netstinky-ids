@@ -47,6 +47,7 @@ struct io_task *tasks = NULL;
 /* Blacklist */
 char *ip_bl_file = NULL;
 ip_blacklist *ip_bl = NULL;
+domain_blacklist *dn_bl = NULL;
 
 /* Event queue */
 struct ids_event_list *ids_events = NULL;
@@ -64,6 +65,7 @@ on_exit_callback()
 	free_linked_list(&iface_list, NULL);
 	free_io_task(&tasks);
 	free_ip_blacklist(&ip_bl);
+	free_domain_blacklist(&dn_bl);
 	free_ids_event_list(&ids_events);
 }
 
@@ -183,6 +185,9 @@ setup_blacklists()
 		goto error;
 	}
 
+	dn_bl = new_domain_blacklist();
+	if (!dn_bl) goto error;
+
 	ip_bl = new_ip_blacklist();
 	if (!ip_bl) goto error;
 
@@ -222,6 +227,8 @@ setup_blacklists()
 error:
 	if (fp) fclose(fp);
 	free_ip4_address_range(&firehol_list);
+	free_ip_blacklist(&ip_bl);
+	free_domain_blacklist(&dn_bl);
 	return (0);
 }
 
