@@ -33,6 +33,13 @@ domain_blacklist_add(domain_blacklist *b, char *domain);
 int
 domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain);
 
+/*
+ * Free memory associated with the domain blacklist and set the pointer at
+ * B to NULL.
+ */
+void
+free_domain_blacklist(domain_blacklist **b);
+
 /**
  * Initialize a new domain blacklist and return the result.
  * @return An initialized domain blacklist or NULL if the operation

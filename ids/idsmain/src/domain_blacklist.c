@@ -6,7 +6,6 @@
  */
 
 #include <string.h>
-
 #include <assert.h>
 
 #include "domain_blacklist.h"
@@ -47,6 +46,19 @@ domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
 	}
 
 	return (result ? 1 : 0);
+}
+
+void
+free_domain_blacklist(domain_blacklist **b)
+{
+	assert(b);
+	hattrie_t **h = (hattrie_t **)b;
+
+	if (h && *h)
+	{
+		hattrie_free(*h);
+		*h = NULL;
+	}
 }
 
 domain_blacklist *new_domain_blacklist()
