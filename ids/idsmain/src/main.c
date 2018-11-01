@@ -18,6 +18,7 @@
 #include "mdns_io_task.h"
 #include "pcap_io_task.h"
 #include "ip_blacklist.h"
+#include "domain_blacklist.h"
 #include "firehol_ip_blacklist.h"
 #include "ids_event_queue.h"
 

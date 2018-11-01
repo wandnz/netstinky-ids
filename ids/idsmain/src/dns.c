@@ -85,7 +85,7 @@ dns_name_to_readable(uint8_t *name)
 	while (label_len && label_len <= remaining)
 	{
 		/* Move to position after length byte */
-		strncpy(readable_pos, label_ptr, label_len);
+		strncpy(readable_pos, (char *)label_ptr, label_len);
 
 		/* Move to next length byte */
 		readable_pos += label_len;

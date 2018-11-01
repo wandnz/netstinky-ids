@@ -6,13 +6,19 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
+
 #include <assert.h>
 
 #include <pcap/pcap.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "ids_pcap.h"
 #include "io_task.h"
 #include "pcap_io_task.h"
 #include "ip_blacklist.h"
+#include "domain_blacklist.h"
 
 #include "ids_event_queue.h"
 
@@ -26,7 +32,7 @@ struct pcap_io_task_state
 	pcap_t *p;
 	char *iface;
 	ip_blacklist *ip_bl;
-	/* TODO: Add dns blacklist */
+	domain_blacklist *dn_bl;
 	struct ids_event_list *event_queue;
 };
 

@@ -174,6 +174,9 @@ ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
 		result = 1;
 	}
 
+	/* Could not add event because list wasn't initialized */
+	else free_ids_event(&e);
+
 	return (result);
 }
 
@@ -249,6 +252,13 @@ ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
 	}
 }
 
+/* Assumes:
+ * -- iface is from command line arguments and does not need to
+ * be freed
+ * -- ioc is a duplicate and must be freed
+ *
+ * Will release IOC if cannot make a new event.
+ */
 struct ids_event *
 new_ids_event(char *iface, uint32_t src_ip, char *ioc)
 {
@@ -271,10 +281,12 @@ new_ids_event(char *iface, uint32_t src_ip, char *ioc)
 		e->next = NULL;
 		e->previous = NULL;
 	}
+	else goto error;
 
 	return (e);
 
 error:
+	if (ioc) free(ioc);
 	free_ids_event_time(&t);
 	free_ids_event(&e);
 	return (NULL);
