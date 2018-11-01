@@ -20,7 +20,7 @@
 #include "ip_blacklist.h"
 #include "domain_blacklist.h"
 #include "firehol_ip_blacklist.h"
-#include "ids_event_queue.h"
+#include "ids_event_list.h"
 
 /* -- DEBUGGING -- */
 #define DEBUG 1
@@ -205,7 +205,7 @@ setup_blacklists()
 		while (ip4_iter)
 		{
 			/* Don't add really large address ranges */
-			if (ip4_iter->prefix_len >= 24)
+			if (ip4_iter->prefix_len >= 28)
 			{
 				uint32_t addr_iter;
 				uint32_t max_addr = ip4_address_range_get_max_addr(ip4_iter);

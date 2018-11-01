@@ -12,7 +12,7 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "ids_event_queue.h"
+#include "ids_event_list.h"
 
 /* Both of these structures are linked lists. */
 
@@ -24,15 +24,15 @@ struct ids_event_list
 	unsigned int num_events;
 };
 
-struct ids_event_time
+struct ids_event_ts
 {
 	struct timespec tm_stamp;
-	struct ids_event_time *next;
+	struct ids_event_ts *next;
 };
 
 struct ids_event
 {
-	struct ids_event_time *times_seen;
+	struct ids_event_ts *times_seen;
 	unsigned int num_times;
 	char *iface;
 	uint32_t src_ip;
@@ -50,11 +50,11 @@ struct ids_event
  */
 int
 ids_event_time_list_add(struct ids_event_list *list, struct ids_event *event,
-		struct ids_event_time *tm);
+		struct ids_event_ts *tm);
 
 void
 ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
-		struct ids_event_time *tm_list);
+		struct ids_event_ts *tm_list);
 
 void
 free_ids_event(struct ids_event **e)
@@ -70,7 +70,7 @@ free_ids_event(struct ids_event **e)
 			tmp = event_iter;
 			event_iter = event_iter->next;
 
-			free_ids_event_time(&(tmp->times_seen));
+			free_ids_event_ts(&(tmp->times_seen));
 
 			/* Interface names are from the command line and should not be
 			 * freed */
@@ -99,11 +99,11 @@ free_ids_event_list(struct ids_event_list **list)
 }
 
 void
-free_ids_event_time(struct ids_event_time **t)
+free_ids_event_ts(struct ids_event_ts **t)
 {
 	assert(t);
 
-	struct ids_event_time *time_iter = *t, *tmp;
+	struct ids_event_ts *time_iter = *t, *tmp;
 
 	if (t && *t)
 	{
@@ -120,7 +120,7 @@ free_ids_event_time(struct ids_event_time **t)
 }
 
 int
-ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
+ids_event_list_add_event(struct ids_event_list *list, struct ids_event *e)
 {
 	assert(list);
 	assert(e);
@@ -137,8 +137,8 @@ ids_event_list_add(struct ids_event_list *list, struct ids_event *e)
 			if (ids_event_time_list_add(list, existing, e->times_seen))
 			{
 				/* Move existing event to the front of the queue. */
-				existing->previous->next = existing->next;
-				existing->next->previous = existing->previous;
+				if (existing->previous) existing->previous->next = existing->next;
+				if (existing->next) existing->next->previous = existing->previous;
 
 				existing->previous = NULL;
 				existing->next = list->head;
@@ -205,7 +205,7 @@ ids_event_list_enforce_max_events(struct ids_event_list *list)
 
 int
 ids_event_time_list_add(struct ids_event_list *list, struct ids_event *event,
-		struct ids_event_time *tm)
+		struct ids_event_ts *tm)
 {
 	assert(list);
 	assert(event);
@@ -228,13 +228,13 @@ ids_event_time_list_add(struct ids_event_list *list, struct ids_event *event,
 
 void
 ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
-		struct ids_event_time *tm_list)
+		struct ids_event_ts *tm_list)
 {
 	assert(list);
 	assert(tm_list);
 
 	int iter;
-	struct ids_event_time *tail = tm_list;
+	struct ids_event_ts *tail = tm_list;
 
 	/* How many times to follow the next pointer */
 	unsigned int num_steps = list->max_timestamps - 1;
@@ -248,7 +248,7 @@ ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
 		}
 
 		/* Remove all timestamps after tail */
-		free_ids_event_time(&(tail->next));
+		free_ids_event_ts(&(tail->next));
 	}
 }
 
@@ -266,12 +266,12 @@ new_ids_event(char *iface, uint32_t src_ip, char *ioc)
 	assert(ioc);
 
 	struct ids_event *e = NULL;
-	struct ids_event_time *t = NULL;
+	struct ids_event_ts *t = NULL;
 
 	if (iface && ioc)
 	{
 		if (!(e = malloc(sizeof(*e)))) goto error;
-		if (!(t = new_ids_event_time())) goto error;
+		if (!(t = new_ids_event_ts())) goto error;
 
 		e->times_seen = t;
 		e->iface = iface;
@@ -287,7 +287,7 @@ new_ids_event(char *iface, uint32_t src_ip, char *ioc)
 
 error:
 	if (ioc) free(ioc);
-	free_ids_event_time(&t);
+	free_ids_event_ts(&t);
 	free_ids_event(&e);
 	return (NULL);
 }
@@ -343,10 +343,10 @@ ids_event_list_contains(struct ids_event_list *list, struct ids_event *e)
 	return (result);
 }
 
-struct ids_event_time *
-new_ids_event_time()
+struct ids_event_ts *
+new_ids_event_ts()
 {
-	struct ids_event_time *tm = NULL;
+	struct ids_event_ts *tm = NULL;
 
 	if ( !( tm = malloc( sizeof( *tm ) ) ) ) goto error;
 
@@ -362,6 +362,6 @@ new_ids_event_time()
 	return ( tm );
 
 error:
-	free_ids_event_time(&tm);
+	free_ids_event_ts(&tm);
 	return (NULL);
 }

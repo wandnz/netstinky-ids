@@ -20,7 +20,7 @@
 #include "ip_blacklist.h"
 #include "domain_blacklist.h"
 
-#include "ids_event_queue.h"
+#include "ids_event_list.h"
 
 /* -- DEBUGGING -- */
 #define DEBUG 1
@@ -76,7 +76,7 @@ pcap_io_task_read(TASK_STRUCT state)
 		if (ids_pcap_is_blacklisted(&f, s->ip_bl, s->dn_bl))
 		{
 			ip.s_addr = htonl(f.dest_ip);
-			if (!ids_event_list_add(s->event_queue, new_ids_event(s->iface, f.src_ip,
+			if (!ids_event_list_add_event(s->event_queue, new_ids_event(s->iface, f.src_ip,
 					f.domain ? f.domain : strdup(inet_ntoa(ip)))))
 			{
 				DPRINT("pcap_io_task_read(): ids_event_list_add() failed\n");

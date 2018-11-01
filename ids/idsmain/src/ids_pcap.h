@@ -7,7 +7,7 @@
 
 #include "ip_blacklist.h"
 #include "domain_blacklist.h"
-#include "ids_event_queue.h"
+#include "ids_event_list.h"
 
 struct ids_pcap_fields
 {

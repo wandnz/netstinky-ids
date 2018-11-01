@@ -11,7 +11,7 @@
 #include "linked_list.h"
 
 struct ids_event;
-struct ids_event_time;
+struct ids_event_ts;
 struct ids_event_list;
 
 /**
@@ -31,7 +31,7 @@ free_ids_event_list(struct ids_event_list **list);
  * not be NULL but can handle *T being NULL.
  */
 void
-free_ids_event_time(struct ids_event_time **t);
+free_ids_event_ts(struct ids_event_ts **t);
 
 /**
  * Add an event to the front of the list. If E is added to the list it will be
@@ -42,7 +42,7 @@ free_ids_event_time(struct ids_event_time **t);
  * @return 1 if the event was added to the list, 0 if unsuccessful.
  */
 int
-ids_event_list_add(struct ids_event_list *list, struct ids_event *e);
+ids_event_list_add_event(struct ids_event_list *list, struct ids_event *e);
 
 /**
  * Checks if the ids_event list contains an event equivalent to E, and returns
@@ -94,5 +94,5 @@ new_ids_event_list(unsigned int max_events, unsigned int max_timestamps);
  * @return A valid ids_event_time struct for the current time, or NULL if the
  * ids_event_time could not be created.
  */
-struct ids_event_time *
-new_ids_event_time();
+struct ids_event_ts *
+new_ids_event_ts();
