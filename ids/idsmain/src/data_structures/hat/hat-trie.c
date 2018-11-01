@@ -719,7 +719,8 @@ void print_node_type(hattrie_iter_t *i)
     assert(i != NULL);
     static size_t level = 0;
     
-    for (int j = 0; j < level + 1; j++)
+    int j;
+    for (j = 0; j < level + 1; j++)
     {
         printf("\t");
     }
@@ -735,7 +736,8 @@ void print_node_type(hattrie_iter_t *i)
     }
     else if (i->stack != NULL) {
         level = i->stack->level;
-        for (int j = 0; j < i->stack->level; j++)
+        int j;
+        for (j = 0; j < i->stack->level; j++)
         {
             printf("\t");
         }

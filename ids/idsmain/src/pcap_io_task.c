@@ -73,7 +73,7 @@ pcap_io_task_read(TASK_STRUCT state)
 	}
 	else if (1 == read_result)
 	{
-		if (ids_pcap_is_blacklisted(&f, s->ip_bl))
+		if (ids_pcap_is_blacklisted(&f, s->ip_bl, s->dn_bl))
 		{
 			ip.s_addr = htonl(f.dest_ip);
 			if (!ids_event_list_add(s->event_queue, new_ids_event(s->iface, f.src_ip,
@@ -85,53 +85,58 @@ pcap_io_task_read(TASK_STRUCT state)
 
 			DPRINT("pcap_io_task_read(): NEW DETECTED INTRUSION\n");
 		}
+		else DPRINT("safe!\n");
 	}
 
 	return (1);
 }
 
 struct io_task *
-pcap_io_task_setup(char *if_name, ip_blacklist *b)
+pcap_io_task_setup(char *if_name, ip_blacklist *b, domain_blacklist *d)
 {
 	assert(if_name);
 	assert(b);
+	assert(d);
 
 	int pcap_fd = -1;
 	struct pcap_io_task_state *state = NULL;
 	struct io_task *task = NULL;
 
-
-	if (!(state = malloc(sizeof(*state))))
+	if (if_name && b && d)
 	{
-		DPRINT("pcap_io_task_setup(%s): malloc() failed\n", if_name);
-		goto error;
+		if (!(state = malloc(sizeof(*state))))
+		{
+			DPRINT("pcap_io_task_setup(%s): malloc() failed\n", if_name);
+			goto error;
+		}
+
+		state->iface = if_name;
+
+		if (!(state->p = ids_pcap_get_pcap(if_name)))
+		{
+			DPRINT("pcap_io_task_setup(%s): ids_pcap_get_pcap() failed\n", if_name);
+			goto error;
+		}
+
+		if (PCAP_ERROR == (pcap_fd = pcap_get_selectable_fd(state->p)))
+		{
+			DPRINT("pcap_io_task_setup(): pcap_get_selectable_fd() failed\n");
+			goto error;
+		}
+
+		/* Bundle into an io_task */
+		if (!(task = new_io_task(pcap_fd, state, pcap_io_task_read, NULL,
+				free_pcap_io_task_state)))
+		{
+			DPRINT("pcap_io_task_setup(): new_io_task() failed\n");
+			goto error;
+		}
+
+		state->ip_bl = b;
+		state->dn_bl = d;
+
+		return (task);
 	}
-
-	state->iface = if_name;
-
-	if (!(state->p = ids_pcap_get_pcap(if_name)))
-	{
-		DPRINT("pcap_io_task_setup(%s): ids_pcap_get_pcap() failed\n", if_name);
-		goto error;
-	}
-
-	if (PCAP_ERROR == (pcap_fd = pcap_get_selectable_fd(state->p)))
-	{
-		DPRINT("pcap_io_task_setup(): pcap_get_selectable_fd() failed\n");
-		goto error;
-	}
-
-	/* Bundle into an io_task */
-	if (!(task = new_io_task(pcap_fd, state, pcap_io_task_read, NULL,
-			free_pcap_io_task_state)))
-	{
-		DPRINT("pcap_io_task_setup(): new_io_task() failed\n");
-		goto error;
-	}
-
-	state->ip_bl = b;
-
-	return (task);
 
 error:
 	free_pcap_io_task_state((TASK_STRUCT *)&state);

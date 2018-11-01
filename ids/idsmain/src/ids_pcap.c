@@ -21,6 +21,7 @@
 #include <netinet/udp.h>
 
 #include "ip_blacklist.h"
+#include "domain_blacklist.h"
 #include "dns.h"
 #include "ids_pcap.h"
 
@@ -220,7 +221,7 @@ error:
 }
 
 int
-ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl)
+ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_blacklist *dn_bl)
 {
 	struct in_addr src_ip_buf, dst_ip_buf;
 	src_ip_buf.s_addr = htonl(f->src_ip);
@@ -234,8 +235,7 @@ ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl)
 
 	if (f->domain)
 	{
-		/* Check domain blacklist */
-		DPRINT("unchecked\n");
+		return (domain_blacklist_is_blacklisted(dn_bl, f->domain));
 	}
 	else return (ip_blacklist_lookup(ip_bl, f->dest_ip));
 

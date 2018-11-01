@@ -264,7 +264,7 @@ main(int argc, char **argv)
 
 	for (iter = iface_list; iter; iter = iter->next)
 	{
-		pcap_task = pcap_io_task_setup((char *)iter->item, ip_bl);
+		pcap_task = pcap_io_task_setup((char *)iter->item, ip_bl, dn_bl);
 		if (!pcap_task || !io_task_add(&tasks, pcap_task))
 			DPRINT("io_task_add() failed\n");
 	}

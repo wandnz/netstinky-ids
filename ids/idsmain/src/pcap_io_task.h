@@ -9,6 +9,7 @@
 #define PCAP_IO_TASK_H_
 
 #include "ip_blacklist.h"
+#include "domain_blacklist.h"
 
 struct pcap_io_task_state;
 
@@ -20,6 +21,6 @@ struct pcap_io_task_state;
  * The result may be NULL if the device could not be set up for packet capture.
  */
 struct io_task *
-pcap_io_task_setup(char *if_name, ip_blacklist *b);
+pcap_io_task_setup(char *if_name, ip_blacklist *b, domain_blacklist *d);
 
 #endif /* PCAP_IO_TASK_H_ */

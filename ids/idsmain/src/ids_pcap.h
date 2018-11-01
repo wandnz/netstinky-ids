@@ -6,6 +6,7 @@
 #define IDS_PCAP_H_
 
 #include "ip_blacklist.h"
+#include "domain_blacklist.h"
 #include "ids_event_queue.h"
 
 struct ids_pcap_fields
@@ -24,7 +25,7 @@ struct ids_pcap_fields
  * @return 1 if an IP address or domain name was in the blacklist
  */
 int
-ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl);
+ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_blacklist *dn_bl);
 
 pcap_t *
 ids_pcap_get_pcap(const char *if_name);

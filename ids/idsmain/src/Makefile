@@ -1,13 +1,13 @@
 CC = gcc
-CFLAGS = -Wall
+CFLAGS += -Wall
 LDFLAGS = -lpcap
 
 TARGET_CFLAGS += -ggdb
 
-SUBDIRS = data_structures/ebvbl
+SUBDIRS = data_structures/ebvbl data_structures/hat
 
-DEPS = $(wildcard *.h) $(wildcard $(SUBDIRS)/*.h)
-SRC = $(wildcard *.c) $(wildcard $(SUBDIRS)/*.c)
+DEPS = $(wildcard *.h) $(foreach dir,$(SUBDIRS),$(wildcard $(dir)/*.h))
+SRC = $(wildcard *.c) $(foreach dir,$(SUBDIRS),$(wildcard $(dir)/*.c))
 OBJ = $(patsubst %.c, %.o, $(SRC))
 
 all: idsmain $(SUBDIRS)
