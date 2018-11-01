@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall
 LDFLAGS = -lpcap
 
-TARGET_CFLAGS += -ggdb3
+TARGET_CFLAGS += -ggdb
 
 SUBDIRS = data_structures/ebvbl
 

@@ -6,6 +6,8 @@ PKG_NAME:=idsmain
 PKG_VERSION:=1.0
 PKG_RELEASE:=1
 
+TARGET_CFLAGS:=+ggdb3
+
 # Source settings (i.e. where to find the source codes)
 # This is a custom variable, used below
 #PKG_SOURCE:=/packages/idsmain.tar.gz
