@@ -5,6 +5,8 @@
  *      Author: mfletche
  */
 
+/* TODO: Make setting rdlength automatic */
+
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -14,6 +16,9 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "dns.h"
 #include "byte_array.h"
 
@@ -216,27 +221,39 @@ dns_parse(uint8_t *pkt_buff, size_t pkt_len)
 		goto error;
 	}
 
-	pkt_parsed->questions = dns_parse_question_section(pkt_parsed->header.qdcount, &pkt_pos, &remaining_len);
-	if (!pkt_parsed->questions)
+	if (pkt_parsed->header.qdcount)
 	{
-		DPRINT("dns_parse(): dns_parse_question_section() failed\n");
-		goto error;
+		pkt_parsed->questions = dns_parse_question_section(pkt_parsed->header.qdcount, &pkt_pos, &remaining_len);
+		if (!pkt_parsed->questions)
+		{
+			DPRINT("dns_parse(): dns_parse_question_section() failed\n");
+			goto error;
+		}
 	}
 
-	if (!dns_parse_answer_section_into(&pkt_parsed->answers, pkt_parsed->header.ancount, &pkt_pos, &remaining_len, pkt_buff))
+	if (pkt_parsed->header.ancount)
 	{
-		DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
-		goto error;
+		if (!dns_parse_answer_section_into(&pkt_parsed->answers, pkt_parsed->header.ancount, &pkt_pos, &remaining_len, pkt_buff))
+		{
+			DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
+			goto error;
+		}
 	}
-	if (!dns_parse_answer_section_into(&pkt_parsed->authority, pkt_parsed->header.nscount, &pkt_pos, &remaining_len, pkt_buff))
+	if (pkt_parsed->header.nscount)
 	{
-		DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
-		goto error;
+		if (!dns_parse_answer_section_into(&pkt_parsed->authority, pkt_parsed->header.nscount, &pkt_pos, &remaining_len, pkt_buff))
+		{
+			DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
+			goto error;
+		}
 	}
-	if (!dns_parse_answer_section_into(&pkt_parsed->additional, pkt_parsed->header.arcount, &pkt_pos, &remaining_len, pkt_buff))
+	if (pkt_parsed->header.arcount)
 	{
-		DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
-		goto error;
+		if (!dns_parse_answer_section_into(&pkt_parsed->additional, pkt_parsed->header.arcount, &pkt_pos, &remaining_len, pkt_buff))
+		{
+			DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
+			goto error;
+		}
 	}
 
 	return (pkt_parsed);
@@ -433,7 +450,7 @@ dns_parse_name(uint8_t **buf_pos, size_t *remaining_len)
 			}
 
 			buf_index += label_len + 1;
-			if (buf_index >= *remaining_len)
+			if (buf_index > *remaining_len)
 			{
 				DPRINT("dns_parse_name(): parsing label would overflow buffer\n");
 				goto error;
@@ -638,20 +655,12 @@ dns_parse_rdata(struct dns_answer **out, enum dns_qtype type,
 	case(TXT):
 		break;
 	case(SRV):
-		if (!((*out)->rdata.srv.service = dns_parse_label(pos_ptr, remaining_len))) return (0);
-		if (!((*out)->rdata.srv.proto = dns_parse_label(pos_ptr, remaining_len))) goto srv_error;
-		if (!((*out)->rdata.srv.name = dns_parse_name(pos_ptr, remaining_len))) goto srv_error;
-		if (!byte_array_read_uint32(&(*out)->rdata.srv.ttl, pos_ptr, remaining_len)) goto srv_error;
-		if (!byte_array_read_uint16(&(*out)->rdata.srv.class, pos_ptr, remaining_len)) goto srv_error;
 		if (!byte_array_read_uint16(&(*out)->rdata.srv.priority, pos_ptr, remaining_len)) goto srv_error;
 		if (!byte_array_read_uint16(&(*out)->rdata.srv.weight, pos_ptr, remaining_len)) goto srv_error;
 		if (!byte_array_read_uint16(&(*out)->rdata.srv.port, pos_ptr, remaining_len)) goto srv_error;
 		if (!((*out)->rdata.srv.target = dns_parse_name(pos_ptr, remaining_len))) goto srv_error;
 		break;
 srv_error:
-		if ((*out)->rdata.srv.service) free((*out)->rdata.srv.service);
-		if ((*out)->rdata.srv.proto) free((*out)->rdata.srv.proto);
-		if ((*out)->rdata.srv.name) free((*out)->rdata.srv.name);
 		if ((*out)->rdata.srv.target) free((*out)->rdata.srv.target);
 		return (0);
 	default:
@@ -720,6 +729,8 @@ print_answer(struct dns_answer *a, FILE *fp)
 	assert(a);
 	assert(fp);
 
+	struct in_addr addr;
+
 	fprintf(fp, "NAME: %s\n", a->name);
 	fprintf(fp, "TYPE: %d\n", a->type);
 	fprintf(fp, "CLASS: %d\n", a->class);
@@ -728,7 +739,8 @@ print_answer(struct dns_answer *a, FILE *fp)
 	switch(a->type)
 	{
 	case A:
-		fprintf(fp, "IP ADDRESS: %d\n", a->rdata.a.ip_address);
+		addr.s_addr = htonl(a->rdata.a.ip_address);
+		fprintf(fp, "IP ADDRESS: %s\n", inet_ntoa(addr));
 		break;
 	case MX:
 		fprintf(fp, "PREFERENCE: %d\n", a->rdata.mx.preference);
@@ -748,11 +760,6 @@ print_answer(struct dns_answer *a, FILE *fp)
 		fprintf(fp, "MINIMUM TTL: %d\n", a->rdata.soa.minimum);
 		break;
 	case SRV:
-		fprintf(fp, "SERVICE: %s\n", a->rdata.srv.service);
-		fprintf(fp, "PROTO: %s\n", a->rdata.srv.proto);
-		fprintf(fp, "NAME: %s\n", a->rdata.srv.name);
-		fprintf(fp, "TTL: %d\n", a->rdata.srv.ttl);
-		fprintf(fp, "CLASS: %d\n", a->rdata.srv.class);
 		fprintf(fp, "PRIORITY: %d\n", a->rdata.srv.priority);
 		fprintf(fp, "WEIGHT: %d\n", a->rdata.srv.weight);
 		fprintf(fp, "PORT: %d\n", a->rdata.srv.port);
@@ -800,7 +807,7 @@ dns_write_answer(uint8_t **pos_ptr, size_t *remaining_len, struct dns_answer *an
 	if (!byte_array_write_uint32(pos_ptr, remaining_len, answer->ttl)) return (0);
 	if (!byte_array_write_uint16(pos_ptr, remaining_len, answer->rdlength)) return (0);
 
-	/* todo: write rdata */
+	dns_write_rdata(pos_ptr, remaining_len, answer);
 
 	return (1);
 }
@@ -816,16 +823,18 @@ dns_write_answer_section(uint8_t **pos_ptr, size_t *remaining_len,
 	assert(pos_ptr);
 	assert(*pos_ptr);
 	assert(remaining_len);
-	assert(ans_list);
 
 	int i;
 
-	for (i = 0; i < ans_len; i++, ans_list = ans_list->next)
+	if (ans_list)
 	{
-		/* check list is not too short */
-		if (!ans_list) return (0);
+		for (i = 0; i < ans_len; i++, ans_list = ans_list->next)
+		{
+			/* check list is not too short */
+			if (!ans_list) return (0);
 
-		if (!dns_write_answer(pos_ptr, remaining_len, ans_list)) return (0);
+			if (!dns_write_answer(pos_ptr, remaining_len, ans_list)) return (0);
+		}
 	}
 
 	return (1);
@@ -859,11 +868,16 @@ dns_write_header(uint8_t **pos_ptr, size_t *remaining_len,
 	**pos_ptr = bit_field;
 	(*pos_ptr)++, (*remaining_len)--;
 
+	pkt->header.qdcount = count_questions(pkt->questions);
+	pkt->header.ancount = count_answers(pkt->answers);
+	pkt->header.nscount = count_answers(pkt->authority);
+	pkt->header.arcount = count_answers(pkt->additional);
+
 	/* calculate these values */
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, count_questions(pkt->questions))) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, count_answers(pkt->answers))) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, count_answers(pkt->authority))) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, count_answers(pkt->authority))) return (0);
+	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.qdcount)) return (0);
+	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.ancount)) return (0);
+	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.nscount)) return (0);
+	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.arcount)) return (0);
 	return (1);
 }
 
@@ -1000,11 +1014,6 @@ dns_write_rdata(uint8_t **pos_ptr, size_t *remaining_len, struct dns_answer *ans
 	case(TXT):
 		break;
 	case(SRV):
-		if (!dns_write_label(pos_ptr, remaining_len, ans->rdata.srv.service)) return (0);
-		if (!dns_write_label(pos_ptr, remaining_len, ans->rdata.srv.proto)) return (0);
-		if (!dns_write_name(pos_ptr, remaining_len, ans->rdata.srv.name)) return (0);
-		if (!byte_array_write_uint32(pos_ptr, remaining_len, ans->rdata.srv.ttl)) return (0);
-		if (!byte_array_write_uint16(pos_ptr, remaining_len, ans->rdata.srv.class)) return (0);
 		if (!byte_array_write_uint16(pos_ptr, remaining_len, ans->rdata.srv.priority)) return (0);
 		if (!byte_array_write_uint16(pos_ptr, remaining_len, ans->rdata.srv.weight)) return (0);
 		if (!byte_array_write_uint16(pos_ptr, remaining_len, ans->rdata.srv.port)) return (0);
@@ -1172,9 +1181,6 @@ free_dns_rdata(struct dns_answer *ans)
 	case(TXT):
 		break;
 	case(SRV):
-		if (NULL != ans->rdata.srv.service) free(ans->rdata.srv.service);
-		if (NULL != ans->rdata.srv.proto) free(ans->rdata.srv.proto);
-		if (NULL != ans->rdata.srv.name) free(ans->rdata.srv.name);
 		if (NULL != ans->rdata.srv.target) free(ans->rdata.srv.target);
 		break;
 	default:

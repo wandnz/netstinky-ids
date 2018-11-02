@@ -128,11 +128,6 @@ struct rdata_ptr
 /* https://www.ietf.org/rfc/rfc2052.txt */
 struct rdata_srv
 {
-	uint8_t *service;
-	uint8_t *proto;
-	uint8_t *name;
-	uint32_t ttl;
-	uint16_t class;
 	uint16_t priority;
 	uint16_t weight;
 	uint16_t port;
