@@ -92,7 +92,7 @@ byte_array_read_uint32(uint32_t *out, uint8_t **array_pos, size_t *remaining_len
 	assert(NULL != array_pos);
 	assert(NULL != remaining_len);
 
-	if (sizeof(*out) < *remaining_len)
+	if (sizeof(*out) <= *remaining_len)
 	{
 		*out = byte_array_get_uint32(*array_pos);
 		(*array_pos) += sizeof(*out);
