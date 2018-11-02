@@ -12,7 +12,12 @@
 #include <errno.h>
 
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
+#include "mfletche-common.h"
+
+#include "linked_list.h"
 #include "mdns.h"
 #include "io_task.h"
 #include "mdns_io_task.h"
@@ -30,6 +35,8 @@ struct mdns_io_task_state
 {
 	int fd;
 	void *packet_buffer;
+	struct dns_answer *record_list;
+	struct linked_list *reply_queue;
 };
 
 void
@@ -42,6 +49,7 @@ free_mdns_io_task_state(TASK_STRUCT *task_state)
 	if (*state)
 	{
 		if ((*state)->packet_buffer) free((*state)->packet_buffer);
+		free_dns_answer(((*state)->record_list));
 		free(*state);
 	}
 	*state = NULL;
@@ -72,7 +80,18 @@ mdns_io_task_read(TASK_STRUCT task_state)
 		if (packet)
 		{
 			dns_print(packet, stdout);
-			free_dns_packet(packet);
+
+			/* Check if any questions are relevant */
+			struct dns_packet *reply = mdns_construct_reply(packet, mdns->record_list);
+			if (reply)
+			{
+				if (!linked_list_add_item(&(mdns->reply_queue), reply))
+				{
+					DPRINT("mdns_io_task_read(): linked_list_add() failed\n");
+				}
+			}
+
+			free_dns_packet(&packet);
 			result = 1;
 		}
 		else
@@ -85,8 +104,11 @@ mdns_io_task_read(TASK_STRUCT task_state)
 struct io_task *
 mdns_io_task_setup()
 {
-	struct mdns_io_task_state *mdns = malloc(sizeof(*mdns));
+	struct mdns_io_task_state *mdns;
 	struct io_task *task = NULL;
+
+	MALLOC_ZERO(mdns);
+
 	if (mdns)
 	{
 		mdns->fd = mdns_get_socket();
@@ -95,9 +117,41 @@ mdns_io_task_setup()
 		mdns->packet_buffer = malloc(PACKET_BUF_LEN);
 		if (!(mdns->packet_buffer)) goto error;
 
+		/* Set up RRs */
+		struct dns_answer *ptr_rr = new_mdns_answer(dns_domain_to_name("ids._tcp.local"), PTR, 120);
+		ptr_rr->rdata.ptr.name = dns_domain_to_name("netstinky.ids._tcp.local");
+		ptr_rr->rdlength = strlen(ptr_rr->rdata.ptr.name) + 1;
+		mdns->record_list = ptr_rr;
+
+		struct dns_answer *a_rr = new_mdns_answer(dns_domain_to_name("netstinky.ids._tcp.local"), A, 120);
+
+		/* TODO: Dynamically get IP address and port */
+		struct in_addr ip_addr;
+		assert(inet_aton("10.1.18.146", &ip_addr));
+		a_rr->rdata.a.ip_address = ntohl(ip_addr.s_addr);
+		a_rr->rdlength = 4;
+
+		ptr_rr->next = a_rr;
+
+		struct dns_answer *svc_rr = new_mdns_answer(dns_domain_to_name("ids._tcp.local"), SRV, 120);
+		svc_rr->rdata.srv.target = dns_domain_to_name("hostname");
+		svc_rr->rdlength = 6 + strlen(svc_rr->rdata.srv.target) + 1;
+		svc_rr->rdata.srv.priority = 0;
+		svc_rr->rdata.srv.weight = 0;
+
+		/* Todo: Change advertising port */
+		svc_rr->rdata.srv.port = 5000;
+		/* Todo: Define a hostname */
+
+		a_rr->next = svc_rr;
+
 		if (!(task = new_io_task(mdns->fd, mdns, mdns_io_task_read,
-				NULL, free_mdns_io_task_state))) goto error;
+				mdns_io_task_write, free_mdns_io_task_state))) goto error;
+
+		/* TODO: Send first advertisement packet */
 	}
+
+
 
 	return (task);
 
@@ -110,8 +164,17 @@ int
 mdns_io_task_write(TASK_STRUCT task_state)
 {
 	struct mdns_io_task_state *mdns = (struct mdns_io_task_state *)task_state;
+	struct dns_packet *reply = NULL;
 
-	/* TODO: Implement */
+	while (NULL != (reply = (struct dns_packet *)linked_list_pop(&(mdns->reply_queue))))
+	{
+		if (!mdns_send_reply(mdns->fd, mdns->packet_buffer, PACKET_BUF_LEN, reply))
+		{
+			DPRINT("Could not send an MDNS reply");
+		}
+
+		free_dns_packet(&reply);
+	}
 
 	/* TODO: Do I care if I only do multicast replies? */
 
