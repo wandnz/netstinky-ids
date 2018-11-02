@@ -32,6 +32,12 @@ linked_list_add_item(struct linked_list **list, LINKED_LIST_ITEM item);
 struct linked_list *
 linked_list_get_last_item(struct linked_list *list);
 
+/**
+ * Gets the first item in the linked list, and removes it from the list.
+ */
+LINKED_LIST_ITEM
+linked_list_pop(struct linked_list **list);
+
 struct linked_list *
 new_linked_list(LINKED_LIST_ITEM item);
 

@@ -77,6 +77,25 @@ linked_list_get_last_item(struct linked_list *list)
 	return (result);
 }
 
+LINKED_LIST_ITEM
+linked_list_pop(struct linked_list **list)
+{
+	assert(list);
+
+	LINKED_LIST_ITEM pop = NULL;
+	struct linked_list *to_remove = NULL;
+	if (list && *list)
+	{
+		pop = (*list)->item;
+		to_remove = (*list);
+
+		*list = (*list)->next;
+		free(to_remove);
+	}
+
+	return (pop);
+}
+
 struct linked_list *
 new_linked_list(LINKED_LIST_ITEM item)
 {
