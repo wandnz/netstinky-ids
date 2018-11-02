@@ -161,12 +161,15 @@ io_task_do_io(struct io_task *task, struct io_task_fdsets *fdsets)
 	}
 }
 
-struct io_task_fdsets *
-io_task_get_fdsets(struct io_task *task)
+void
+io_task_get_fdsets(struct io_task *task, struct io_task_fdsets *fdsets)
 {
-	struct io_task_fdsets *fdsets = new_io_task_fdsets();
+	assert(fdsets);
 	if (fdsets)
 	{
+		/* Reset fdsets */
+		FD_ZERO(&(fdsets->read_fdset));
+		FD_ZERO(&(fdsets->write_fdset));
 		while (task)
 		{
 			/* Add to read/write set if there is a function to handle that
@@ -180,7 +183,7 @@ io_task_get_fdsets(struct io_task *task)
 		}
 	}
 
-	return (fdsets);
+	return;
 }
 
 /* Get the maximum file descriptor in the task list. Return -1 if the list is
@@ -201,11 +204,10 @@ io_task_max_fd(struct io_task *task)
 }
 
 /* TODO: Should error condition cause something different to happen? */
-struct io_task_fdsets *
-io_task_select(struct io_task *task)
+void
+io_task_select(struct io_task *task, struct io_task_fdsets *fdsets)
 {
 	int max_fd = -1, select_result;
-	struct io_task_fdsets *fdsets = NULL;
 	struct timeval tv;
 
 	/* task may be NULL if list is empty */
@@ -215,7 +217,7 @@ io_task_select(struct io_task *task)
 		assert(max_fd >= 0);
 
 		/* construct fdsets */
-		if (!(fdsets = io_task_get_fdsets(task))) goto error;
+		io_task_get_fdsets(task, fdsets);
 
 		/* do not wait for select */
 		tv.tv_sec = 0;
@@ -236,19 +238,19 @@ io_task_select(struct io_task *task)
 		}
 		else if (select_result)
 		{
-			DPRINT("io_task_select() has IO tasks ready\n");
+			/* DPRINT("io_task_select() has IO tasks ready\n"); */
 		}
 		else
 		{
 			free_io_task_fdsets(&fdsets);
 		}
 
-		return (fdsets);
+		return;
 	}
 
 error:
 	free_io_task_fdsets(&fdsets);
-	return (fdsets);
+	return;
 }
 
 /* Setters for io_task fields */

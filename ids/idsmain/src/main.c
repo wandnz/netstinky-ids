@@ -270,9 +270,10 @@ main(int argc, char **argv)
 	}
 
 	DPRINT("Waiting for MDNS packets.\n");
+	struct io_task_fdsets *fdset = new_io_task_fdsets();
 	while (1)
 	{
-		struct io_task_fdsets *fdset = io_task_select(tasks);
+		io_task_select(tasks, fdset);
 		io_task_do_io(tasks, fdset);
 	}
 

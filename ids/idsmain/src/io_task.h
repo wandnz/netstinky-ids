@@ -53,8 +53,10 @@ io_task_contains(struct io_task *first, int fd);
 void
 io_task_do_io(struct io_task *task, struct io_task_fdsets *fdsets);
 
-struct io_task_fdsets *
-io_task_get_fdsets(struct io_task *task);
+/* Gets the fdsets for the given TASKs and puts them in the FDSETS structure.
+ * If FDSETS is NULL then the structure is also allocated. */
+void
+io_task_get_fdsets(struct io_task *task, struct io_task_fdsets *fdsets);
 
 int
 io_task_max_fd(struct io_task *task);
@@ -63,8 +65,8 @@ io_task_max_fd(struct io_task *task);
  * Returns a structure containing fd_set fields which indicate which IO tasks
  * can do work without blocking. If there was an error, or there were no
  * non-blocking tasks, returns NULL. */
-struct io_task_fdsets *
-io_task_select(struct io_task *task);
+void
+io_task_select(struct io_task *task, struct io_task_fdsets *fdsets);
 
 struct io_task *
 new_io_task(int fd, TASK_STRUCT task_state, ids_io_read do_read, ids_io_write do_write,
