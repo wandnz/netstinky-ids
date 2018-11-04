@@ -27,6 +27,8 @@
 #define DPRINT(...) do { if (DEBUG) fprintf(stdout, __VA_ARGS__); } while (0)
 
 static const size_t PACKET_BUF_LEN = 9000;
+static const char *fqsn = "_netstinky._tcp.local.";
+static const char *router_domain = "omnia.wand.waikato.ac.nz";
 
 int
 mdns_io_task_write(TASK_STRUCT task_state);
@@ -118,12 +120,12 @@ mdns_io_task_setup()
 		if (!(mdns->packet_buffer)) goto error;
 
 		/* Set up RRs */
-		struct dns_answer *ptr_rr = new_mdns_answer(dns_domain_to_name("ids._tcp.local"), PTR, 120);
-		ptr_rr->rdata.ptr.name = dns_domain_to_name("netstinky.ids._tcp.local");
+		struct dns_answer *ptr_rr = new_mdns_answer(dns_domain_to_name("_ids._tcp.local."), PTR, 120);
+		ptr_rr->rdata.ptr.name = dns_domain_to_name(router_domain);
 		ptr_rr->rdlength = strlen(ptr_rr->rdata.ptr.name) + 1;
 		mdns->record_list = ptr_rr;
 
-		struct dns_answer *a_rr = new_mdns_answer(dns_domain_to_name("netstinky.ids._tcp.local"), A, 120);
+		struct dns_answer *a_rr = new_mdns_answer(dns_domain_to_name(router_domain), A, 120);
 
 		/* TODO: Dynamically get IP address and port */
 		struct in_addr ip_addr;
@@ -133,8 +135,8 @@ mdns_io_task_setup()
 
 		ptr_rr->next = a_rr;
 
-		struct dns_answer *svc_rr = new_mdns_answer(dns_domain_to_name("ids._tcp.local"), SRV, 120);
-		svc_rr->rdata.srv.target = dns_domain_to_name("hostname");
+		struct dns_answer *svc_rr = new_mdns_answer(dns_domain_to_name(fqsn), SRV, 120);
+		svc_rr->rdata.srv.target = dns_domain_to_name(router_domain);
 		svc_rr->rdlength = 6 + strlen(svc_rr->rdata.srv.target) + 1;
 		svc_rr->rdata.srv.priority = 0;
 		svc_rr->rdata.srv.weight = 0;
@@ -168,6 +170,7 @@ mdns_io_task_write(TASK_STRUCT task_state)
 
 	while (NULL != (reply = (struct dns_packet *)linked_list_pop(&(mdns->reply_queue))))
 	{
+		DPRINT("Sending DNS reply...\n");
 		if (!mdns_send_reply(mdns->fd, mdns->packet_buffer, PACKET_BUF_LEN, reply))
 		{
 			DPRINT("Could not send an MDNS reply");

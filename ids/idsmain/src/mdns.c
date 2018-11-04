@@ -135,8 +135,10 @@ mdns_construct_reply(struct dns_packet *p, struct dns_answer *record_list)
 					{
 						/* Add record to answer list */
 						if (NULL == (*reply_tail = dns_answer_copy(record_iter))) goto error;
-						reply_tail = &((*reply_tail)->next->next);
+						reply_tail = &((*reply_tail)->next);
 					}
+
+					record_iter = record_iter->next;
 				}
 			}
 		}

@@ -64,6 +64,24 @@ dns_answer_copy(struct dns_answer *a)
 	if (a && (copy = malloc(sizeof(*copy))))
 	{
 		memcpy(copy, a, sizeof(*copy));
+
+		/* Create a new name string */
+		copy->name = strdup(copy->name);
+
+		switch(copy->type)
+		{
+		case SOA:
+			copy->rdata.soa.mname = strdup(copy->rdata.soa.mname);
+			copy->rdata.soa.rname = strdup(copy->rdata.soa.rname);
+			break;
+		case PTR:
+			copy->rdata.ptr.name = strdup(copy->rdata.ptr.name);
+			break;
+		case SRV:
+			copy->rdata.srv.target = strdup(copy->rdata.srv.target);
+			break;
+		}
+
 		copy->next = NULL;
 	}
 
