@@ -19,6 +19,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "mfletche-common.h"
+
 #include "dns.h"
 #include "byte_array.h"
 
@@ -33,8 +35,41 @@ static const size_t MAX_LABEL_LEN = 63;
 static const size_t MAX_NAME_LEN = 255;
 static const size_t MAX_UDP_MSG_LEN = 512;
 
+/* -- MACROS -- */
+
+/* -- STATIC CHECKING FUNCTIONS -- */
+
+static inline int
+domain_length_ok(size_t length)
+{
+	return (length <= MAX_NAME_LEN);
+}
+
+static inline int
+label_length_ok(size_t length)
+{
+	return (length <= MAX_LABEL_LEN);
+}
+
+/* -- STATIC FUNCTIONS -- */
+
+/*
+ * Does not check bounds. Use carefully */
+static inline unsigned int
+domain_pointer_offset(uint8_t *pointer)
+{
+	unsigned int offset = *pointer++ << 8;
+	offset |= *pointer;
+
+	return (offset);
+}
+
+/* -- PUBLIC FUNCTIONS -- */
+
+/* -- PRIVATE FUNCTIONS -- */
+
 uint16_t
-count_answers(struct dns_answer *ans_list)
+dns_answer_number(struct dns_answer *ans_list)
 {
 	uint16_t count = 0;
 	while (ans_list)
@@ -46,7 +81,7 @@ count_answers(struct dns_answer *ans_list)
 }
 
 uint16_t
-count_questions(struct dns_question *qn_list)
+dns_question_number(struct dns_question *qn_list)
 {
 	uint16_t count = 0;
 	while (qn_list)
@@ -111,12 +146,156 @@ error:
 }
 
 int
-dns_compare_names(uint8_t *a, uint8_t *b)
+dns_compare_domain(uint8_t *a, uint8_t *b)
 {
 	/* domain names must be compared case-insensitively */
 	/* TODO: Determine if this is safe to use */
 	int r = strcasecmp((char *)a, (char *)b);
 	return (r);;
+}
+
+/** Get the actual length that a compressed domain name takes up.
+ *
+ */
+size_t
+dns_domain_compressed_length(char *domain_start, char *domain_end)
+{
+	assert(domain_start);
+	assert(domain_end);
+
+	unsigned int length_total = 0;
+	unsigned int length_label = 0;
+	if (domain_start && domain_end)
+	{
+		while (domain_start < domain_end)
+		{
+			if (dns_label_is_compressed(domain_start))
+			{
+				/* Pointer is two bytes long */
+				length_total += 2;
+				break;
+			}
+
+			/* This includes the length byte. */
+			length_label = *domain_start + 1;
+			if (!label_length_ok(length_label)) goto error;
+
+			length_total += length_label;
+			if (!domain_length_ok(length_total)) goto error;
+
+			/* Complete if length byte is 0. */
+			if (length_label == 0) break;
+
+			domain_start += length_label;
+		}
+
+	}
+
+error:
+	return (0);
+}
+
+/**
+ * Get the length of a domain name when uncompressed.
+ * @param packet_start The start of the DNS packet.
+ * @param packet_end The first byte after the DNS packet.
+ * @param domain_start The start of the domain name.
+ * @return The bytes required to contain the uncompressed domain name.
+ */
+size_t dns_domain_uncompressed_length(const uint8_t *packet_start,
+		const uint8_t *packet_end, const uint8_t *domain_start)
+{
+	assert(packet_start);
+	assert(packet_end);
+	assert(domain_start);
+	assert(packet_start < packet_end);
+	assert(packet_start <= domain_start && domain_start < packet_end);
+
+	size_t domain_len = 0;
+	unsigned int label_len = 0;
+	unsigned int total_len = 0;
+
+	if (packet_start && packet_end && domain_start)
+	{
+		while (packet_start <= domain_start && domain_start < packet_end)
+		{
+			/* Dereference DNS label pointer */
+			if (dns_label_is_compressed(domain_start))
+				if (!(domain_start = dns_label_dereference_pointer(packet_start, packet_end, domain_start)))
+					goto error;
+
+			/* This includes the length byte. */
+			label_len = *domain_start + 1;
+			if (!label_length_ok(label_len)) goto error;
+
+			total_len += label_len;
+			if (!domain_length_ok(total_len)) goto error;
+
+			/* Complete if length byte is 0. */
+			if (label_len == 0) break;
+
+			domain_start += label_len;
+
+		}
+	}
+
+	return (domain_len);
+
+error:
+	return (0);
+}
+
+/**
+ * Gets the position of a label if it is compressed.
+ */
+char *
+dns_label_dereference_pointer(const uint8_t *packet_start, const uint8_t *packet_end,
+		const char *pointer)
+{
+	assert(packet_start);
+	assert(packet_end);
+	assert(packet_start <= pointer && pointer < packet_end);
+	unsigned int offset;
+	char *dest = NULL;
+
+	if (packet_start && packet_end)
+	{
+		/* Make sure that it is a pointer, not a length byte */
+		assert(*pointer & 0xC0 == 0xC0);
+		if (*pointer & 0xC0 == 0xC0)
+		{
+			offset = domain_pointer_offset(pointer);
+			dest = packet_start + offset;
+
+			/* Destination must be before the pointer and within packet bounds */
+			if (dest >= pointer || dest >= packet_end) return (NULL);
+		}
+	}
+
+	return (dest);
+}
+
+/**
+ * Determines if a label is compressed.
+ *
+ * @param label A pointer to what is either the length byte or the index to
+ * the repeated DNS string.
+ * @return 1 if the label is compressed, 0 if not, -1 if an error occurred.
+ */
+int dns_label_is_compressed(const char *label)
+{
+	assert(label);
+
+	int result = -1;
+
+	if (label)
+	{
+		/* If most-significant two bits are set, label is compressed */
+		if (label[0] & 0xc0 == 0xC0) result = 1;
+		else result = 0;
+	}
+
+	return (result);
 }
 
 char *
@@ -421,6 +600,8 @@ dns_parse_label(uint8_t **buf_pos, size_t *remaining_len)
 	assert(remaining_len);
 
 	uint8_t *out = NULL;
+
+	uint8_t *pos = *buf_pos;
 	if (*remaining_len > 0)
 	{
 		size_t label_len = (*buf_pos)[0];
@@ -886,10 +1067,10 @@ dns_write_header(uint8_t **pos_ptr, size_t *remaining_len,
 	**pos_ptr = bit_field;
 	(*pos_ptr)++, (*remaining_len)--;
 
-	pkt->header.qdcount = count_questions(pkt->questions);
-	pkt->header.ancount = count_answers(pkt->answers);
-	pkt->header.nscount = count_answers(pkt->authority);
-	pkt->header.arcount = count_answers(pkt->additional);
+	pkt->header.qdcount = dns_question_number(pkt->questions);
+	pkt->header.ancount = dns_answer_number(pkt->answers);
+	pkt->header.nscount = dns_answer_number(pkt->authority);
+	pkt->header.arcount = dns_answer_number(pkt->additional);
 
 	/* calculate these values */
 	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.qdcount)) return (0);
@@ -927,7 +1108,7 @@ dns_write_question_section(uint8_t **pos_ptr, size_t *remaining_len,
 	assert(pkt);
 
 	struct dns_question *qn = pkt->questions;
-	int num_qns = count_questions(pkt->questions);
+	int num_qns = dns_question_number(pkt->questions);
 	int i;
 	for (i = 0; i < num_qns; i++, qn = qn->next)
 	{
@@ -1114,7 +1295,7 @@ rr_collection_search(struct rr_collection *head, uint8_t *name)
 	{
 		/* It is a mistake to have any records without a name */
 		assert(head->name);
-		if (dns_compare_names(name, head->name) == 0) return (head);
+		if (dns_compare_domain(name, head->name) == 0) return (head);
 
 		head = head->next;
 	}

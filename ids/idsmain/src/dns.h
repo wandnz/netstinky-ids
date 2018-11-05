@@ -196,7 +196,7 @@ struct dns_answer *
 dns_answer_list_copy(struct dns_answer *a);
 
 int
-dns_compare_names(uint8_t *a, uint8_t *b);
+dns_compare_domain(uint8_t *a, uint8_t *b);
 
 uint8_t *
 dns_domain_to_name(char *domain);
