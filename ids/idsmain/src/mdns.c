@@ -115,7 +115,7 @@ mdns_construct_reply(struct dns_packet *p, struct dns_answer *record_list)
 			if (!q) goto error;
 
 			/* This special domain name will be sent all records */
-			int all_services = dns_compare_names(q->qname,
+			int all_services = dns_domain_compare(q->qname,
 					dns_domain_to_name(MDNS_SD_META_REQUEST)) == 0 ? 1 : 0;
 			if (all_services)
 			{
@@ -129,7 +129,7 @@ mdns_construct_reply(struct dns_packet *p, struct dns_answer *record_list)
 				record_iter = record_list;
 				while (record_iter)
 				{
-					if (!dns_compare_names(q->qname, record_iter->name)
+					if (!dns_domain_compare(q->qname, record_iter->name)
 							&& q->qclass == record_iter->class
 							&& q->qtype == record_iter->type)
 					{
@@ -171,9 +171,9 @@ mdns_send_reply(int fd, uint8_t *packet_buf, size_t buf_len, struct dns_packet *
 		replyto_addr.sin_port = htons(MDNS_PORT);
 		replyto_addr.sin_addr.s_addr = inet_addr(MDNS_IP);
 
-		if (!(packet_len = dns_write(packet_buf, buf_len, p))) goto error;
+		if (!(packet_len = dns_write(p, packet_buf, packet_buf + buf_len))) goto error;
 
-		struct dns_packet *test_packet = dns_parse(packet_buf, packet_len);
+		struct dns_packet *test_packet = dns_parse(packet_buf, packet_buf + packet_len);
 		dns_print(test_packet, stdout);
 		free_dns_packet(&test_packet);
 

@@ -37,6 +37,55 @@ static const size_t MAX_UDP_MSG_LEN = 512;
 
 /* -- MACROS -- */
 
+/* -- PRIVATE FUNCTION DECLARATIONS -- */
+
+size_t
+dns_domain_compressed_length(const dns_domain domain_start,
+		const uint8_t *packet_end);
+
+int dns_label_is_compressed(const dns_domain label);
+
+struct dns_answer *
+dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
+		const uint8_t *packet_start, const uint8_t *packet_end);
+
+dns_domain_literal
+dns_parse_domain(uint8_t **buffer_pos, const uint8_t *packet_start,
+		const uint8_t *packet_end);
+
+uint8_t *
+dns_parse_header(struct dns_packet *out, const uint8_t *packet_start,
+		const uint8_t *packet_end);
+
+struct dns_question *
+dns_parse_question_section(uint16_t qn_num, uint8_t **packet_pos,
+		const uint8_t *packet_start, const uint8_t *packet_end);
+
+uint8_t *
+dns_parse_rdata(union rdata_u *rdata, enum dns_qtype type,
+		const uint8_t *rdata_start, const uint8_t *packet_start,
+		const uint8_t *rdata_end);
+
+uint8_t *
+dns_write_answer_section(const struct dns_answer *answer, uint8_t *buffer_pos,
+		const uint8_t *buffer_end);
+
+uint8_t *
+dns_write_domain(dns_domain_literal domain, uint8_t *pos,
+		const uint8_t *buffer_end);
+
+uint8_t *
+dns_write_header(const struct dns_packet *packet, uint8_t *buffer_pos,
+		const uint8_t *buffer_end);
+
+uint8_t *
+dns_write_question_section(const struct dns_packet *packet,
+		uint8_t *buffer_pos, const uint8_t *buffer_end);
+
+uint8_t *
+dns_write_rdata(const union rdata_u rdata, const enum dns_qtype rdata_type,
+		uint8_t *rdata_start, const uint8_t *buffer_end);
+
 /* -- STATIC CHECKING FUNCTIONS -- */
 
 static inline int
@@ -58,7 +107,7 @@ label_length_ok(size_t length)
 static inline unsigned int
 domain_pointer_offset(uint8_t *pointer)
 {
-	unsigned int offset = *pointer++ << 8;
+	unsigned int offset = (*pointer++ & ~0xC0) << 8;
 	offset |= *pointer;
 
 	return (offset);
@@ -66,31 +115,189 @@ domain_pointer_offset(uint8_t *pointer)
 
 /* -- PUBLIC FUNCTIONS -- */
 
+struct dns_answer *
+dns_answer_list_copy(struct dns_answer *a)
+{
+	struct dns_answer *copy_head = NULL, *copy_tail = NULL, *tmp = NULL;
+	while (a)
+	{
+		if (!(tmp = dns_answer_copy(a))) goto error;
+
+		if (!copy_head) copy_head = tmp;
+		if (copy_tail) copy_tail->next = tmp;
+		copy_tail = tmp;
+
+		a = a->next;
+	}
+
+	return (copy_head);
+
+error:
+	free_dns_answer(copy_head);
+	return (NULL);
+}
+
+int
+dns_domain_compare(dns_domain_literal a, dns_domain_literal b)
+{
+	/* domain names must be compared case-insensitively */
+	/* TODO: Determine if this is safe to use */
+	int r = strcasecmp((char *)a, (char *)b);
+	return (r);
+}
+
+struct dns_packet *
+dns_parse(uint8_t *packet_start, uint8_t *packet_end)
+{
+	assert(packet_start);
+	assert(packet_end);
+	assert(packet_start < packet_end);
+
+	uint8_t *pkt_pos = packet_start;
+	struct dns_packet *pkt;
+	int count;
+
+	if (packet_start && packet_end && packet_start < packet_end)
+	{
+		MALLOC_ZERO(pkt);
+		if (!pkt)
+		{
+			DPRINT("dns_parse(): malloc() failed\n");
+			goto error;
+		}
+
+		if (!(pkt_pos = dns_parse_header(pkt, pkt_pos, packet_end)))
+		{
+			DPRINT("dns_parse(): dns_parse_header() failed\n");
+			goto error;
+		}
+
+		if ((count = pkt->header.qdcount))
+		{
+			if (!(pkt->questions = dns_parse_question_section(count, &pkt_pos,
+					packet_start, packet_end)))
+			{
+				DPRINT("dns_parse(): dns_parse_question_section() failed\n");
+				goto error;
+			}
+		}
+
+		if ((count = pkt->header.ancount))
+		{
+			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos, packet_start,
+					packet_end)))
+			{
+				DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
+				goto error;
+			}
+		}
+
+		if ((count = pkt->header.nscount))
+		{
+			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
+					packet_start, packet_end)))
+			{
+				DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
+				goto error;
+			}
+		}
+
+		if ((count = pkt->header.arcount))
+		{
+			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
+					packet_start, packet_end)))
+			{
+				DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
+				goto error;
+			}
+		}
+	}
+
+	return (pkt);
+
+error:
+	/* reverse any operations done so far, free all structures */
+	free_dns_packet(&pkt);
+	return (NULL);
+}
+
+void
+dns_print(struct dns_packet *pkt, FILE *fp)
+{
+	assert(pkt);
+	assert(fp);
+
+	fprintf(fp, "\n");
+	fprintf(fp, " -- MESSAGE HEADER -- \n");
+	fprintf(fp, "ID: %d\n", pkt->header.id);
+	fprintf(fp, "QR: %d\n", pkt->header.qr);
+	fprintf(fp, "OPCODE: %d\n", pkt->header.opcode);
+	fprintf(fp, "AA: %d\n", pkt->header.aa);
+	fprintf(fp, "TC: %d\n", pkt->header.tc);
+	fprintf(fp, "RD: %d\n", pkt->header.rd);
+	fprintf(fp, "RA: %d\n", pkt->header.ra);
+	fprintf(fp, "Z: %d\n", pkt->header.z);
+	fprintf(fp, "QDCOUNT: %d\n", pkt->header.qdcount);
+	fprintf(fp, "ANCOUNT: %d\n", pkt->header.ancount);
+	fprintf(fp, "NSCOUNT: %d\n", pkt->header.nscount);
+	fprintf(fp, "ARCOUNT: %d\n", pkt->header.arcount);
+	fprintf(fp, " -- QUESTION SECTION -- \n");
+	struct dns_question *q = pkt->questions;
+	while (q)
+	{
+		fprintf(fp, "QNAME: %s\n", q->qname);
+		fprintf(fp, "QTYPE: %d\n", q->qtype);
+		fprintf(fp, "QCLASS: %d\n", q->qclass);
+		q = q->next;
+	}
+	fprintf(fp, " -- ANSWER SECTION -- \n");
+	struct dns_answer *a = pkt->answers;
+	while (a)
+	{
+		dns_answer_print(a, fp);
+		a = a->next;
+	}
+	fprintf(fp, " -- AUTHORITY SECTION -- \n");
+	a = pkt->authority;
+	while (a)
+	{
+		dns_answer_print(a, fp);
+		a = a->next;
+	}
+	fprintf(fp, " -- ADDITIONAL SECTION -- \n");
+	a = pkt->additional;
+	while (a)
+	{
+		dns_answer_print(a, fp);
+		a = a->next;
+	}
+	fprintf(fp, "\n\n");
+}
+
+size_t dns_write(struct dns_packet *packet, uint8_t *buffer_start,
+		uint8_t *buffer_end)
+{
+	assert(packet);
+	assert(buffer_start);
+	assert(buffer_end);
+
+	uint8_t *buffer_pos = buffer_start;
+	if (packet && buffer_start && buffer_end && buffer_start < buffer_end)
+	{
+		if (!(buffer_pos = dns_write_header(packet, buffer_pos, buffer_end))) goto error;
+		if (!(buffer_pos = dns_write_question_section(packet, buffer_pos, buffer_end))) goto error;
+		if (!(buffer_pos = dns_write_answer_section(packet->answers, buffer_pos, buffer_end))) goto error;
+		if (!(buffer_pos = dns_write_answer_section(packet->authority, buffer_pos, buffer_end))) goto error;
+		if (!(buffer_pos = dns_write_answer_section(packet->additional, buffer_pos, buffer_end))) goto error;
+	}
+	ptrdiff_t packet_len = buffer_pos - buffer_start;
+	return (packet_len);
+
+error:
+	return (0);
+}
+
 /* -- PRIVATE FUNCTIONS -- */
-
-uint16_t
-dns_answer_number(struct dns_answer *ans_list)
-{
-	uint16_t count = 0;
-	while (ans_list)
-	{
-		count++;
-		ans_list = ans_list->next;
-	}
-	return (count);
-}
-
-uint16_t
-dns_question_number(struct dns_question *qn_list)
-{
-	uint16_t count = 0;
-	while (qn_list)
-	{
-		count++;
-		qn_list = qn_list->next;
-	}
-	return (count);
-}
 
 struct dns_answer *
 dns_answer_copy(struct dns_answer *a)
@@ -123,53 +330,85 @@ dns_answer_copy(struct dns_answer *a)
 	return (copy);
 }
 
-struct dns_answer *
-dns_answer_list_copy(struct dns_answer *a)
+uint16_t
+dns_answer_number(const struct dns_answer *ans_list)
 {
-	struct dns_answer *copy_head = NULL, *copy_tail = NULL, *tmp = NULL;
-	while (a)
+	uint16_t count = 0;
+	struct dns_answer *ans_pos = (struct dns_answer *)ans_list;
+	while (ans_pos)
 	{
-		if (!(tmp = dns_answer_copy(a))) goto error;
-
-		if (!copy_head) copy_head = tmp;
-		if (copy_tail) copy_tail->next = tmp;
-		copy_tail = tmp;
-
-		a = a->next;
+		count++;
+		ans_pos = ans_pos->next;
 	}
-
-	return (copy_head);
-
-error:
-	free_dns_answer(copy_head);
-	return (NULL);
+	return (count);
 }
 
-int
-dns_compare_domain(uint8_t *a, uint8_t *b)
+void
+dns_answer_print(struct dns_answer *a, FILE *fp)
 {
-	/* domain names must be compared case-insensitively */
-	/* TODO: Determine if this is safe to use */
-	int r = strcasecmp((char *)a, (char *)b);
-	return (r);;
+	assert(a);
+	assert(fp);
+
+	struct in_addr addr;
+
+	fprintf(fp, "NAME: %s\n", a->name);
+	fprintf(fp, "TYPE: %d\n", a->type);
+	fprintf(fp, "CLASS: %d\n", a->class);
+	fprintf(fp, "TTL: %d\n", a->ttl);
+	fprintf(fp, "RLENGTH: %d\n", a->rdlength);
+	switch(a->type)
+	{
+	case A:
+		addr.s_addr = htonl(a->rdata.a.ip_address);
+		fprintf(fp, "IP ADDRESS: %s\n", inet_ntoa(addr));
+		break;
+	case MX:
+		fprintf(fp, "PREFERENCE: %d\n", a->rdata.mx.preference);
+		fprintf(fp, "MAIL EXCHANGER: %s\n", a->rdata.mx.mail_exchanger);
+		break;
+	case PTR:
+		fprintf(fp, "NAME: %s\n", a->rdata.ptr.name);
+		break;
+	case SOA:
+		/* TODO: Find out order of mname, rname */
+		fprintf(fp, "PRIMARY NS: %s\n", a->rdata.soa.rname);
+		fprintf(fp, "ADMIN MB: %s\n", a->rdata.soa.mname);
+		fprintf(fp, "SERIAL NUMBER: %d\n", a->rdata.soa.serial);
+		fprintf(fp, "REFRESH INTERVAL: %d\n", a->rdata.soa.refresh);
+		fprintf(fp, "RETRY INTERVAL: %d\n", a->rdata.soa.retry);
+		fprintf(fp, "EXPIRATION LIMIT: %d\n", a->rdata.soa.expire);
+		fprintf(fp, "MINIMUM TTL: %d\n", a->rdata.soa.minimum);
+		break;
+	case SRV:
+		fprintf(fp, "PRIORITY: %d\n", a->rdata.srv.priority);
+		fprintf(fp, "WEIGHT: %d\n", a->rdata.srv.weight);
+		fprintf(fp, "PORT: %d\n", a->rdata.srv.port);
+		fprintf(fp, "TARGET: %s\n", a->rdata.srv.target);
+		break;
+	default:
+		fprintf(fp, "Unknown format: %d\n", a->type);
+		break;
+	}
 }
 
 /** Get the actual length that a compressed domain name takes up.
  *
  */
 size_t
-dns_domain_compressed_length(char *domain_start, char *domain_end)
+dns_domain_compressed_length(const dns_domain domain_start,
+		const uint8_t *packet_end)
 {
 	assert(domain_start);
-	assert(domain_end);
+	assert(packet_end);
 
 	unsigned int length_total = 0;
 	unsigned int length_label = 0;
-	if (domain_start && domain_end)
+	uint8_t *pos = domain_start;
+	if (domain_start && packet_end)
 	{
-		while (domain_start < domain_end)
+		while (pos < packet_end)
 		{
-			if (dns_label_is_compressed(domain_start))
+			if (dns_label_is_compressed(pos))
 			{
 				/* Pointer is two bytes long */
 				length_total += 2;
@@ -177,22 +416,51 @@ dns_domain_compressed_length(char *domain_start, char *domain_end)
 			}
 
 			/* This includes the length byte. */
-			length_label = *domain_start + 1;
+			length_label = *pos + 1;
 			if (!label_length_ok(length_label)) goto error;
 
 			length_total += length_label;
 			if (!domain_length_ok(length_total)) goto error;
 
 			/* Complete if length byte is 0. */
-			if (length_label == 0) break;
+			if (length_label <= 1) break;
 
-			domain_start += length_label;
+			pos += length_label;
 		}
 
 	}
 
+	return (length_total);
+
 error:
 	return (0);
+}
+
+/**
+ * Gets the position of a label if it is compressed.
+ */
+dns_domain
+dns_label_dereference_pointer(const dns_domain pointer, const uint8_t *packet_start, const uint8_t *packet_end)
+{
+	assert(packet_start);
+	assert(packet_end);
+	assert(packet_start <= pointer && pointer < packet_end);
+	unsigned int offset;
+	dns_domain dest = NULL;
+
+	if (packet_start && packet_end)
+	{
+		/* Make sure that it is a pointer, not a length byte */
+		assert((*pointer & 0xC0) == 0xC0);
+
+		offset = domain_pointer_offset(pointer);
+		dest = (dns_domain)(packet_start + offset);
+
+		/* Destination must be before the pointer and within packet bounds */
+		if (dest >= pointer || dest >= packet_end) return (NULL);
+	}
+
+	return (dest);
 }
 
 /**
@@ -202,77 +470,42 @@ error:
  * @param domain_start The start of the domain name.
  * @return The bytes required to contain the uncompressed domain name.
  */
-size_t dns_domain_uncompressed_length(const uint8_t *packet_start,
-		const uint8_t *packet_end, const uint8_t *domain_start)
+size_t dns_domain_uncompressed_length( const dns_domain domain_start,
+		const uint8_t *packet_start, const uint8_t *packet_end)
 {
 	assert(packet_start);
 	assert(packet_end);
 	assert(domain_start);
-	assert(packet_start < packet_end);
-	assert(packet_start <= domain_start && domain_start < packet_end);
 
-	size_t domain_len = 0;
 	unsigned int label_len = 0;
 	unsigned int total_len = 0;
+	dns_domain label_start = domain_start;
 
-	if (packet_start && packet_end && domain_start)
+	while (packet_start <= label_start && label_start < packet_end)
 	{
-		while (packet_start <= domain_start && domain_start < packet_end)
-		{
-			/* Dereference DNS label pointer */
-			if (dns_label_is_compressed(domain_start))
-				if (!(domain_start = dns_label_dereference_pointer(packet_start, packet_end, domain_start)))
-					goto error;
+		/* Dereference DNS label pointer */
+		if (dns_label_is_compressed(label_start))
+			if (!(label_start = dns_label_dereference_pointer(label_start, packet_start, packet_end)))
+				goto error;
 
-			/* This includes the length byte. */
-			label_len = *domain_start + 1;
-			if (!label_length_ok(label_len)) goto error;
+		/* This includes the length byte. */
+		label_len = *label_start + 1;
+		if (!label_length_ok(label_len)) goto error;
 
-			total_len += label_len;
-			if (!domain_length_ok(total_len)) goto error;
+		total_len += label_len;
+		if (!domain_length_ok(total_len)) goto error;
 
-			/* Complete if length byte is 0. */
-			if (label_len == 0) break;
+		/* Complete if length byte is 0. */
+		if (label_len == 1) break;
 
-			domain_start += label_len;
+		label_start += label_len;
 
-		}
 	}
 
-	return (domain_len);
+	return ((size_t)total_len);
 
 error:
 	return (0);
-}
-
-/**
- * Gets the position of a label if it is compressed.
- */
-char *
-dns_label_dereference_pointer(const uint8_t *packet_start, const uint8_t *packet_end,
-		const char *pointer)
-{
-	assert(packet_start);
-	assert(packet_end);
-	assert(packet_start <= pointer && pointer < packet_end);
-	unsigned int offset;
-	char *dest = NULL;
-
-	if (packet_start && packet_end)
-	{
-		/* Make sure that it is a pointer, not a length byte */
-		assert(*pointer & 0xC0 == 0xC0);
-		if (*pointer & 0xC0 == 0xC0)
-		{
-			offset = domain_pointer_offset(pointer);
-			dest = packet_start + offset;
-
-			/* Destination must be before the pointer and within packet bounds */
-			if (dest >= pointer || dest >= packet_end) return (NULL);
-		}
-	}
-
-	return (dest);
 }
 
 /**
@@ -282,7 +515,7 @@ dns_label_dereference_pointer(const uint8_t *packet_start, const uint8_t *packet
  * the repeated DNS string.
  * @return 1 if the label is compressed, 0 if not, -1 if an error occurred.
  */
-int dns_label_is_compressed(const char *label)
+int dns_label_is_compressed(const dns_domain label)
 {
 	assert(label);
 
@@ -291,11 +524,54 @@ int dns_label_is_compressed(const char *label)
 	if (label)
 	{
 		/* If most-significant two bits are set, label is compressed */
-		if (label[0] & 0xc0 == 0xC0) result = 1;
+		if ((label[0] & 0xC0) == 0xC0) result = 1;
 		else result = 0;
 	}
 
 	return (result);
+}
+
+struct dns_answer *
+dns_parse_answer(uint8_t **buf_pos,
+		const uint8_t *packet_start, const uint8_t *packet_end)
+{
+	assert(buf_pos);
+	assert(packet_start);
+	assert(packet_end);
+	assert(packet_start <= *buf_pos && *buf_pos < packet_end);
+
+	struct dns_answer *ans = NULL;
+
+	if (!(ans = new_dns_answer())) goto error;
+	if (!(ans->name = dns_parse_domain(buf_pos, packet_start, packet_end)))
+			goto error;
+
+	if (!(*buf_pos = byte_array_read_uint16(&(ans->type), *buf_pos, packet_end))) goto error;
+	if (!(*buf_pos = byte_array_read_uint16(&(ans->class), *buf_pos, packet_end))) goto error;
+	if (!(*buf_pos = byte_array_read_uint32(&(ans->ttl), *buf_pos, packet_end))) goto error;
+	if (!(*buf_pos = byte_array_read_uint16(&(ans->rdlength), *buf_pos, packet_end))) goto error;
+
+	if (!dns_parse_rdata(&(ans->rdata), ans->type, *buf_pos, packet_start,
+			*buf_pos + ans->rdlength))
+		goto error;
+
+	return (ans);
+
+error:
+	free_dns_answer(ans);
+	return (NULL);
+}
+
+uint16_t
+dns_question_number(const struct dns_question *qn_list)
+{
+	uint16_t count = 0;
+	while (qn_list)
+	{
+		count++;
+		qn_list = qn_list->next;
+	}
+	return (count);
 }
 
 char *
@@ -396,153 +672,14 @@ error:
 	return (NULL);
 }
 
-struct dns_packet *
-dns_parse(uint8_t *pkt_buff, size_t pkt_len)
-{
-	assert(pkt_buff);
-
-	uint8_t *pkt_pos = pkt_buff;
-	size_t remaining_len = pkt_len;
-
-	struct dns_packet *pkt_parsed = malloc(sizeof(*pkt_parsed));
-	if (NULL == pkt_parsed)
-	{
-		DPRINT("dns_parse(): malloc() failed\n");
-		goto error;
-	}
-	memset(pkt_parsed, 0, sizeof(*pkt_parsed));
-
-	if (!dns_parse_header(pkt_parsed, &pkt_pos, &pkt_len))
-	{
-		DPRINT("dns_parse(): dns_parse_header() failed\n");
-		goto error;
-	}
-
-	if (pkt_parsed->header.qdcount)
-	{
-		pkt_parsed->questions = dns_parse_question_section(pkt_parsed->header.qdcount, &pkt_pos, &remaining_len);
-		if (!pkt_parsed->questions)
-		{
-			DPRINT("dns_parse(): dns_parse_question_section() failed\n");
-			goto error;
-		}
-	}
-
-	if (pkt_parsed->header.ancount)
-	{
-		if (!dns_parse_answer_section_into(&pkt_parsed->answers, pkt_parsed->header.ancount, &pkt_pos, &remaining_len, pkt_buff))
-		{
-			DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
-			goto error;
-		}
-	}
-	if (pkt_parsed->header.nscount)
-	{
-		if (!dns_parse_answer_section_into(&pkt_parsed->authority, pkt_parsed->header.nscount, &pkt_pos, &remaining_len, pkt_buff))
-		{
-			DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
-			goto error;
-		}
-	}
-	if (pkt_parsed->header.arcount)
-	{
-		if (!dns_parse_answer_section_into(&pkt_parsed->additional, pkt_parsed->header.arcount, &pkt_pos, &remaining_len, pkt_buff))
-		{
-			DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
-			goto error;
-		}
-	}
-
-	return (pkt_parsed);
-
-error:
-	/* reverse any operations done so far, free all structures */
-	free_dns_packet(&pkt_parsed);
-	return (NULL);
-}
-
-int
-dns_parse_answer(struct dns_answer **out, uint8_t **buf_pos,
-		size_t *remaining_len, uint8_t *buf_start)
-{
-	assert(out);
-
-	/* this might be annoying but it will force proper initialization
-	 * of variables so should make programs safer */
-	assert(NULL == *out);
-
-	assert(buf_pos);
-	assert(*buf_pos);
-	assert(remaining_len);
-
-	struct dns_answer *ans = NULL;
-
-	/* if the most significant 2 bits of the name field are 1 the
-	 * field contains a pointer instead of a literal name */
-	if (*remaining_len > 0)
-	{
-		ans = new_dns_answer();
-		if (NULL == ans) goto error;
-
-		/* Check if name is a literal string or a pointer */
-		if (*buf_pos[0] & 0xC0)
-		{
-			uint16_t ptr;
-			if (!byte_array_read_uint16(&ptr, buf_pos, remaining_len)) goto error;
-			ptr &= 0x3FFF;	/* Clear top two bits */
-
-			/* Don't want to increment our main buffer pointer, etc because
-			 * label is located in an area we have read previously */
-			uint8_t *ptr_ptr = &(buf_start[ptr]);
-			size_t buf_len = MAX_PKT_SIZE;
-
-			ans->name = dns_parse_name(&ptr_ptr, &buf_len);
-			if (!(ans->name)) goto error;
-
-		}
-		else
-		{
-			ans->name = dns_parse_name(buf_pos, remaining_len);
-			if (NULL == ans->name) goto error;
-		}
-
-		if (!byte_array_read_uint16(&(ans->type), buf_pos, remaining_len)) goto error;
-		if (!byte_array_read_uint16(&(ans->class), buf_pos, remaining_len)) goto error;
-		if (!byte_array_read_uint32(&(ans->ttl), buf_pos, remaining_len)) goto error;
-		if (!byte_array_read_uint16(&(ans->rdlength), buf_pos, remaining_len)) goto error;
-
-		if (ans->rdlength > *remaining_len) goto error;
-
-		/* rdata has a separate length field so set up a smaller
-		 * limit for it */
-		uint8_t *rdata_pos = *buf_pos;
-		size_t rdata_remaining_len = ans->rdlength;
-
-		if (!dns_parse_rdata(&ans, ans->type, &rdata_pos, &rdata_remaining_len)) goto error;
-
-		/* since everything worked out, now update the "master"
-		 * pointer and remainder */
-		(*buf_pos) += ans->rdlength;
-		(*remaining_len) -= ans->rdlength;
-	}
-
-	*out = ans;
-
-	return (1);
-
-error:
-	free_dns_answer(ans);
-	*out = NULL;
-	return (0);
-}
-
 struct dns_answer *
 dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
-		size_t *remaining_len, uint8_t *buf_start)
+		const uint8_t *packet_start, const uint8_t *packet_end)
 {
 	assert(buf_pos);
 	assert(*buf_pos);
-	assert(remaining_len);
+	assert(packet_start);
+	assert(packet_end);
 
 	struct dns_answer *first_answer = NULL;
 	struct dns_answer *last_answer = NULL;
@@ -551,7 +688,8 @@ dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
 	for (i = 0; i < num_answers; i++)
 	{
 		struct dns_answer *new_answer = NULL;
-		if (!dns_parse_answer(&new_answer, buf_pos, remaining_len, buf_start)) goto error;
+		if (!(new_answer = dns_parse_answer(buf_pos, packet_start, packet_end)))
+			goto error;
 
 		if (NULL == last_answer)
 			first_answer = last_answer = new_answer;
@@ -569,178 +707,127 @@ error:
 	return (NULL);
 }
 
-int
-dns_parse_answer_section_into(struct dns_answer **out,
-		uint16_t num_answers, uint8_t **buf_pos, size_t *remaining_len,
-		uint8_t *buf_start)
+dns_domain_literal
+dns_parse_domain(uint8_t **buffer_pos, const uint8_t *packet_start,
+		const uint8_t *packet_end)
 {
-	assert(out);
-	assert(buf_pos);
-	assert(*buf_pos);
-	assert(remaining_len);
+	assert(buffer_pos);
+	assert(*buffer_pos);
+	assert(packet_start);
+	assert(packet_end);
 
-	if (num_answers > 0)
-	{
-		*out = dns_parse_answer_section(num_answers, buf_pos, remaining_len,
-				buf_start);
-		if (NULL == *out) goto error;
-	}
+	dns_domain_literal domain_out = NULL;
+	dns_domain_literal domain_out_pos = NULL;
+	dns_domain domain_in_pos = NULL;
+	size_t total_length, label_length;
 
-	return (1);
-
-error:
-	return (0);
-}
-
-uint8_t *
-dns_parse_label(uint8_t **buf_pos, size_t *remaining_len)
-{
-	assert(buf_pos);
-	assert(*buf_pos);
-	assert(remaining_len);
-
-	uint8_t *out = NULL;
-
-	uint8_t *pos = *buf_pos;
-	if (*remaining_len > 0)
-	{
-		size_t label_len = (*buf_pos)[0];
-		if (label_len > MAX_LABEL_LEN) return (NULL);
-		if ( (label_len + 1) >= *remaining_len) return (NULL);
-
-		/* add NULL byte and length byte */
-		size_t label_bytes = label_len + 2;
-
-		out = malloc(label_bytes);
-		if (!out) return (NULL);
-
-		strncpy((char *)out, (char *)*buf_pos, label_bytes);
-		out[label_bytes] = 0; /* ensure NULL termination */
-
-		/* don't skip over the next length byte */
-		*buf_pos += label_len + 1;
-		*remaining_len -= label_len;
-	}
-
-	return (out);
-}
-
-uint8_t *
-dns_parse_name(uint8_t **buf_pos, size_t *remaining_len)
-{
-	assert(buf_pos);
-	assert(*buf_pos);
-	assert(remaining_len);
-
-	uint8_t *out = NULL;
-
-	size_t buf_index = 0;
-	if (*remaining_len > 0)
-	{
-		size_t label_len = 0;
-		do
-		{
-			/* Hop along string only checking the label lengths */
-			label_len = (*buf_pos)[buf_index];
-			if (label_len > MAX_LABEL_LEN)
-			{
-				DPRINT("dns_parse_name(): label length exceeds MAX_LABEL_LEN\n");
-				goto error;
-			}
-
-			buf_index += label_len + 1;
-			if (buf_index > *remaining_len)
-			{
-				DPRINT("dns_parse_name(): parsing label would overflow buffer\n");
-				goto error;
-			}
-			if (buf_index >= MAX_NAME_LEN)
-			{
-				DPRINT("dns_parse_name(): name length exceeds MAX_NAME_LEN\n");
-			}
-		} while (label_len != 0);
-	}
-
-	/* buf_index now contains the length (including \x0 byte) */
-	out = malloc(buf_index);
-	if (NULL == out)
-	{
-		DPRINT("dns_parse_name(): malloc() failed\n");
+	/* Find out length of domain literal */
+	if (!(total_length
+			= dns_domain_uncompressed_length(*buffer_pos, packet_start,
+					packet_end)))
 		goto error;
+
+	if (!(domain_out = malloc(total_length))) goto error;
+	domain_out_pos = domain_out;
+	domain_in_pos = *buffer_pos;
+
+	while (domain_in_pos < packet_end)
+	{
+		if (dns_label_is_compressed(domain_in_pos)
+			&& !(domain_in_pos = dns_label_dereference_pointer(domain_in_pos, packet_start, packet_end)))
+				goto error;
+
+		/* Checks on label length have already been performed when getting the
+		 * length so don't need to do those again. */
+		label_length = *domain_in_pos + 1;
+
+		/* Copy label. Won't be NULL terminated until after last label has been
+		 * copied. */
+		strncpy((char *)domain_out_pos, (char *)domain_in_pos, label_length);
+
+		if (label_length <= 1) break;	/* Done */
+
+		domain_in_pos += label_length;
+		domain_out_pos += label_length;
 	}
 
-	strncpy((char *)out, (char *)(*buf_pos), buf_index);
+	*buffer_pos = *buffer_pos + dns_domain_compressed_length(*buffer_pos,
+			packet_end);
 
-	*buf_pos += buf_index;
-	*remaining_len -= buf_index;
-
-	return (out);
+	return (domain_out);
 
 error:
-	if (out) free(out);
-	return (0);
+	if (domain_out) free(domain_out);
+	return (NULL);
 }
 
-int dns_parse_header(struct dns_packet *out, uint8_t **buf_pos, size_t *remaining_len)
+uint8_t *
+dns_parse_header(struct dns_packet *out, const uint8_t *packet_start,
+		const uint8_t *packet_end)
 {
 	assert(out);
-	assert(buf_pos);
-	assert(*buf_pos);
-	assert(remaining_len);
+	assert(packet_start);
+	assert(packet_end);
 
-	if (*remaining_len >= DNS_HEADER_LEN)
-	{
-		out->header.id = byte_array_get_uint16(*buf_pos);
-		out->header.qr = ((*buf_pos)[2] & 0x80) >> 7;
-		out->header.opcode = ((*buf_pos)[2] & 0x78) >> 3;
-		out->header.aa = ((*buf_pos)[2] & 0x04) >> 2;
-		out->header.tc = ((*buf_pos)[2] & 0x02) >> 1;
-		out->header.rd = ((*buf_pos)[2] & 0x01);
-		out->header.ra = ((*buf_pos)[3] & 0x80) >> 7;
-		out->header.z = ((*buf_pos)[3] & 0x70) >> 4;
-		out->header.rcode = ((*buf_pos)[3] & 0x0F);
-		out->header.qdcount = byte_array_get_uint16(&((*buf_pos)[4]));
-		out->header.ancount = byte_array_get_uint16(&((*buf_pos)[6]));
-		out->header.nscount = byte_array_get_uint16(&((*buf_pos)[8]));
-		out->header.arcount = byte_array_get_uint16(&((*buf_pos)[10]));
+	uint8_t *packet_pos = (uint8_t *)packet_start;
+	if (packet_end < packet_pos + DNS_HEADER_LEN) goto error;
 
-		(*buf_pos) += DNS_HEADER_LEN;
-		(*remaining_len) -= DNS_HEADER_LEN;
+	struct dns_header h = out->header;
 
-		return (1);
-	}
+	packet_pos = byte_array_read_uint16(&(h.id), packet_pos, packet_end);
+	h.qr = (*packet_pos & 0x80) >> 7;
+	h.opcode = (*packet_pos & 0x78) >> 3;
+	h.aa = (*packet_pos & 0x04) >> 2;
+	h.tc = (*packet_pos & 0x02) >> 1;
+	h.rd = (*packet_pos & 0x01);
+	packet_pos++;
+	h.ra = (*packet_pos & 0x80) >> 7;
+	h.z = (*packet_pos & 0x70) >> 4;
+	h.rcode = (*packet_pos & 0x0F);
+	packet_pos++;
+	packet_pos = byte_array_read_uint16(&(h.qdcount), packet_pos, packet_end);
+	packet_pos = byte_array_read_uint16(&(h.ancount), packet_pos, packet_end);
+	packet_pos = byte_array_read_uint16(&(h.nscount), packet_pos, packet_end);
+	packet_pos = byte_array_read_uint16(&(h.arcount), packet_pos, packet_end);
 
+	out->header = h;
+
+	return (packet_pos);
+
+error:
 	return (0);
 }
 
 struct dns_question *
-dns_parse_question(uint8_t **qn_start, size_t *max_len)
+dns_parse_question(uint8_t **out, const uint8_t *packet_start,
+		const uint8_t *packet_end)
 {
-	assert(qn_start);
-	assert(*qn_start);
-	assert(max_len);
+	assert(out);
+	assert(*out);
+	assert(packet_start);
+	assert(packet_end);
 
 	struct dns_question *qn = new_dns_question();
 	if (!qn)
 	{
 		DPRINT("dns_parse_question(): new_dns_question() failed\n");
-		return (NULL);
+		goto error;
 	}
 
-	qn->qname = dns_parse_name(qn_start, max_len);
+	qn->qname = dns_parse_domain(out, packet_start, packet_end);
 	if (!qn->qname)
 	{
 		DPRINT("dns_parse_question(): dns_parse_name() failed\n");
 		goto error;
 	}
 
-	if (!byte_array_read_uint16(&(qn->qtype), qn_start, max_len))
+	if (!(*out = byte_array_read_uint16(&(qn->qtype), *out, packet_end)))
 	{
 		DPRINT("dns_parse_question(): byte_array_read_uint16() failed\n");
 		goto error;
 	}
 
-	if (!byte_array_read_uint16(&(qn->qclass), qn_start, max_len))
+	if (!(*out = byte_array_read_uint16(&(qn->qclass), *out, packet_end)))
 	{
 		DPRINT("dns_parse_question(): byte_array_read_uint16() failed\n");
 		goto error;
@@ -754,61 +841,67 @@ error:
 }
 
 struct dns_question *
-dns_parse_question_section(uint16_t qn_num,
-		uint8_t **buf_pos, size_t *remaining_len)
+dns_parse_question_section(uint16_t qn_num, uint8_t **packet_pos,
+		const uint8_t *packet_start, const uint8_t *packet_end)
 {
-	assert(buf_pos);
-	assert(*buf_pos);
-	assert(remaining_len);
+	assert(packet_pos);
+	assert(*packet_pos);
+	assert(packet_start);
+	assert(packet_end);
 
-	struct dns_question *qn_list = NULL;
-	struct dns_question *last_qn = NULL;
+	struct dns_question *q_list_head = NULL, *q_list_tail = NULL;
 	int i;
 
-	for (i = 0; i < qn_num; i++)
+	for (i = qn_num; i > 0; i--)
 	{
-		struct dns_question *new_qn = dns_parse_question(buf_pos, remaining_len);
+		struct dns_question *new_qn = dns_parse_question(packet_pos,
+				packet_start, packet_end);
 		if (!new_qn)
 		{
 			DPRINT("dns_parse_question_section(): dns_parse_question() failed\n");
 			goto error;
 		}
 
-		if (!qn_list)
-		{
-			qn_list = new_qn;
-			last_qn = qn_list;
-		}
+		if (!q_list_tail)
+			q_list_tail = q_list_head = new_qn;
 		else
 		{
-			last_qn->next = new_qn;
-			last_qn = last_qn->next;
+			q_list_tail->next = new_qn;
+			q_list_tail = q_list_tail->next;
 		}
 	}
 
-	return (qn_list);
+	return (q_list_head);
 
 error:
-	free_dns_question(qn_list);
+	free_dns_question(q_list_head);
 	return (NULL);
 }
 
-int
-dns_parse_rdata(struct dns_answer **out, enum dns_qtype type,
-		uint8_t **pos_ptr, size_t *remaining_len)
+uint8_t *
+dns_parse_rdata(union rdata_u *rdata, enum dns_qtype type, const uint8_t *rdata_start,
+		const uint8_t *packet_start, const uint8_t *rdata_end)
 {
-	assert(pos_ptr);
+	assert(rdata);
+	assert(rdata_start);
+	assert(packet_start);
+	assert(rdata_end);
+
+	uint8_t *rdata_pos = (uint8_t *)rdata_start;
 
 	switch(type)
 	{
 	case(A):
-		if (!byte_array_read_uint32(&(*out)->rdata.a.ip_address, pos_ptr, remaining_len)) return (0);
+		if (!(rdata_pos = byte_array_read_uint32(&(rdata->a.ip_address),
+				rdata_start, rdata_end)))
+			return (0);
 		break;
 	case(NS):
 		/* no break: NS and PTR have the same format */
 	case(PTR):
-		(*out)->rdata.ptr.name = dns_parse_name(pos_ptr, remaining_len);
-		if (!(*out)->rdata.ptr.name) return (0);
+		if (!(rdata->ptr.name = dns_parse_domain(&rdata_pos, packet_start,
+				rdata_end)))
+			goto error;
 		break;
 	case(MD):
 		break;
@@ -817,23 +910,43 @@ dns_parse_rdata(struct dns_answer **out, enum dns_qtype type,
 	case(CNAME):
 		break;
 	case(SOA):
-		(*out)->rdata.soa.mname = dns_parse_name(pos_ptr, remaining_len);
-		if (!(*out)->rdata.soa.mname) return (0);
-		size_t name_len = strlen((char *)((*out)->rdata.soa.mname));
-		pos_ptr += name_len;
-		remaining_len -= name_len;
+		if (!(rdata->soa.mname = dns_parse_domain(&rdata_pos, packet_start,
+				rdata_end)))
+			goto soa_error;
 
-		(*out)->rdata.soa.rname = dns_parse_name(pos_ptr, remaining_len);
-		if (!(*out)->rdata.soa.rname) return (0);
-		name_len = strlen((char *)((*out)->rdata.soa.rname));
-		pos_ptr += name_len;
-		remaining_len -= name_len;
+		if (!(rdata->soa.rname = dns_parse_domain(&rdata_pos, packet_start,
+				rdata_end)))
+			goto soa_error;
 
-		if (!byte_array_read_uint32(&(*out)->rdata.soa.serial, pos_ptr, remaining_len)) return (0);
-		if (!byte_array_read_uint32(&(*out)->rdata.soa.refresh, pos_ptr, remaining_len)) return (0);
-		if (!byte_array_read_uint32(&(*out)->rdata.soa.retry, pos_ptr, remaining_len)) return (0);
-		if (!byte_array_read_uint32(&(*out)->rdata.soa.expire, pos_ptr, remaining_len)) return (0);
-		if (!byte_array_read_uint32(&(*out)->rdata.soa.minimum, pos_ptr, remaining_len)) return (0);
+		if (!(rdata_pos = byte_array_read_uint32(&(rdata->soa.serial),
+				rdata_pos, rdata_end)))
+			goto soa_error;
+		if (!(rdata_pos = byte_array_read_uint32(&(rdata->soa.refresh),
+				rdata_pos, rdata_end)))
+			goto soa_error;
+		if (!(rdata_pos = byte_array_read_uint32(&(rdata->soa.retry),
+				rdata_pos, rdata_end)))
+			goto soa_error;
+		if (!(rdata_pos = byte_array_read_uint32(&(rdata->soa.expire),
+				rdata_pos, rdata_end)))
+			goto soa_error;
+		if (!(rdata_pos = byte_array_read_uint32(&(rdata->soa.minimum),
+				rdata_pos, rdata_end)))
+			goto soa_error;
+		break;
+		/* SOA specific cleanup */
+soa_error:
+		if (rdata->soa.mname)
+		{
+			free(rdata->soa.mname);
+			rdata->soa.mname = NULL;
+		}
+		if (rdata->soa.rname)
+		{
+			free(rdata->soa.rname);
+			rdata->soa.rname = NULL;
+		}
+		goto error;
 		break;
 	case(MB):
 		break;
@@ -854,329 +967,215 @@ dns_parse_rdata(struct dns_answer **out, enum dns_qtype type,
 	case(TXT):
 		break;
 	case(SRV):
-		if (!byte_array_read_uint16(&(*out)->rdata.srv.priority, pos_ptr, remaining_len)) goto srv_error;
-		if (!byte_array_read_uint16(&(*out)->rdata.srv.weight, pos_ptr, remaining_len)) goto srv_error;
-		if (!byte_array_read_uint16(&(*out)->rdata.srv.port, pos_ptr, remaining_len)) goto srv_error;
-		if (!((*out)->rdata.srv.target = dns_parse_name(pos_ptr, remaining_len))) goto srv_error;
+		if (!(rdata_pos = byte_array_read_uint16(&(rdata->srv.priority), rdata_pos, rdata_end))) goto srv_error;
+		if (!(rdata_pos = byte_array_read_uint16(&(rdata->srv.weight), rdata_pos, rdata_end))) goto srv_error;
+		if (!(rdata_pos = byte_array_read_uint16(&(rdata->srv.port), rdata_pos, rdata_end))) goto srv_error;
+		if (!(rdata->srv.target = dns_parse_domain(&rdata_pos, packet_start, rdata_end))) goto srv_error;
 		break;
 srv_error:
-		if ((*out)->rdata.srv.target) free((*out)->rdata.srv.target);
-		return (0);
-	default:
-		break;
-	}
-
-	return (1);
-}
-
-void
-dns_print(struct dns_packet *pkt, FILE *fp)
-{
-	assert(pkt);
-	assert(fp);
-
-	fprintf(fp, "\n");
-	fprintf(fp, " -- MESSAGE HEADER -- \n");
-	fprintf(fp, "ID: %d\n", pkt->header.id);
-	fprintf(fp, "QR: %d\n", pkt->header.qr);
-	fprintf(fp, "OPCODE: %d\n", pkt->header.opcode);
-	fprintf(fp, "AA: %d\n", pkt->header.aa);
-	fprintf(fp, "TC: %d\n", pkt->header.tc);
-	fprintf(fp, "RD: %d\n", pkt->header.rd);
-	fprintf(fp, "RA: %d\n", pkt->header.ra);
-	fprintf(fp, "Z: %d\n", pkt->header.z);
-	fprintf(fp, "QDCOUNT: %d\n", pkt->header.qdcount);
-	fprintf(fp, "ANCOUNT: %d\n", pkt->header.ancount);
-	fprintf(fp, "NSCOUNT: %d\n", pkt->header.nscount);
-	fprintf(fp, "ARCOUNT: %d\n", pkt->header.arcount);
-	fprintf(fp, " -- QUESTION SECTION -- \n");
-	struct dns_question *q = pkt->questions;
-	while (q)
-	{
-		fprintf(fp, "QNAME: %s\n", q->qname);
-		fprintf(fp, "QTYPE: %d\n", q->qtype);
-		fprintf(fp, "QCLASS: %d\n", q->qclass);
-		q = q->next;
-	}
-	fprintf(fp, " -- ANSWER SECTION -- \n");
-	struct dns_answer *a = pkt->answers;
-	while (a)
-	{
-		print_answer(a, fp);
-		a = a->next;
-	}
-	fprintf(fp, " -- AUTHORITY SECTION -- \n");
-	a = pkt->authority;
-	while (a)
-	{
-		print_answer(a, fp);
-		a = a->next;
-	}
-	fprintf(fp, " -- ADDITIONAL SECTION -- \n");
-	a = pkt->additional;
-	while (a)
-	{
-		print_answer(a, fp);
-		a = a->next;
-	}
-	fprintf(fp, "\n\n");
-}
-
-void
-print_answer(struct dns_answer *a, FILE *fp)
-{
-	assert(a);
-	assert(fp);
-
-	struct in_addr addr;
-
-	fprintf(fp, "NAME: %s\n", a->name);
-	fprintf(fp, "TYPE: %d\n", a->type);
-	fprintf(fp, "CLASS: %d\n", a->class);
-	fprintf(fp, "TTL: %d\n", a->ttl);
-	fprintf(fp, "RLENGTH: %d\n", a->rdlength);
-	switch(a->type)
-	{
-	case A:
-		addr.s_addr = htonl(a->rdata.a.ip_address);
-		fprintf(fp, "IP ADDRESS: %s\n", inet_ntoa(addr));
-		break;
-	case MX:
-		fprintf(fp, "PREFERENCE: %d\n", a->rdata.mx.preference);
-		fprintf(fp, "MAIL EXCHANGER: %s\n", a->rdata.mx.mail_exchanger);
-		break;
-	case PTR:
-		fprintf(fp, "NAME: %s\n", a->rdata.ptr.name);
-		break;
-	case SOA:
-		/* TODO: Find out order of mname, rname */
-		fprintf(fp, "PRIMARY NS: %s\n", a->rdata.soa.rname);
-		fprintf(fp, "ADMIN MB: %s\n", a->rdata.soa.mname);
-		fprintf(fp, "SERIAL NUMBER: %d\n", a->rdata.soa.serial);
-		fprintf(fp, "REFRESH INTERVAL: %d\n", a->rdata.soa.refresh);
-		fprintf(fp, "RETRY INTERVAL: %d\n", a->rdata.soa.retry);
-		fprintf(fp, "EXPIRATION LIMIT: %d\n", a->rdata.soa.expire);
-		fprintf(fp, "MINIMUM TTL: %d\n", a->rdata.soa.minimum);
-		break;
-	case SRV:
-		fprintf(fp, "PRIORITY: %d\n", a->rdata.srv.priority);
-		fprintf(fp, "WEIGHT: %d\n", a->rdata.srv.weight);
-		fprintf(fp, "PORT: %d\n", a->rdata.srv.port);
-		fprintf(fp, "TARGET: %s\n", a->rdata.srv.target);
+		if (rdata->srv.target)
+		{
+			free(rdata->srv.target);
+			rdata->srv.target = NULL;
+		}
+		goto error;
 		break;
 	default:
-		fprintf(fp, "Unknown format: %d\n", a->type);
 		break;
 	}
-}
 
-size_t dns_write(uint8_t *buf_ptr, size_t buf_len,
-		struct dns_packet *pkt)
-{
-	assert(buf_ptr);
-	assert(pkt);
-
-	uint8_t *buf_pos = buf_ptr;
-	size_t remaining_len = buf_len;
-
-	if (!dns_write_header(&buf_pos, &remaining_len, pkt)) goto error;
-
-	if (!dns_write_question_section(&buf_pos, &remaining_len, pkt)) goto error;
-	if (!dns_write_answer_section(&buf_pos, &remaining_len, pkt->answers, pkt->header.ancount)) goto error;
-	if (!dns_write_answer_section(&buf_pos, &remaining_len, pkt->authority, pkt->header.nscount)) goto error;
-	if (!dns_write_answer_section(&buf_pos, &remaining_len, pkt->additional, pkt->header.arcount)) goto error;
-	ptrdiff_t packet_len = buf_pos - buf_ptr;
-	return (packet_len);
+	return (rdata_pos);
 
 error:
-	return (0);
+	return (NULL);
 }
 
-int
-dns_write_answer(uint8_t **pos_ptr, size_t *remaining_len, struct dns_answer *answer)
+uint8_t *
+dns_write_answer(const struct dns_answer *answer, uint8_t *answer_start,
+		const uint8_t *buffer_end)
 {
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
 	assert(answer);
+	assert(answer_start);
+	assert(buffer_end);
+	uint8_t *answer_pos = (uint8_t *)answer_start;
 
-	if (!dns_write_name(pos_ptr, remaining_len, answer->name)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, answer->type)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, answer->class)) return (0);
-	if (!byte_array_write_uint32(pos_ptr, remaining_len, answer->ttl)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, answer->rdlength)) return (0);
+	if (!(answer_pos = dns_write_domain(answer->name, answer_pos, buffer_end)))
+		goto error;
+	if (!(answer_pos = byte_array_write_uint16(answer->type, answer_pos, buffer_end)))
+		goto error;
+	if (!(answer_pos = byte_array_write_uint16(answer->class, answer_pos, buffer_end)))
+		goto error;
+	if (!(answer_pos = byte_array_write_uint32(answer->ttl, answer_pos, buffer_end)))
+		goto error;
+	if (!(answer_pos = byte_array_write_uint16(answer->rdlength, answer_pos, buffer_end)))
+		goto error;
 
-	dns_write_rdata(pos_ptr, remaining_len, answer);
+	if (!(answer_pos = dns_write_rdata(answer->rdata, answer->type, answer_pos, buffer_end)))
+		goto error;
 
-	return (1);
+	return (answer_pos);
+
+error:
+	return (NULL);
 }
 
 /* Unlike the write_question_section function, this function does not
  * take the packet as an argument. This is because there are three
  * different sections with the same answer format so more specifics
  * must be provided */
-int
-dns_write_answer_section(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_answer *ans_list, uint16_t ans_len)
+uint8_t *
+dns_write_answer_section(const struct dns_answer *answer, uint8_t *buffer_pos,
+		const uint8_t *buffer_end)
 {
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
+	assert(buffer_pos);
+	assert(buffer_end);
 
-	int i;
+	struct dns_answer *list_pos = (struct dns_answer *)answer;
 
-	if (ans_list)
+	if (answer)
 	{
-		for (i = 0; i < ans_len; i++, ans_list = ans_list->next)
+		int i;
+		for (i = dns_answer_number(answer); i > 0; i--)
 		{
-			/* check list is not too short */
-			if (!ans_list) return (0);
-
-			if (!dns_write_answer(pos_ptr, remaining_len, ans_list)) return (0);
+			assert(list_pos);
+			if (!(buffer_pos = dns_write_answer(list_pos, buffer_pos, buffer_end)))
+				return (0);
 		}
 	}
 
-	return (1);
+	return (buffer_pos);
 }
 
-int
-dns_write_header(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_packet *pkt)
+uint8_t *
+dns_write_header(const struct dns_packet *packet, uint8_t *buffer_pos,
+		const uint8_t *buffer_end)
 {
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
-	assert(pkt);
+	assert(packet);
+	assert(buffer_pos);
+	assert(buffer_end);
 
-	if (*remaining_len < DNS_HEADER_LEN) return (0);
+	uint8_t *packet_pos = (uint8_t *)buffer_pos;
+	struct dns_header h = packet->header;
+	if (buffer_end - buffer_pos >= DNS_HEADER_LEN)
+	{
+		if (!(packet_pos = byte_array_write_uint16(h.id, packet_pos, buffer_end)))
+			goto error;
 
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.id)) return (0);
-	uint8_t bit_field = 0;
-	bit_field |= pkt->header.qr << 7;
-	bit_field |= pkt->header.opcode << 3;
-	bit_field |= pkt->header.aa << 2;
-	bit_field |= pkt->header.tc << 1;
-	bit_field |= pkt->header.rd;
-	**pos_ptr = bit_field;
-	(*pos_ptr)++, (*remaining_len)--;
+		uint8_t bit_field = 0;
+		bit_field |= h.qr << 7;
+		bit_field |= h.opcode << 3;
+		bit_field |= h.aa << 2;
+		bit_field |= h.tc << 1;
+		bit_field |= h.rd;
 
-	bit_field = 0;
-	bit_field |= pkt->header.ra << 7;
-	bit_field |= pkt->header.z << 4;
-	bit_field |= pkt->header.rcode;
-	**pos_ptr = bit_field;
-	(*pos_ptr)++, (*remaining_len)--;
+		*packet_pos = bit_field;
+		packet_pos++;
 
-	pkt->header.qdcount = dns_question_number(pkt->questions);
-	pkt->header.ancount = dns_answer_number(pkt->answers);
-	pkt->header.nscount = dns_answer_number(pkt->authority);
-	pkt->header.arcount = dns_answer_number(pkt->additional);
+		bit_field = 0;
+		bit_field |= h.ra << 7;
+		bit_field |= h.z << 4;
+		bit_field |= h.rcode;
 
-	/* calculate these values */
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.qdcount)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.ancount)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.nscount)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, pkt->header.arcount)) return (0);
-	return (1);
+		*packet_pos = bit_field;
+		packet_pos++;
+
+		h.qdcount = dns_question_number(packet->questions);
+		h.ancount = dns_answer_number(packet->answers);
+		h.nscount = dns_answer_number(packet->authority);
+		h.arcount = dns_answer_number(packet->additional);
+
+		if (!(packet_pos = byte_array_write_uint16(h.qdcount, packet_pos, buffer_end))) goto error;
+		if (!(packet_pos = byte_array_write_uint16(h.ancount, packet_pos, buffer_end))) goto error;
+		if (!(packet_pos = byte_array_write_uint16(h.nscount, packet_pos, buffer_end))) goto error;
+		if (!(packet_pos = byte_array_write_uint16(h.arcount, packet_pos, buffer_end))) goto error;
+	}
+
+	return (packet_pos);
+error:
+	return (NULL);
 }
 
-int
-dns_write_question(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_question *qn)
+uint8_t *
+dns_write_question(const struct dns_question *qn, uint8_t *buffer_pos,
+		const uint8_t *buffer_end)
 {
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
 	assert(qn);
+	assert(buffer_pos);
+	assert(buffer_end);
 
-	if (!dns_write_name(pos_ptr, remaining_len, qn->qname)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, qn->qtype)) return (0);
-	if (!byte_array_write_uint16(pos_ptr, remaining_len, qn->qclass)) return (0);
+	if (!(buffer_pos = dns_write_domain(qn->qname, buffer_pos, buffer_end)))
+		goto error;
+	if (!(buffer_pos = byte_array_write_uint16(qn->qtype, buffer_pos, buffer_end)))
+		goto error;
+	if (!(buffer_pos = byte_array_write_uint16(qn->qclass, buffer_pos, buffer_end)))
+		goto error;
 
-	return (1);
+	return (buffer_pos);
+error:
+	return (NULL);
 }
 
 /* This requires the entire packet structure because I wanted to
  * check the qncount */
-int
-dns_write_question_section(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_packet *pkt)
+uint8_t *
+dns_write_question_section(const struct dns_packet *packet,
+		uint8_t *buffer_pos, const uint8_t *buffer_end)
 {
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
-	assert(pkt);
+	assert(packet);
+	assert(buffer_pos);
+	assert(buffer_end);
 
-	struct dns_question *qn = pkt->questions;
-	int num_qns = dns_question_number(pkt->questions);
+	struct dns_question *q = packet->questions;
+	int q_len = dns_question_number(packet->questions);
 	int i;
-	for (i = 0; i < num_qns; i++, qn = qn->next)
+	uint8_t *q_section_end = buffer_pos;
+	for (i = q_len; i > 0; i--)
 	{
-		assert(qn);
-		if (!dns_write_question(pos_ptr, remaining_len, qn)) return (0);
+		assert(q);	/* Should never have a NULL pointer */
+		if (!(q_section_end = dns_write_question(q, buffer_pos, buffer_end)))
+			return (NULL);
+
+		q = q->next;
 	}
 
-	return (1);
+	return (q_section_end);
 }
 
-int
-dns_write_label(uint8_t **pos_ptr, size_t *remaining_len, uint8_t *label)
+uint8_t *
+dns_write_domain(dns_domain_literal domain, uint8_t *pos,
+		const uint8_t *buffer_end)
 {
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
-	assert(label);
+	assert(domain);
+	assert(pos);
+	assert(buffer_end);
 
-	int result = snprintf((char *)(*pos_ptr), *remaining_len, "%s", label);
-	if (result < 0) return (0);
+	size_t max_len = buffer_end - pos;
+	int domain_len = snprintf((char *)pos, max_len, "%s", domain);
+	if (domain_len < 0 || domain_len > max_len) return (NULL);
 
-	/* can write over NULL byte with next label or name */
-	int bytes = result;
-	if (bytes > *remaining_len) return (0);
-
-	(*pos_ptr) += bytes;
-	*remaining_len -= bytes;
-
-	return (bytes);
+	/* Include space for NULL terminator */
+	return (pos + domain_len + 1);
 }
 
-int
-dns_write_name(uint8_t **pos_ptr, size_t *remaining_len, uint8_t *name)
+uint8_t *
+dns_write_rdata(const union rdata_u rdata, const enum dns_qtype rdata_type,
+		uint8_t *rdata_start, const uint8_t *buffer_end)
 {
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
-	assert(name);
+	assert(rdata_start);
+	assert(buffer_end);
 
-	int result = snprintf((char *)(*pos_ptr), *remaining_len, "%s", name);
-	if (result < 0) return (0);
-
-	int bytes = result + 1;
-	if (bytes > *remaining_len) return (0);
-
-	(*pos_ptr) += bytes;
-	(*remaining_len) -= bytes;
-
-	return (bytes);
-}
-
-int
-dns_write_rdata(uint8_t **pos_ptr, size_t *remaining_len, struct dns_answer *ans)
-{
-	assert(pos_ptr);
-	assert(*pos_ptr);
-	assert(remaining_len);
-	assert(ans);
-
-	switch(ans->type)
+	uint8_t *rdata_pos = rdata_start;
+	switch(rdata_type)
 	{
 	case(A):
-		if (!byte_array_write_uint32(pos_ptr, remaining_len, ans->rdata.a.ip_address)) return (0);
+		if (!(rdata_pos = byte_array_write_uint32(rdata.a.ip_address, rdata_pos, buffer_end)))
+			goto error;
 		break;
 	case(NS):
 		/* no break: NS and PTR have the same format */
 	case(PTR):
-		if (!dns_write_name(pos_ptr, remaining_len, ans->rdata.ptr.name)) return (0);
+		if (!(rdata_pos = dns_write_domain(rdata.ptr.name, rdata_pos, buffer_end)))
+			goto error;
 		break;
 	case(MD):
 		break;
@@ -1185,14 +1184,20 @@ dns_write_rdata(uint8_t **pos_ptr, size_t *remaining_len, struct dns_answer *ans
 	case(CNAME):
 		break;
 	case(SOA):
-		if (!dns_write_name(pos_ptr, remaining_len, ans->rdata.soa.mname)) return (0);
-		if (!dns_write_name(pos_ptr, remaining_len, ans->rdata.soa.rname)) return (0);
-
-		if (!byte_array_write_uint32(pos_ptr, remaining_len, ans->rdata.soa.serial)) return (0);
-		if (!byte_array_write_uint32(pos_ptr, remaining_len, ans->rdata.soa.refresh)) return (0);
-		if (!byte_array_write_uint32(pos_ptr, remaining_len, ans->rdata.soa.retry)) return (0);
-		if (!byte_array_write_uint32(pos_ptr, remaining_len, ans->rdata.soa.expire)) return (0);
-		if (!byte_array_write_uint32(pos_ptr, remaining_len, ans->rdata.soa.minimum)) return (0);
+		if (!(rdata_pos = dns_write_domain(rdata.soa.mname, rdata_pos, buffer_end)))
+			goto error;
+		if (!(rdata_pos = dns_write_domain(rdata.soa.rname, rdata_pos, buffer_end)))
+			goto error;
+		if (!(rdata_pos = byte_array_write_uint32(rdata.soa.serial, rdata_pos, buffer_end)))
+			return (0);
+		if (!(rdata_pos = byte_array_write_uint32(rdata.soa.refresh, rdata_pos, buffer_end)))
+			return (0);
+		if (!(rdata_pos = byte_array_write_uint32(rdata.soa.retry, rdata_pos, buffer_end)))
+			return (0);
+		if (!(rdata_pos = byte_array_write_uint32(rdata.soa.expire, rdata_pos, buffer_end)))
+			return (0);
+		if (!(rdata_pos = byte_array_write_uint32(rdata.soa.minimum, rdata_pos, buffer_end)))
+			return (0);
 		break;
 	case(MB):
 		break;
@@ -1213,20 +1218,27 @@ dns_write_rdata(uint8_t **pos_ptr, size_t *remaining_len, struct dns_answer *ans
 	case(TXT):
 		break;
 	case(SRV):
-		if (!byte_array_write_uint16(pos_ptr, remaining_len, ans->rdata.srv.priority)) return (0);
-		if (!byte_array_write_uint16(pos_ptr, remaining_len, ans->rdata.srv.weight)) return (0);
-		if (!byte_array_write_uint16(pos_ptr, remaining_len, ans->rdata.srv.port)) return (0);
-		if (!dns_write_name(pos_ptr, remaining_len, ans->rdata.srv.target)) return (0);
+		if (!(rdata_pos = byte_array_write_uint16(rdata.srv.priority, rdata_pos, buffer_end)))
+			goto error;
+		if (!(rdata_pos = byte_array_write_uint16(rdata.srv.weight, rdata_pos, buffer_end)))
+			goto error;
+		if (!(rdata_pos = byte_array_write_uint16(rdata.srv.port, rdata_pos, buffer_end)))
+			goto error;
+		if (!(rdata_pos = dns_write_domain(rdata.srv.target, rdata_pos, buffer_end)))
+			goto error;
 		break;
 	default:
 		break;
 	}
 
-	return (1);
+	return (rdata_pos);
+
+error:
+	return (NULL);
 }
 
 int
-rr_collection_add_record(struct rr_collection **head, uint8_t *name,
+rr_collection_add_record(struct rr_collection **head, dns_domain_literal name,
 		struct dns_answer *record)
 {
 	assert(head);
@@ -1286,7 +1298,8 @@ rr_collection_add_record(struct rr_collection **head, uint8_t *name,
 }
 
 struct rr_collection *
-rr_collection_search(struct rr_collection *head, uint8_t *name)
+rr_collection_search(struct rr_collection *head,
+		const dns_domain_literal name)
 {
 	/* This function accepts a NULL collection as it could be empty */
 	assert(name);
@@ -1295,7 +1308,7 @@ rr_collection_search(struct rr_collection *head, uint8_t *name)
 	{
 		/* It is a mistake to have any records without a name */
 		assert(head->name);
-		if (dns_compare_domain(name, head->name) == 0) return (head);
+		if (dns_domain_compare(name, head->name) == 0) return (head);
 
 		head = head->next;
 	}

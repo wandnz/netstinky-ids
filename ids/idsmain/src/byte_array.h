@@ -7,35 +7,42 @@
 #ifndef BYTE_ARRAY_H_
 #define BYTE_ARRAY_H_
 
-uint16_t
-byte_array_get_uint16(uint8_t *array);
+/*
+ * All byte_array_read_xxx functions have the same usage:
+ *
+ * Reads a value from a byte array.
+ * @param out The location to write the result to.
+ * @param pos The position to begin the reading from.
+ * @param buffer_end The first invalid address after the byte array.
+ * @return The address of the first byte after the value or NULL if the value
+ * could not be read.
+ */
 
-uint32_t
-byte_array_get_uint32(uint8_t *array);
+uint8_t *
+byte_array_read_uint16(uint16_t *out, const uint8_t *pos,
+		const uint8_t *buffer_end);
 
-void
-byte_array_put_uint32(uint8_t *out_ptr, uint32_t value);
+uint8_t *
+byte_array_read_uint32(uint32_t *out, const uint8_t *pos,
+		const uint8_t *buffer_end);
 
 /*
- * Reads a uint16 from a byte array and updates the position pointer
- * into the array, and the remaining length in the array.
+ * All byte_array_write_xxx functions have the same usage:
  *
- * Returns 1 if successful, 0 if unsuccessful.
+ * Write a value to a byte array.
+ * @param value The value to write to the byte array.
+ * @param pos The position to start writing to.
+ * @param buffer_end The first invalid address after the byte array.
+ * @return The address of the first byte after the written value, or NULL if
+ * the value could not be written.
  */
-int
-byte_array_read_uint16(uint16_t *out, uint8_t **array_pos,
-		size_t *remaining_len);
 
-int
-byte_array_read_uint32(uint32_t *out, uint8_t **array_pos,
-		size_t *remaining_len);
+uint8_t *
+byte_array_write_uint16(uint16_t value, uint8_t *pos,
+		const uint8_t *buffer_end);
 
-int
-byte_array_write_uint16(uint8_t **pos_ptr, size_t *remaining_len,
-		uint16_t value);
-
-int
-byte_array_write_uint32(uint8_t **pos_ptr, size_t *remaining_len,
-		uint32_t value);
+uint8_t *
+byte_array_write_uint32(uint32_t value, uint8_t *pos,
+		const uint8_t *buffer_end);
 
 #endif /* BYTE_ARRAY_H_ */

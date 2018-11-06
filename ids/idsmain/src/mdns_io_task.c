@@ -78,7 +78,7 @@ mdns_io_task_read(TASK_STRUCT task_state)
 	}
 	else
 	{
-		struct dns_packet *packet = dns_parse(mdns->packet_buffer, PACKET_BUF_LEN);
+		struct dns_packet *packet = dns_parse(mdns->packet_buffer, mdns->packet_buffer + packet_len);
 		if (packet)
 		{
 			dns_print(packet, stdout);

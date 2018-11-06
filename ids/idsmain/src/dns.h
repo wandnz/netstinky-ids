@@ -11,6 +11,16 @@
 #include <stdint.h>
 #include <stdio.h>
 
+/**
+ * The dns_domain_literal can be safely stored as a C string as it is always
+ * NULL-terminated.
+ *
+ * The dns_domain may or may not use compression. If it uses compression it
+ * will not be NULL terminated.
+ */
+typedef char *dns_domain_literal;
+typedef uint8_t *dns_domain;
+
 enum dns_header_opcode
 {
 	QUERY = 0,
@@ -85,7 +95,7 @@ enum dns_class
 
 struct dns_question
 {
-	uint8_t *qname;
+	dns_domain_literal qname;
 	uint16_t qtype;
 	uint16_t qclass;
 	struct dns_question *next;	/* probably multiple questions */
@@ -94,8 +104,8 @@ struct dns_question
 /* the rdata field of the answer has various formats */
 struct rdata_soa
 {
-	uint8_t *mname;
-	uint8_t *rname;
+	dns_domain_literal mname;
+	dns_domain_literal rname;
 	uint32_t serial;
 	uint32_t refresh;
 	uint32_t retry;
@@ -106,7 +116,7 @@ struct rdata_soa
 struct rdata_mx
 {
 	uint16_t preference;
-	uint8_t *mail_exchanger;
+	dns_domain_literal mail_exchanger;
 };
 
 struct rdata_a
@@ -122,7 +132,7 @@ struct rdata_aaaa
 /* PTR and NS have the same format */
 struct rdata_ptr
 {
-	uint8_t *name;
+	dns_domain_literal name;
 };
 
 /* https://www.ietf.org/rfc/rfc2052.txt */
@@ -131,7 +141,7 @@ struct rdata_srv
 	uint16_t priority;
 	uint16_t weight;
 	uint16_t port;
-	uint8_t *target;
+	dns_domain_literal target;
 };
 
 union rdata_u {
@@ -145,7 +155,7 @@ union rdata_u {
 
 struct dns_answer
 {
-	uint8_t *name;
+	dns_domain_literal name;
 	uint16_t type;
 	uint16_t class;
 	uint32_t ttl;
@@ -168,7 +178,7 @@ struct dns_packet
  * to be used for a small DNS database with a few names at most. */
 struct rr_collection
 {
-	uint8_t *name;
+	dns_domain_literal name;
 	struct dns_answer *records;
 	struct rr_collection *next;
 };
@@ -196,7 +206,7 @@ struct dns_answer *
 dns_answer_list_copy(struct dns_answer *a);
 
 int
-dns_compare_domain(uint8_t *a, uint8_t *b);
+dns_domain_compare(dns_domain_literal a, dns_domain_literal b);
 
 uint8_t *
 dns_domain_to_name(char *domain);
@@ -205,122 +215,24 @@ char *
 dns_name_to_readable(uint8_t *name);
 
 /**
- * Parses a DNS packet contained in PKT_BUFF into a dns_packet
- * structure.
- *
- * PKT_BUFF may not be NULL.
- *
- * Returns the parsed packet or NULL if the operation was
- * unsuccessful.
+ * Parses a DNS packet (in a buffer beginning at PACKET_START and ending at
+ * PACKET_END) into a newly allocated dns_packet structure.
+ * @param PACKET_START The address of the first byte of the packet.
+ * @param PACKET_END The address of the first byte that is not a part of the
+ * packet.
+ * @return A parsed DNS packet or NULL if an error occurred.
  */
 struct dns_packet *
-dns_parse(uint8_t *pkt_buff, size_t pkt_len);
-
-/**
- * Parses the DNS answer starting at the address in *BUF_POS.
- * *BUF_POS and *REMAINING_LEN will be updated. Creates a new
- * dns_answer struct and updates the *OUT pointer to its address.
- *
- * Returns 1 if successful, 0 if unsuccessful.
- */
-int
-dns_parse_answer(struct dns_answer **out, uint8_t **buf_pos,
-		size_t *remaining_len, uint8_t *buf_start);
-
-/**
- * Parse NUM_ANSWERS dns answers from a buffer, beginning at
- * *BUF_POS. Updates the *BUF_POS and *REMAINING_LEN to point to the
- * next unparsed byte, and have the correct number of unparsed bytes.
- *
- * Returns a dns_answer list or NULL if the operation failed.
- */
-struct dns_answer *
-dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
-		size_t *remaining_len, uint8_t *buf_start);
-
-/*
- * Puts the next answer section into *OUT and returns 1 if successful.
- */
-int
-dns_parse_answer_section_into(struct dns_answer **out,
-		uint16_t num_answers, uint8_t **buf_pos, size_t *remaining_len,
-		uint8_t *buf_start);
-
-/**
- * Parses the header of a DNS packet into OUT. Updates *BUF_POS to
- * point to the next unparsed byte, and updates REMAINING_LEN by
- * reducing it by the length of the header.
- *
- * Returns 1 on success and 0 on failure. Failure is due to the
- * packet length being too short to contain a DNS header.
- */
-int
-dns_parse_header(struct dns_packet *out, uint8_t **buf_pos, size_t *remaining_len);
-
-/**
- * Parses a name starting at *NAME_POS into a newly allocated
- * byte array. Updates *NAME_POS so that it points to the next byte
- * that has not been parsed. Updates *REMAINING_LEN to remove the
- * bytes that were used by the name string.
- *
- * Returns a pointer to the name string or NULL if the operation
- * failed.
- */
-uint8_t *
-dns_parse_name(uint8_t **name_pos, size_t *remaining_len);
-
-/**
- * Parse a question from a buffer starting at position *QN_START.
- * Updates the position of the pointer in *QN_START and the remaining
- * bytes in *MAX_LEN.
- *
- * Returns a new dns_question structure or NULL if the operation
- * failed.
- */
-struct dns_question *
-dns_parse_question(uint8_t **qn_start, size_t *max_len);
-
-/**
- * Parse a list of questions from the question section of a DNS
- * packet. Updates BUF_POS to point to the next unparsed byte and
- * updates REMAINING_LEN by decrementing it by the size of the
- * question section.
- */
-struct dns_question *
-dns_parse_question_section(uint16_t qn_num,
-		uint8_t **buf_pos, size_t *remaining_len);
-
-int
-dns_parse_rdata(struct dns_answer **out, enum dns_qtype type,
-		uint8_t **pos_ptr, size_t *remaining_len);
+dns_parse(uint8_t *packet_start, uint8_t *packet_end);
 
 void
 dns_print(struct dns_packet *pkt, FILE *fp);
 
 void
-print_answer(struct dns_answer *a, FILE *fp);
+dns_answer_print(struct dns_answer *a, FILE *fp);
 
-int
-dns_write_answer_section(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_answer *ans_list, uint16_t ans_len);
-
-int
-dns_write_question_section(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_packet *pkt);
-
-size_t dns_write(uint8_t *buf_ptr, size_t buf_len,
-		struct dns_packet *pkt);
-
-int
-dns_write_header(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_packet *pkt);
-
-int
-dns_write_name(uint8_t **pos_ptr, size_t *remaining_len, uint8_t *name);
-
-int
-dns_write_question(uint8_t **pos_ptr, size_t *remaining_len,
-		struct dns_question *qn);
+size_t dns_write(struct dns_packet *packet, uint8_t *buffer_start,
+		uint8_t *buffer_end);
 
 /**
  * Add a record to a resource record collection.
@@ -333,11 +245,12 @@ dns_write_question(uint8_t **pos_ptr, size_t *remaining_len,
  * Returns 1 if successful, 0 if unsuccessful.
  */
 int
-rr_collection_add_record(struct rr_collection **head, uint8_t *name,
+rr_collection_add_record(struct rr_collection **head, dns_domain_literal name,
 		struct dns_answer *record);
 
 struct rr_collection *
-rr_collection_search(struct rr_collection *head, uint8_t *name);
+rr_collection_search(struct rr_collection *head,
+		const dns_domain_literal name);
 
 void
 free_dns_answer(struct dns_answer *ans);
