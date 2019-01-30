@@ -1,3 +1,8 @@
+
+# Created by https://www.gitignore.io/api/c,linux,eclipse
+# Edit at https://www.gitignore.io/?templates=c,linux,eclipse
+
+### C ###
 # Prerequisites
 *.d
 
@@ -51,32 +56,91 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# Turris-Omnia gitignore
-.DS_Store
-.*.swp
-/env
-/dl
-/.config.old
-/bin*
-/.config
-/build_dir
-/staging_dir
-/tmp
-/logs*
-/feeds
-/feeds.conf
-/package/feeds
-/package/openwrt-packages
-key-build*
-*.orig
-*.rej
-*~
-.#*
-*#
-.emacs.desktop*
-TAGS*~
-/files/etc/git-version
-git-src
-.vagrant/
-/Vagrantfile
+### Eclipse ###
 
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+# External tool builders
+.externalToolBuilders/
+
+# Locally stored "Eclipse launch configurations"
+*.launch
+
+# PyDev specific (Python IDE for Eclipse)
+*.pydevproject
+
+# CDT-specific (C/C++ Development Tooling)
+.cproject
+
+# CDT- autotools
+.autotools
+
+# Java annotation processor (APT)
+.factorypath
+
+# PDT-specific (PHP Development Tools)
+.buildpath
+
+# sbteclipse plugin
+.target
+
+# Tern plugin
+.tern-project
+
+# TeXlipse plugin
+.texlipse
+
+# STS (Spring Tool Suite)
+.springBeans
+
+# Code Recommenders
+.recommenders/
+
+# Annotation Processing
+.apt_generated/
+
+# Scala IDE specific (Scala & Java development for Eclipse)
+.cache-main
+.scala_dependencies
+.worksheet
+
+### Eclipse Patch ###
+# Eclipse Core
+.project
+
+# JDT-specific (Eclipse Java Development Tools)
+.classpath
+
+# Annotation Processing
+.apt_generated
+
+.sts4-cache/
+
+### Linux ###
+*~
+
+# temporary files which can be created if a process still has a handle open of a deleted file
+.fuse_hidden*
+
+# KDE directory preferences
+.directory
+
+# Linux trash folder which might appear on any partition or disk
+.Trash-*
+
+# .nfs files are created when an open file is removed but is still being accessed
+.nfs*
+
+*.mk
+Debug/
+# End of https://www.gitignore.io/api/c,linux,eclipse
