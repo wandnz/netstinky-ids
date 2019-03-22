@@ -25,6 +25,6 @@ int
 ip_blacklist_lookup(ip_blacklist *b, uint32_t addr);
 
 ip_blacklist *
-new_ip_blacklist();
+new_ip_blacklist(void);
 
 #endif /* IP_BLACKLIST_H_ */

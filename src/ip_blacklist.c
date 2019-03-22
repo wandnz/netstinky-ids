@@ -1,9 +1,7 @@
 #include "ip_blacklist.h"
 
 #include "firehol_ip_blacklist.h"
-#include "data_structures/ebvbl/ebvbl.h"
-
-static const unsigned int element_realloc = 10;
+#include "utils/ebvbl/ebvbl.h"
 
 void
 free_ip_blacklist(ip_blacklist **b)

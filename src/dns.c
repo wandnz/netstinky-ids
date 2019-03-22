@@ -19,21 +19,16 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "mfletche-common.h"
+#include "utils/common.h"
 
 #include "dns.h"
-#include "byte_array.h"
+#include "utils/byte_array.h"
 
-/* -- DEBUGGING -- */
-#define DEBUG 1
-#define DPRINT(...) do { if (DEBUG) fprintf(stdout, __VA_ARGS__); } while (0)
 
-static const size_t MAX_PKT_SIZE = 65535;
 static const size_t DNS_HEADER_LEN = 12;
 
 static const size_t MAX_LABEL_LEN = 63;
 static const size_t MAX_NAME_LEN = 255;
-static const size_t MAX_UDP_MSG_LEN = 512;
 
 /* -- MACROS -- */
 
@@ -154,7 +149,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 	assert(packet_start < packet_end);
 
 	uint8_t *pkt_pos = packet_start;
-	struct dns_packet *pkt;
+	struct dns_packet *pkt = NULL;
 	int count;
 
 	if (packet_start && packet_end && packet_start < packet_end)
@@ -653,7 +648,7 @@ dns_domain_to_name(char *domain)
 		if (token_len > MAX_LABEL_LEN) goto error;
 
 		*name_pos = token_len;
-		name_pos++, name_len--;
+        (void)(name_pos++), name_len--;
 		int r = snprintf((char *)name_pos, name_len, "%s", token);
 		if (r < 0) goto error;
 

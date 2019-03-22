@@ -8,7 +8,7 @@
 #ifndef DOMAIN_BLACKLIST_H_
 #define DOMAIN_BLACKLIST_H_
 
-#include "data_structures/hat/hat-trie.h"
+#include "utils/hat/hat-trie.h"
 
 /**
  * Hide the specific implementation details of the domain
@@ -45,6 +45,6 @@ free_domain_blacklist(domain_blacklist **b);
  * @return An initialized domain blacklist or NULL if the operation
  * failed.
  */
-domain_blacklist *new_domain_blacklist();
+domain_blacklist *new_domain_blacklist(void);
 
 #endif /* DOMAIN_BLACKLIST_H_ */

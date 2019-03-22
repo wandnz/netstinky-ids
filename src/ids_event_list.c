@@ -298,7 +298,7 @@ new_ids_event_list(unsigned int max_events, unsigned int max_timestamps)
 	assert(max_events > 0);
 	assert(max_timestamps > 0);
 
-	struct ids_event_list *list;
+	struct ids_event_list *list = NULL;
 
 	if (max_events > 0 && max_timestamps > 0)
 	{

@@ -199,40 +199,32 @@ struct rr_collection
  * @return The copied answer or list of answers. NULL if the operation
  * failed.
  */
-struct dns_answer *
-dns_answer_copy(struct dns_answer *a);
+struct dns_answer *dns_answer_copy(struct dns_answer *a);
 
-struct dns_answer *
-dns_answer_list_copy(struct dns_answer *a);
+struct dns_answer *dns_answer_list_copy(struct dns_answer *a);
 
-int
-dns_domain_compare(dns_domain_literal a, dns_domain_literal b);
+int dns_domain_compare(dns_domain_literal a, dns_domain_literal b);
 
-uint8_t *
-dns_domain_to_name(char *domain);
+uint8_t *dns_domain_to_name(char *domain);
 
-char *
-dns_name_to_readable(uint8_t *name);
+char *dns_name_to_readable(uint8_t *name);
 
 /**
  * Parses a DNS packet (in a buffer beginning at PACKET_START and ending at
  * PACKET_END) into a newly allocated dns_packet structure.
- * @param PACKET_START The address of the first byte of the packet.
- * @param PACKET_END The address of the first byte that is not a part of the
+ * @param packet_start The address of the first byte of the packet.
+ * @param packet_end The address of the first byte that is not a part of the
  * packet.
  * @return A parsed DNS packet or NULL if an error occurred.
  */
-struct dns_packet *
-dns_parse(uint8_t *packet_start, uint8_t *packet_end);
+struct dns_packet *dns_parse(uint8_t *packet_start, uint8_t *packet_end);
 
-void
-dns_print(struct dns_packet *pkt, FILE *fp);
+void dns_print(struct dns_packet *pkt, FILE *fp);
 
-void
-dns_answer_print(struct dns_answer *a, FILE *fp);
+void dns_answer_print(struct dns_answer *a, FILE *fp);
 
 size_t dns_write(struct dns_packet *packet, uint8_t *buffer_start,
-		uint8_t *buffer_end);
+		         uint8_t *buffer_end);
 
 /**
  * Add a record to a resource record collection.
@@ -244,36 +236,29 @@ size_t dns_write(struct dns_packet *packet, uint8_t *buffer_start,
  *
  * Returns 1 if successful, 0 if unsuccessful.
  */
-int
-rr_collection_add_record(struct rr_collection **head, dns_domain_literal name,
-		struct dns_answer *record);
+int rr_collection_add_record(struct rr_collection **head,
+                            dns_domain_literal name,
+                    		struct dns_answer *record);
 
-struct rr_collection *
-rr_collection_search(struct rr_collection *head,
-		const dns_domain_literal name);
+struct rr_collection *rr_collection_search(struct rr_collection *head,
+		                                   const dns_domain_literal name);
 
-void
-free_dns_answer(struct dns_answer *ans);
+void free_dns_answer(struct dns_answer *ans);
 
-void
-free_dns_packet(struct dns_packet **packet);
+void free_dns_packet(struct dns_packet **packet);
 
 /*
  * Destroys a dns question and all substructures appropriately.
  */
-void
-free_dns_question(struct dns_question *qn);
+void free_dns_question(struct dns_question *qn);
 
-void
-free_dns_rdata(struct dns_answer *ans);
+void free_dns_rdata(struct dns_answer *ans);
 
-void
-free_rr_collection(struct rr_collection *c);
+void free_rr_collection(struct rr_collection *c);
 
-struct dns_answer *new_dns_answer();
+struct dns_answer *new_dns_answer(void);
 
 /* Allocates and initializes a new dns_question structure */
-struct
-dns_question *new_dns_question();
+struct dns_question *new_dns_question(void);
 
 #endif /* DNS_H_ */

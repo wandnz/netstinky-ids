@@ -35,13 +35,17 @@ ids_pcap_get_pcap(const char *if_name);
  * the packet was a DNS query, the query will be in the DOMAIN attribute.
  *
  * This does not change the IFACE attribute.
- * @param p The pcap device to read a packet from
- * @param out The structure to write the fields into
+ * @param pcap_hdr The libpcap header of the read packet
+ * @param pcap_data The data payload (including protocol headers) of the packet
+ * @param out Pointer to a struct that will be populated with fields relating
+ *            to the IDS status of this packet (listed or not)
  * @return 1 if reading was successful and the packet was one that we are
  * interested in, 0 if packet was not one we are interested in, -1 if there
  * was an error
  */
 int
-ids_pcap_read_packet(pcap_t *p, struct ids_pcap_fields *out);
+ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
+                     const unsigned char *pcap_data,
+                     struct ids_pcap_fields *out);
 
 #endif /* IDS_PCAP_H_ */

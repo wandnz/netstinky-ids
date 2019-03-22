@@ -95,4 +95,4 @@ new_ids_event_list(unsigned int max_events, unsigned int max_timestamps);
  * ids_event_time could not be created.
  */
 struct ids_event_ts *
-new_ids_event_ts();
+new_ids_event_ts(void);

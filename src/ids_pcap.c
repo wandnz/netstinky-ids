@@ -20,96 +20,55 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
+#include "utils/common.h"
 #include "ip_blacklist.h"
 #include "domain_blacklist.h"
 #include "dns.h"
 #include "ids_pcap.h"
 
-/* -- DEBUGGING -- */
-#define DEBUG 1
-#define DPRINT(...) do { if (DEBUG) fprintf(stdout, __VA_ARGS__); } while (0)
+/**
+ * TODO: Refactor references to global state into a struct pointed to by
+ * \s user_dat instead.
+ */
+extern ip_blacklist *ip_bl;
+extern domain_blacklist *dn_bl;
+extern struct ids_event_list *event_queue;
 
-static const char *pcap_filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0 and tcp[tcpflags] & tcp-ack == 0)";
-static const int promisc_enabled = 0;
-static const int immediate_mode_enabled = 1;
-
-pcap_t *
-ids_pcap_get_pcap(const char *if_name)
+void packet_handler(unsigned char *user_dat,
+                    const struct pcap_pkthdr* pcap_hdr,
+                    const unsigned char *packet)
 {
-	assert(if_name);
+    int result;
+    struct ids_pcap_fields fields;
+    memset(&fields, 0, sizeof(fields));
+    result = ids_pcap_read_packet(pcap_hdr, packet, &fields);
+    if (result == 1) {
+        if (ids_pcap_is_blacklisted(&fields, ip_bl, dn_bl)) {
+            struct in_addr ip;
+            char *iface_name = strdup("eth0");  // TODO: Fix this
+            char *ioc_str;
+            struct ids_event *ev;
 
-	char err_buf[PCAP_ERRBUF_SIZE];
-	struct bpf_program filter;
-	pcap_t *pcap = NULL;
-	int tmp_result = 0;
+            ip.s_addr = htonl(fields.dest_ip);
+            ioc_str = fields.domain ? fields.domain : strdup(inet_ntoa(ip));
+            ev = new_ids_event(iface_name, fields.src_ip, ioc_str);
 
-	/* Create pcap device */
-	if (!(pcap = pcap_create( if_name, err_buf)))
-	{
-		DPRINT("ids_pcap_get_pcap(%s): pcap_create() failed with message: %s\n",
-				if_name, err_buf);
-		goto error;
-	}
+            if (!ids_event_list_add_event(event_queue, ev)) {
+                DPRINT("packet_handler: ids_event_list_add() failed\n");
+                return;
+            }
 
-	/* These functions will only fail if the pcap has already been activated.
-	 * They return 0 on success. */
-	tmp_result = pcap_set_promisc(pcap, promisc_enabled);
-	assert(!tmp_result);	/* During debugging, crash immediately */
-	if (PCAP_ERROR_ACTIVATED == tmp_result)
-	{
-		DPRINT("ids_pcap_get_pcap(%s): pcap_set_promisc() failed\n", if_name);
-		goto error;
-	}
+            DPRINT("pcap_io_task_read(): NEW DETECTED INTRUSION\n");
+        } else {
+            DPRINT("Safe!\n");
+        }
+    } else if (result == -1) {
+        DPRINT("pcap_io_task_read(): ids_pcap_read_packet() failed\n");
+    }
 
-	assert(!pcap_set_immediate_mode(pcap, immediate_mode_enabled));
-	assert(!tmp_result);	/* During debugging, crash immediately */
-	if (PCAP_ERROR_ACTIVATED == tmp_result)
-	{
-		DPRINT("ids_pcap_get_pcap(%s): pcap_set_immediate_mode() failed\n",
-				if_name);
-		goto error;
-	}
-
-	tmp_result = pcap_activate(pcap);
-	if (tmp_result < 0)
-	{
-		/* Check for programming errors */
-		assert(PCAP_ERROR_ACTIVATED != tmp_result);
-		assert(PCAP_ERROR_NO_SUCH_DEVICE != tmp_result);
-
-		DPRINT("ids_pcap_get_pcap(%s): pcap_activate() failed with message: %s\n",
-				if_name, pcap_geterr(pcap));
-		goto error;
-	}
-	else if (tmp_result > 0)
-	{
-		/* Display warning message */
-		DPRINT("ids_pcap_get_pcap(%s): pcap_activate() warning: %s\n",
-				if_name, pcap_geterr(pcap));
-	}
-
-	/* Set up filter */
-	if (PCAP_ERROR == pcap_compile(pcap, &filter, pcap_filter, 0, 0))
-	{
-		DPRINT("ids_pcap_get_pcap(%s): pcap_compile() failed with message: %s\n",
-				if_name, pcap_geterr(pcap));
-		goto error;
-	}
-
-	if (PCAP_ERROR == pcap_setfilter(pcap, &filter))
-	{
-		DPRINT("ids_pcap_get_pcap(%s): pcap_setfilter() failed with message: %s\n",
-				if_name, pcap_geterr(pcap));
-		goto error;
-	}
-
-	DPRINT("ids_pcap_get_pcap(%s): successfully completed \n", if_name);
-	return (pcap);
-
-error:
-	if (pcap) pcap_close(pcap);
-	pcap = NULL;
-	return (pcap);
+    if (fields.domain != NULL) {
+        free(fields.domain);
+    }
 }
 
 int
@@ -120,27 +79,17 @@ ids_pcap_lookup_ip(ip_blacklist *b, uint32_t a)
 }
 
 int
-ids_pcap_read_packet(pcap_t *p, struct ids_pcap_fields *out)
+ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
+                     const unsigned char *pcap_data,
+                     struct ids_pcap_fields *out)
 {
-	struct pcap_pkthdr *pcap_hdr = NULL;
-	const u_char *pcap_data = NULL;
+    struct ether_header *eth_hdr = NULL;
+    struct ip *ip_hdr = NULL;
+    struct tcphdr *tcp_hdr = NULL;
+    struct udphdr *udp_hdr = NULL;
+    struct dns_packet *dns_pkt = NULL;
 
-	struct ether_header *eth_hdr = NULL;
-	struct ip *ip_hdr = NULL;
-	struct tcphdr *tcp_hdr = NULL;
-	struct udphdr *udp_hdr = NULL;
-	struct dns_packet *dns_pkt = NULL;
-
-	uint8_t *payload_pos = NULL;
-
-	/* Get next packet */
-	if (PCAP_ERROR == pcap_next_ex(p, &pcap_hdr, &pcap_data))
-	{
-		DPRINT("ids_pcap_read_packet(): pcap_next_ex() failed with message: %s\n",
-				pcap_geterr(p));
-		goto error;
-	}
-
+    uint8_t *payload_pos = NULL;
 	/* Crash immediately during debugging if pcap_data is not a valid pointer */
 	assert(pcap_data);
 	if (pcap_data)
@@ -175,7 +124,7 @@ ids_pcap_read_packet(pcap_t *p, struct ids_pcap_fields *out)
 
 		switch (ip_hdr->ip_p)
 		{
-			case 6:
+			case IPPROTO_TCP:
 				DPRINT("ids_pcap_read_packet(): tcp packet\n");
 				tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*eth_hdr) + sizeof(*ip_hdr));
 
@@ -184,12 +133,12 @@ ids_pcap_read_packet(pcap_t *p, struct ids_pcap_fields *out)
 
 				out->domain = NULL;
 				break;
-			case 17:
+			case IPPROTO_UDP:
 				DPRINT("ids_pcap_read_packet(): udp packet\n");
 				udp_hdr = (struct udphdr *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr)));
 				payload_pos = (uint8_t *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
 				dns_pkt = dns_parse(payload_pos,
-						pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
+						(uint8_t *) payload_pos + (pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr))));
 
 				if (!dns_pkt)
 				{
@@ -201,7 +150,8 @@ ids_pcap_read_packet(pcap_t *p, struct ids_pcap_fields *out)
 				if (dns_pkt->header.qdcount)
 				{
 					/* TODO: Check multiple questions */
-					out->domain = dns_name_to_readable(dns_pkt->questions->qname);
+					out->domain = dns_name_to_readable((unsigned char *)
+                            dns_pkt->questions->qname);
 				}
 
 				free_dns_packet(&dns_pkt);
