@@ -94,6 +94,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 	assert(pcap_data);
 	if (pcap_data)
 	{
+        char src_str[18];
+        char dst_str[18];
 		if (!pcap_hdr)
 		{
 			DPRINT("ids_pcap_read_packet(): pcap header was NULL\n");
@@ -117,8 +119,12 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 			goto error;
 		}
 		ip_hdr = (struct ip *)(pcap_data + sizeof(*eth_hdr));
-		DPRINT("ids_pcap_read_packet(): destination IP: %s\n", inet_ntoa(ip_hdr->ip_dst));
-		DPRINT("ids_pcap_read_packet(): source IP: %s\n", inet_ntoa(ip_hdr->ip_src));
+
+        strncpy(src_str, inet_ntoa(ip_hdr->ip_src), 18);
+        strncpy(dst_str, inet_ntoa(ip_hdr->ip_dst), 18);
+
+        DPRINT("ids_pcap_read_packet(): IP packet %s -> %s\n",
+               src_str, dst_str);
 		out->dest_ip = ntohl(ip_hdr->ip_dst.s_addr);
 		out->src_ip = ntohl(ip_hdr->ip_src.s_addr);
 
