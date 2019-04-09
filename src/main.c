@@ -262,6 +262,12 @@ done:
     return rc;
 }
 
+/**
+ * Called when an event occurs on the pcap file descriptor.
+ * @param handle: The handle of the libuv poll handle.
+ * @param status: status < 0 indicates that an error occurred, 0 means success.
+ * @param events: A bitmask of events.
+ */
 static void pcap_data_cb(uv_poll_t *handle, int status, int events)
 {
     if (status < 0) {
@@ -269,15 +275,20 @@ static void pcap_data_cb(uv_poll_t *handle, int status, int events)
         return;
     }
 
+    assert(status==0);
+
     if (events & UV_READABLE) {
         int pkt_num = 0;
         // If we are here, the fd is ready to read
-        pkt_num = pcap_dispatch(pcap, 0, packet_handler, NULL);
+        // cnt = 0 or -1 means read all packets (but -1 will work with older versions of pcap,
+        // where 0 does not)
+        int cnt = -1;
+        pkt_num = pcap_dispatch(pcap, cnt, packet_handler, NULL);
 
-        if (pkt_num == -1) {
+        if (pkt_num == PCAP_ERROR) {
             fprintf(stderr, "Error processing packet\n%s\n",
                     pcap_geterr(pcap));
-        } else if (pkt_num == -2) {
+        } else if (pkt_num == PCAP_ERROR_BREAK) {
             fprintf(stderr, "Pcap requested loop close.\n");
             uv_stop(loop);
         }
