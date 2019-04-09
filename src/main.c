@@ -199,6 +199,44 @@ error:
     return (0);
 }
 
+static bool setup_stdin_pipe(uv_loop_t *loop)
+{
+	assert(loop);
+    int ipc = 0;
+    uv_file stdin_fd = 0;
+
+    if (0 > uv_pipe_init(loop, &stdin_pipe, ipc))
+    {
+    	DPRINT("pipe could not be initialized\n");
+    	return false;
+    }
+
+    if (0 > uv_pipe_open(&stdin_pipe, stdin_fd))
+    {
+    	DPRINT("pipe could not be opened\n");
+    	return false;
+    }
+
+    return true;
+}
+
+static bool setup_polling(uv_loop_t *loop)
+{
+	assert(loop);
+    if (0 > uv_poll_init(loop, &poll_handle, pcap_fd))
+    {
+    	printf("polling could not be initialized\n");
+    	return false;
+    }
+
+    if (0 > uv_poll_start(&poll_handle, UV_READABLE, pcap_data_cb))
+    {
+    	printf("could not start polling\n");
+    	return false;
+    }
+
+    return true;
+}
 
 static int set_filter(pcap_t *pcap, const char *filter, char *err)
 {
@@ -310,18 +348,21 @@ int main(int argc, char **argv)
     if ((retval = configure_pcap(filter, dev, err) != 0)) goto done;
 
     memset(&poll_handle, 0, sizeof(poll_handle));
-    loop = uv_default_loop();
+    if (NULL == (loop = uv_default_loop()))
+    {
+    	DPRINT("loop could not be allocated\n");
+    	goto done;
+    }
 
-    uv_pipe_init(loop, &stdin_pipe, 0);
-    uv_pipe_open(&stdin_pipe, 0);
-    uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin);
+    if (!setup_stdin_pipe(loop)) goto done;
 
-    uv_poll_init(loop, &poll_handle, pcap_fd);
-    uv_poll_start(&poll_handle, UV_READABLE, pcap_data_cb);
+    if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
 
-    uv_run(loop, UV_RUN_DEFAULT);
+    if (!setup_polling(loop)) goto done;
 
-    uv_poll_stop(&poll_handle);
+    if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
+
+    if (0 > uv_poll_stop(&poll_handle)) printf("warning: could not stop polling\n");
 
     // Close the polling loop with a callback, as it will need to close the
     // pcap fd when the polling fd is closed (must wait for polling fd to
@@ -337,7 +378,7 @@ int main(int argc, char **argv)
 done:
     if (loop) {
         int close_result;
-        while((close_result =  uv_loop_close(loop)) == UV_EBUSY) {
+        while((close_result = uv_loop_close(loop)) == UV_EBUSY) {
             uv_run(loop, UV_RUN_NOWAIT);
         }
     } else {
