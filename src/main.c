@@ -396,7 +396,6 @@ int main(int argc, char **argv)
     int retval = -1;
     const char *filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0\
  and tcp[tcpflags] & tcp-ack == 0)";
-    const char *dev = "eth0";
     char err[PCAP_ERRBUF_SIZE];
 
     if (!parse_args(argc, argv)) {
@@ -414,7 +413,7 @@ int main(int argc, char **argv)
     event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
 
 
-    if ((retval = configure_pcap(filter, dev, err) != 0)) goto done;
+    //if ((retval = configure_pcap(filter, (char *)iface_list->item, err) != 0)) goto done;
 
     memset(&poll_handle, 0, sizeof(poll_handle));
     if (NULL == (loop = uv_default_loop()))
