@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
@@ -217,23 +218,7 @@ static bool setup_stdin_pipe(uv_loop_t *loop)
     	return false;
     }
 
-    return true;
-}
-
-static bool setup_polling(uv_loop_t *loop)
-{
-	assert(loop);
-    if (0 > uv_poll_init(loop, &poll_handle, pcap_fd))
-    {
-    	printf("polling could not be initialized\n");
-    	return false;
-    }
-
-    if (0 > uv_poll_start(&poll_handle, UV_READABLE, pcap_data_cb))
-    {
-    	printf("could not start polling\n");
-    	return false;
-    }
+    printf("initialized stdin\n");
 
     return true;
 }
@@ -293,6 +278,79 @@ static void pcap_data_cb(uv_poll_t *handle, int status, int events)
             uv_stop(loop);
         }
     }
+}
+
+static bool setup_polling(uv_loop_t *loop)
+{
+	assert(loop);
+    if (0 > uv_poll_init(loop, &poll_handle, pcap_fd))
+    {
+    	printf("polling could not be initialized\n");
+    	return false;
+    }
+
+    if (0 > uv_poll_start(&poll_handle, UV_READABLE, pcap_data_cb))
+    {
+    	printf("could not start polling\n");
+    	return false;
+    }
+
+    return true;
+}
+
+/**
+ * Callback when SIGTERM is received by program. Stop the main event loop from running.
+ * @param handle: The signal handle.
+ * @param signum: The signal which triggered the callback.
+ */
+void signal_cb(uv_signal_t *handle, int signum)
+{
+	printf("received signal\n");
+	uv_signal_stop(handle);
+
+	uv_stop(loop);
+}
+
+/**
+ * Sets the stop flag for the loop when the process receives SIGTERM.
+ * @param loop: An event loop.
+ *
+ * The signal handler must be a variable from the main loop or a global, otherwise it will lose
+ * its memory allocation after this function has completed.
+ */
+bool setup_sigterm_handling(uv_loop_t *loop, uv_signal_t *handle)
+{
+	assert(loop);
+	assert(handle);
+
+	if (0 > uv_signal_init(loop, handle))
+	{
+		fprintf(stderr, "Could not initialize signal handle\n");
+		return false;
+	}
+	if (0 > uv_signal_start(handle, signal_cb, SIGTERM))
+	{
+		fprintf(stderr, "Could not start signal handling\n");
+		return false;
+	}
+	return true;
+}
+
+bool setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
+{
+	assert(loop);
+	assert(handle);
+	if (0 > uv_signal_init(loop, handle))
+	{
+		fprintf(stderr, "Could not initialize signal handle\n");
+		return false;
+	}
+	if (0 > uv_signal_start(handle, signal_cb, SIGINT))
+	{
+		fprintf(stderr, "Could not start signal handling\n");
+		return false;
+	}
+	return true;
 }
 
 static void walk_cb(uv_handle_t *handle, void *arg)
@@ -366,6 +424,11 @@ int main(int argc, char **argv)
     }
 
     if (!setup_stdin_pipe(loop)) goto done;
+
+    uv_signal_t sigterm_handle, sigint_handle;
+    if (!setup_sigterm_handling(loop, &sigterm_handle)) goto done;
+    if (!setup_sigint_handling(loop, &sigint_handle)) goto done;
+    printf("setup sigterm\n");
 
     if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
 
