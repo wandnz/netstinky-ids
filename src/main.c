@@ -31,7 +31,7 @@ int configure_pcap(const char *filter, const char *dev, char *err);
 static pcap_t *pcap = NULL;
 static int pcap_fd = -1;
 static uv_loop_t *loop = NULL;
-static uv_poll_t poll_handle;
+static uv_poll_t pcap_handle;
 static uv_pipe_t stdin_pipe;
 
 const static char *getopt_args = "hp:i:";
@@ -280,16 +280,16 @@ static void pcap_data_cb(uv_poll_t *handle, int status, int events)
     }
 }
 
-static bool setup_polling(uv_loop_t *loop)
+static bool setup_pcap_handle(uv_loop_t *loop)
 {
 	assert(loop);
-    if (0 > uv_poll_init(loop, &poll_handle, pcap_fd))
+    if (0 > uv_poll_init(loop, &pcap_handle, pcap_fd))
     {
     	printf("polling could not be initialized\n");
     	return false;
     }
 
-    if (0 > uv_poll_start(&poll_handle, UV_READABLE, pcap_data_cb))
+    if (0 > uv_poll_start(&pcap_handle, UV_READABLE, pcap_data_cb))
     {
     	printf("could not start polling\n");
     	return false;
@@ -386,7 +386,7 @@ static void read_stdin(uv_stream_t *stream, ssize_t nread,
         free(buf->base);
 }
 
-static void close_polling(uv_handle_t *handle)
+static void close_pcap_handle(uv_handle_t *handle)
 {
     free_globals();
 }
@@ -415,7 +415,7 @@ int main(int argc, char **argv)
 
     //if ((retval = configure_pcap(filter, (char *)iface_list->item, err) != 0)) goto done;
 
-    memset(&poll_handle, 0, sizeof(poll_handle));
+    memset(&pcap_handle, 0, sizeof(pcap_handle));
     if (NULL == (loop = uv_default_loop()))
     {
     	DPRINT("loop could not be allocated\n");
@@ -431,16 +431,16 @@ int main(int argc, char **argv)
 
     if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
 
-    if (!setup_polling(loop)) goto done;
+    if (!setup_pcap_handle(loop)) goto done;
 
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
 
-    if (0 > uv_poll_stop(&poll_handle)) printf("warning: could not stop polling\n");
+    if (0 > uv_poll_stop(&pcap_handle)) printf("warning: could not stop polling\n");
 
     // Close the polling loop with a callback, as it will need to close the
     // pcap fd when the polling fd is closed (must wait for polling fd to
     // close to prevent leaks)
-    uv_close((uv_handle_t *) &poll_handle, close_polling);
+    uv_close((uv_handle_t *) &pcap_handle, close_pcap_handle);
     // Close the remaining handles on the running loop
     uv_walk(loop, walk_cb, NULL);
 
