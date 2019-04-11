@@ -413,7 +413,7 @@ int main(int argc, char **argv)
     event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
 
 
-    //if ((retval = configure_pcap(filter, (char *)iface_list->item, err) != 0)) goto done;
+    if ((retval = configure_pcap(filter, (char *)iface_list->item, err) != 0)) goto done;
 
     memset(&pcap_handle, 0, sizeof(pcap_handle));
     if (NULL == (loop = uv_default_loop()))
