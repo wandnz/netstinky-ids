@@ -34,16 +34,10 @@ static uv_loop_t *loop = NULL;
 static uv_poll_t pcap_handle;
 static uv_pipe_t stdin_pipe;
 
-const static char *getopt_args = "hp:i:";
-const static struct option long_options[] = {
-    {"ipbl", 1, 0, 0},
-};
-const static char *getopt_usage =
-        "\nRun as: %s -p port -i dev1 [-i devn]\n";
-
 struct linked_list *iface_list = NULL;
 static int server_port = -1;
 char *ip_bl_file = NULL;
+char *dn_bl_file = NULL;
 ip_blacklist *ip_bl = NULL;
 domain_blacklist *dn_bl = NULL;
 struct ids_event_list *event_queue = NULL;
@@ -59,6 +53,15 @@ static void free_globals(void) {
 
 int parse_args(int argc, char **argv)
 {
+	char *getopt_args = "hp:i:";
+	struct option long_options[] = {
+	    {"ipbl", 1, 0, 0},
+		{"dnbl", 1, 0, 0},
+		{0, 0, 0, 0}
+	};
+	const static char *getopt_usage =
+	        "\nRun as: %s -p port -i dev1 [-i devn]\n";
+
     char *program = NULL;
     int option_char;
     int iface_num = 0;
@@ -74,18 +77,29 @@ int parse_args(int argc, char **argv)
         switch (option_char) {
         case 0:
             // Is a long option
-
-            // Only one long option: ipbl
-            if (!optarg) {
-                fprintf(stderr, "Did not receive an option for %s\n",
-                        long_options[option_index].name);
-                break;
-            } else {
-                fprintf(stderr, "Argument --ipbl (IP blacklist file): %s\n",
-                        optarg);
-                ip_bl_file = optarg;
-                break;
-            }
+        	if (0 == option_index)
+        	{
+				if (!optarg) {
+					fprintf(stderr, "Did not receive an option for %s\n",
+							long_options[option_index].name);
+				} else {
+					fprintf(stderr, "Argument --ipbl (IP blacklist file): %s\n",
+							optarg);
+					ip_bl_file = optarg;
+				}
+        	}
+        	else if (1 == option_index)
+        	{
+        		if (!optarg) {
+        			fprintf(stderr, "Did not receive an option for %s\n",
+        					long_options[option_index].name);
+        		} else {
+        			fprintf(stderr, "Argument --dnbl (domain blacklist file): %s\n",
+        					optarg);
+        			dn_bl_file = optarg;
+        		}
+        	}
+        	break;
         case 'h':
             fprintf(stderr, getopt_usage, program);
             return 1;
