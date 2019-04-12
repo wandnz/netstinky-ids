@@ -235,9 +235,11 @@ int setup_domain_blacklist()
 			domain_blacklist_add(dn_bl, domain);
 			free(domain);
 		}
+		fclose(bl_fp);
 	}
 
 	DPRINT("domain blacklist setup complete...\n");
+	return 1;
 
 error:
 	if (bl_fp) fclose(bl_fp);
