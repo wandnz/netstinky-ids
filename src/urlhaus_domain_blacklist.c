@@ -38,9 +38,9 @@ urlhaus_process_line(char **line, size_t *line_sz)
 	assert(*line_sz);
 
 	if (urlhaus_is_comment(*line)) return 0;
-	char prefix[] = "http://";
-	assert(0 == strncmp(prefix, *line, strlen(prefix)));
-	char *domain_name_pos = *line + strlen(prefix);
+
+	char *domain_name_pos = *line + strlen("http://");
+	if ('/' == *domain_name_pos) domain_name_pos++;	// Append extra in case prefix was 'https://'
 
 	// Find first '/' character
 	for (char *dn_iter = domain_name_pos; *dn_iter != '\0'; dn_iter++)
