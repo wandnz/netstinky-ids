@@ -55,7 +55,7 @@ urlhaus_process_line(char **line, size_t *line_sz)
 	// May overlap, so can't use strcpy or memmove.
 	size_t domain_name_len = strlen(domain_name_pos);
 	for (size_t it = 0; it <= domain_name_len; it++)
-		*line[it] = domain_name_pos[it];
+		(*line)[it] = domain_name_pos[it];
 
 	return 1;
 }
