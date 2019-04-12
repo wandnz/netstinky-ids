@@ -16,6 +16,7 @@
 #include "ip_blacklist.h"
 #include "domain_blacklist.h"
 #include "firehol_ip_blacklist.h"
+#include "urlhaus_domain_blacklist.h"
 #include "ids_event_list.h"
 #include "ids_pcap.h"
 
@@ -162,13 +163,10 @@ int parse_args(int argc, char **argv)
     return success;
 }
 
-int setup_blacklists()
+int setup_ip_blacklist()
 {
     struct ip4_address_range *firehol_list = NULL;
     FILE *fp = NULL;
-
-    dn_bl = new_domain_blacklist();
-    if (!dn_bl) goto error;
 
     ip_bl = new_ip_blacklist();
     if (!ip_bl) goto error;
@@ -212,6 +210,38 @@ error:
     free_ip_blacklist(&ip_bl);
     free_domain_blacklist(&dn_bl);
     return (0);
+}
+
+/**
+ * Open the domain blacklist provided at the command line and insert all domains into the blacklist
+ * structure. Should only be run once. Checks that dn_bl is NULL so an existing data structure is
+ * not leaked.
+ */
+int setup_domain_blacklist()
+{
+	FILE *bl_fp = NULL;
+	if (dn_bl_file)
+	{
+		assert(!dn_bl);
+	    dn_bl = new_domain_blacklist();
+	    if (!dn_bl) goto error;
+
+		bl_fp = fopen(dn_bl_file, "r");
+		if (!bl_fp) goto error;
+
+		char *domain = NULL;
+		while (NULL == (domain = urlhaus_get_next_domain(bl_fp)))
+		{
+			domain_blacklist_add(dn_bl, domain);
+			free(domain);
+		}
+	}
+
+	DPRINT("domain blacklist setup complete...\n");
+
+error:
+	if (bl_fp) fclose(bl_fp);
+	return 0;
 }
 
 static bool setup_stdin_pipe(uv_loop_t *loop)
@@ -417,9 +447,14 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    if (!setup_blacklists()) {
-        DPRINT("setupt_blacklists() failed\n");
+    if (!setup_ip_blacklist()) {
+        DPRINT("setup_ip_blacklist() failed\n");
         exit(EXIT_FAILURE);
+    }
+
+    if (!setup_domain_blacklist()) {
+    	DPRINT("setup_domain_blacklist() failed\n");
+    	exit(EXIT_FAILURE);
     }
 
     // pcap_io_task_setup, configure and add the pcap task to the event
