@@ -106,6 +106,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 			goto error;
 		}
 		eth_hdr = (struct ether_header *)pcap_data;
+		out->src_mac = *(struct ids_pcap_mac *)eth_hdr->ether_shost;
+		out->dest_mac = *(struct ids_pcap_mac *)eth_hdr->ether_dhost;
 
 		/* Not an error if not IP but not interested in it. */
 		if (ntohs(eth_hdr->ether_type) != ETHERTYPE_IP) return (0);
@@ -127,6 +129,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 			case IPPROTO_TCP:
 				DPRINT("ids_pcap_read_packet(): tcp packet\n");
 				tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*eth_hdr) + sizeof(*ip_hdr));
+				out->dest_port = tcp_hdr->dest;
+				out->src_port = tcp_hdr->source;
 
 				/* Check header is correct */
 				assert((tcp_hdr->th_flags & TH_SYN) && !(tcp_hdr->th_flags & TH_ACK));
@@ -136,6 +140,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 			case IPPROTO_UDP:
 				DPRINT("ids_pcap_read_packet(): udp packet\n");
 				udp_hdr = (struct udphdr *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr)));
+				out->dest_port = udp_hdr->dest;
+				out->src_port = udp_hdr->source;
 				payload_pos = (uint8_t *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
 				dns_pkt = dns_parse(payload_pos,
 						(uint8_t *) payload_pos + (pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr))));

@@ -9,10 +9,19 @@
 #include "domain_blacklist.h"
 #include "ids_event_list.h"
 
+struct ids_pcap_mac
+{
+	uint8_t mac_addr[6];
+};
+
 struct ids_pcap_fields
 {
 	uint32_t src_ip;
 	uint32_t dest_ip;
+	struct ids_pcap_mac src_mac;	/* In network order */
+	struct ids_pcap_mac dest_mac;
+	uint16_t src_port;
+	uint16_t dest_port;
 	char *domain;
 	char *iface;	/* Not set in the read_packet function */
 };
