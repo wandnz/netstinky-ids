@@ -230,7 +230,7 @@ int setup_domain_blacklist()
 		if (!bl_fp) goto error;
 
 		char *domain = NULL;
-		while (NULL == (domain = urlhaus_get_next_domain(bl_fp)))
+		while (NULL != (domain = urlhaus_get_next_domain(bl_fp)))
 		{
 			domain_blacklist_add(dn_bl, domain);
 			free(domain);
