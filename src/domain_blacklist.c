@@ -44,7 +44,7 @@ _domain_blacklist_reverse_labels(char * domain)
 	if (reversed_idx < 0) goto error;
 	reversed[reversed_idx] = '\0';
 
-	if (NULL != (tok = strtok(token_cpy, &delim)))
+	if (NULL != (tok = strtok(token_cpy, delim)))
 	{
 		do {
 			tok_len = strlen(tok);
@@ -54,7 +54,7 @@ _domain_blacklist_reverse_labels(char * domain)
 
 			// prepend '.'
 			if (--reversed_idx >= 0) reversed[reversed_idx] = '.';
-		} while (NULL != (tok = strtok(NULL, &delim)));
+		} while (NULL != (tok = strtok(NULL, delim)));
 	}
 
 	free(token_cpy);
@@ -97,13 +97,32 @@ domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
 	size_t len;
 	value_t *result = NULL;
 
+	char *reversed = _domain_blacklist_reverse_labels(domain);
+	if (!reversed)
+	{
+		// This is a serious error since we can't check the blacklist. Definitely log it.
+		fprintf(stderr, "Could not reverse domain name when checking blacklist: %s\n", domain);
+		return 0;
+	}
+
 	if (b && domain)
 	{
 		len = strlen(domain);
-		result = hattrie_tryget(h, domain, len);
+		result = hattrie_tryget(h, reversed, len);
 	}
 
+	free(reversed);
+
 	return (result ? 1 : 0);
+}
+
+void
+domain_blacklist_clear(domain_blacklist *b)
+{
+	assert(b);
+	hattrie_t *h = (hattrie_t *)b;
+
+	hattrie_free(h);
 }
 
 void
