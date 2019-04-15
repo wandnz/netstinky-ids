@@ -4,7 +4,7 @@
  *  Created on: 1/11/2018
  *      Author: mfletche
  */
-
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
