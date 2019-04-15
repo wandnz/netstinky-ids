@@ -10,21 +10,79 @@
 
 #include "domain_blacklist.h"
 
+/**
+ * At least for the HAT-trie, extra compression can be attained by reversing the labels so that
+ * TLDs come first.
+ *
+ * When checking domain names, they will also need to be reversed before lookup.
+ *
+ * Does not modify original domain string. Returns a dynamically allocated string.
+ *
+ * Will return NULL if memory allocation failed (there are a few extra strings required for this
+ * operation).
+ */
+char *
+_domain_blacklist_reverse_labels(char * domain)
+{
+	assert(domain);
+	int reversed_idx = -1;
+	char *delim = ".";
+
+	// token_cpy is the copy which will be destroyed by strtok
+	char *token_cpy = strdup(domain), *reversed = NULL;
+	if (!token_cpy) goto error;
+
+	char *tok = NULL;
+	size_t tok_len;
+
+	size_t reversed_sz = strlen(domain) + 1;
+	reversed = malloc(reversed_sz);
+	if (!reversed) return NULL;	// Memory allocation error
+
+	// Counts back from end as domain labels are prepended
+	reversed_idx = reversed_sz - 1;
+	if (reversed_idx < 0) goto error;
+	reversed[reversed_idx] = '\0';
+
+	if (NULL != (tok = strtok(token_cpy, &delim)))
+	{
+		do {
+			tok_len = strlen(tok);
+			reversed_idx -= tok_len;
+			assert(reversed_idx >= 0);
+			strncpy(reversed + reversed_idx, tok, tok_len);
+
+			// prepend '.'
+			if (--reversed_idx >= 0) reversed[reversed_idx] = '.';
+		} while (NULL != (tok = strtok(NULL, &delim)));
+	}
+
+	free(token_cpy);
+	return reversed;
+
+error:
+	if (token_cpy) free(token_cpy);
+	if (reversed) free(reversed);
+	return NULL;
+}
+
 int
 domain_blacklist_add(domain_blacklist *b, char *domain)
 {
 	assert(b);
 	assert(domain);
 
+	// Reverse domain label order before inserting.
+	char *reversed = _domain_blacklist_reverse_labels(domain);
+	if (!reversed) return 0;
+
 	hattrie_t *h = (hattrie_t *)b;
 	value_t *result = NULL;
 	size_t len;
 
-	if (b && domain)
-	{
-		len = strlen(domain);
-		result = hattrie_get(h, domain, len);
-	}
+	len = strlen(reversed);
+	result = hattrie_get(h, reversed, len);
+	free(reversed);
 
 	return (result ? 1 : 0);
 }
