@@ -6,7 +6,7 @@ src = $(wildcard *.c) \
 obj = $(src:.c=.o)
 
 CFLAGS:=-Wall -ggdb -std=c11
-LDFLAGS:=-luv -lpcap
+LDFLAGS:=-luv -lpcap -lavahi-core lavahi-client lavahi-common
 
 # Add _GNU_SOURCE define on Linux
 ifeq ($(shell uname -s), Linux)
@@ -22,6 +22,7 @@ clean:
 	@rm -f utils/*.o
 	@rm -f utils/hat/*.o
 	@rm -f utils/ebvbl/*.o
+	@rm -f mdns/*.o
 
 .PHONY: clean
 
