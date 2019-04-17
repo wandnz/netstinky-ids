@@ -12,6 +12,8 @@
 
 #include <poll.h>
 #include <avahi-common/cdecl.h>
+#include <avahi-client/client.h>
+#include <avahi-client/publish.h>
 #include <avahi-common/simple-watch.h>
 
 /**

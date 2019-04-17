@@ -5,6 +5,8 @@
  *      Author: mfletche
  */
 
+#include "ids_mdns_avahi.h"
+
 #include "mdns_libuv_integration.h"
 
 bool mdns_check_setup(uv_loop_t *loop, uv_check_t *check, AvahiSimplePoll *poll)

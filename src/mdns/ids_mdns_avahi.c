@@ -17,9 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <avahi-client/client.h>
-#include <avahi-client/publish.h>
-
 #include <avahi-common/alternative.h>
 #include <avahi-common/domain.h>
 #include <avahi-common/error.h>

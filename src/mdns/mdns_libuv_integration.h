@@ -11,6 +11,8 @@
 #include <assert.h>
 #include <stdbool.h>
 
+#include <avahi-common/simple-watch.h>
+
 #include <uv.h>
 
 /**
