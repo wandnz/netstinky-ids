@@ -5,12 +5,14 @@
  *      Author: mfletche
  */
 
+#ifndef SRC_IDS_MDNS_H_
+#define SRC_IDS_MDNS_H_
+
+#include <stdbool.h>
+
 #include <poll.h>
 #include <avahi-common/cdecl.h>
 #include <avahi-common/simple-watch.h>
-
-#ifndef SRC_IDS_MDNS_H_
-#define SRC_IDS_MDNS_H_
 
 /**
  * Encapsulates the variables required for the Avahi client library. Can be
@@ -24,5 +26,17 @@ typedef struct AvahiMdnsContext
 	AvahiClient *client;
 	AvahiEntryGroup *group;
 } AvahiMdnsContext;
+
+bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns);
+
+/**
+ * Perform one non-blocking iteration of the Avahi event loop.
+ */
+void ids_mdns_walk(AvahiSimplePoll *poll);
+
+/**
+ * Free resources needed for MDNS.
+ */
+void ids_mdns_free_mdns(AvahiMdnsContext *mdns);
 
 #endif /* SRC_IDS_MDNS_H_ */

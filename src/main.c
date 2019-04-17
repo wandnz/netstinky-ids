@@ -19,6 +19,7 @@
 #include "urlhaus_domain_blacklist.h"
 #include "ids_event_list.h"
 #include "ids_pcap.h"
+#include "mdns/ids_mdns_avahi.h"
 
 #define MAX_EVENTS 5
 #define MAX_TS 5
@@ -35,6 +36,8 @@ static uv_loop_t *loop = NULL;
 static uv_poll_t pcap_handle;
 static uv_pipe_t stdin_pipe;
 
+AvahiMdnsContext mdns;
+
 struct linked_list *iface_list = NULL;
 static int server_port = -1;
 char *ip_bl_file = NULL;
@@ -50,6 +53,7 @@ static void free_globals(void) {
     if (event_queue) free_ids_event_list(&event_queue);
     if (ip_bl) free_ip_blacklist(&ip_bl);
     if (dn_bl) free_domain_blacklist(&dn_bl);
+    ids_mdns_free_mdns(&mdns);
 }
 
 int parse_args(int argc, char **argv)
@@ -443,6 +447,9 @@ int main(int argc, char **argv)
     const char *filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0\
  and tcp[tcpflags] & tcp-ack == 0)";
     char err[PCAP_ERRBUF_SIZE];
+    uv_check_t mdns_handle;
+
+    memset(&mdns, 0, sizeof(mdns));
 
     if (!parse_args(argc, argv)) {
         DPRINT("parse_args() failed\n");
@@ -483,6 +490,10 @@ int main(int argc, char **argv)
     if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
 
     if (!setup_pcap_handle(loop)) goto done;
+
+    if (!ids_mdns_setup_mdns(&mdns)) goto done;
+    if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
+    		|| !mdns_check_start(mdns_handle)) goto done;
 
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
 

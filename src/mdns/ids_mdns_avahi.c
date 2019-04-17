@@ -9,6 +9,8 @@
  *  Created on: 11/04/2019
  *      Author: mfletche
  */
+#include "ids_mdns_avahi.h"
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -23,7 +25,6 @@
 #include <avahi-common/error.h>
 #include <avahi-common/malloc.h>
 
-#include "ids_mdns.h"
 
 void create_services(AvahiMdnsContext *mdns);
 
