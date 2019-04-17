@@ -1,7 +1,8 @@
 src = $(wildcard *.c) \
       $(wildcard utils/*.c) \
       $(wildcard utils/ebvbl/*.c) \
-      $(wildcard utils/hat/*.c)
+      $(wildcard utils/hat/*.c) \
+      $(wildcard mdns/*.c)
 obj = $(src:.c=.o)
 
 CFLAGS:=-Wall -ggdb -std=c11

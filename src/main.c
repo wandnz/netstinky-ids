@@ -20,6 +20,7 @@
 #include "ids_event_list.h"
 #include "ids_pcap.h"
 #include "mdns/ids_mdns_avahi.h"
+#include "mdns/mdns_libuv_integration.h"
 
 #define MAX_EVENTS 5
 #define MAX_TS 5
@@ -493,7 +494,7 @@ int main(int argc, char **argv)
 
     if (!ids_mdns_setup_mdns(&mdns)) goto done;
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
-    		|| !mdns_check_start(mdns_handle)) goto done;
+    		|| !mdns_check_start(&mdns_handle)) goto done;
 
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
 
