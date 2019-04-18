@@ -45,7 +45,8 @@ void packet_handler(unsigned char *user_dat,
     if (result == 1) {
         if (ids_pcap_is_blacklisted(&fields, ip_bl, dn_bl)) {
             struct in_addr ip;
-            char *iface_name = strdup("eth0");  // TODO: Fix this
+            // TODO: A name is required, but has proved difficult to get
+            char *iface_name = "placeholder";
             char *ioc_str;
             struct ids_event *ev;
 

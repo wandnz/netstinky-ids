@@ -273,6 +273,7 @@ new_ids_event(char *iface, uint32_t src_ip, char *ioc)
 		if (!(e = malloc(sizeof(*e)))) goto error;
 		if (!(t = new_ids_event_ts())) goto error;
 
+		e->num_times = 1;
 		e->times_seen = t;
 		e->iface = iface;
 		e->src_ip = src_ip;

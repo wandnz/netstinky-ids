@@ -53,6 +53,7 @@ static bool AvahiMdnsContext_use_alternative_service_name(AvahiMdnsContext *mdns
 static void entry_group_callback(AvahiEntryGroup *g, AvahiEntryGroupState state, void *userdata)
 {
 	AvahiMdnsContext *mdns = (AvahiMdnsContext *)userdata;
+	assert(mdns);
 	assert(g == mdns->group || mdns->group == NULL);
 	mdns->group = g;
 
@@ -90,11 +91,11 @@ static void entry_group_callback(AvahiEntryGroup *g, AvahiEntryGroupState state,
 void create_services(AvahiMdnsContext *mdns)
 {
 	int ret;
-	assert(mdns->client);
+	//assert(mdns->client);
 
 	// Check if first time running
 	if (!mdns->group)
-		if (!(mdns->group = avahi_entry_group_new(mdns->client, entry_group_callback, NULL)))
+		if (!(mdns->group = avahi_entry_group_new(mdns->client, entry_group_callback, mdns)))
 		{
 			fprintf(stderr, "create_services: %s\n",
 					avahi_strerror(avahi_client_errno(mdns->client)));
@@ -140,9 +141,13 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
 {
 	AvahiMdnsContext *mdns = (AvahiMdnsContext *)userdata;
 
+	// The first time this runs, client may not have been assigned yet
+	if (!mdns->client) mdns->client = c;
+
 	switch(state)
 	{
 	case AVAHI_CLIENT_S_RUNNING:
+		printf("AVAHI_CLIENT_S_RUNNING\n");
 		create_services(mdns);
 		break;
 	case AVAHI_CLIENT_FAILURE:
@@ -150,11 +155,14 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
 		avahi_simple_poll_quit(mdns->simple_poll);
 		break;
 	case AVAHI_CLIENT_S_COLLISION:
+		printf("AVAHI_CLIENT_S_COLLISION\n");
 		// continue
 	case AVAHI_CLIENT_S_REGISTERING:
+		printf("AVAHI_CLIENT_S_REGISTERING\n");
 		if (mdns->group) avahi_entry_group_reset(mdns->group);
 		break;
 	case AVAHI_CLIENT_CONNECTING:
+		printf("AVAHI_CLIENT_CONNECTING");
 		break;
 	}
 }
@@ -163,6 +171,7 @@ bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns)
 {
 	int error;
 
+	mdns->name = avahi_strdup("NetStinky");
 	mdns->simple_poll = avahi_simple_poll_new();
 	if (!mdns->simple_poll) return false;
 
@@ -211,7 +220,6 @@ void ids_mdns_free_mdns(AvahiMdnsContext *mdns)
 	assert(mdns);
 
 	// freeing avahi_client will free group
-	// TODO: check that poll is freed when dbus_connection_close is called
 	if (mdns->client) avahi_client_free(mdns->client);
 	if (mdns->simple_poll) avahi_simple_poll_free(mdns->simple_poll);
 	if (mdns->name) avahi_free(mdns->name);
