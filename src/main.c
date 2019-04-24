@@ -19,6 +19,7 @@
 #include "urlhaus_domain_blacklist.h"
 #include "ids_event_list.h"
 #include "ids_pcap.h"
+#include "ids_server.h"
 #include "mdns/ids_mdns_avahi.h"
 #include "mdns/mdns_libuv_integration.h"
 
@@ -449,6 +450,7 @@ int main(int argc, char **argv)
  and tcp[tcpflags] & tcp-ack == 0)";
     char err[PCAP_ERRBUF_SIZE];
     uv_check_t mdns_handle;
+    uv_tcp_t server_handle;
 
     memset(&mdns, 0, sizeof(mdns));
 
@@ -495,6 +497,10 @@ int main(int argc, char **argv)
     if (!ids_mdns_setup_mdns(&mdns)) goto done;
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
     		|| !mdns_check_start(&mdns_handle)) goto done;
+
+    printf("setting up event server...\n");
+    if (0 != setup_event_server(loop, &server_handle, 8000)) goto done;
+    printf("setup event server...\n");
 
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
 
