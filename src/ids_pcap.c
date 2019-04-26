@@ -56,10 +56,13 @@ void packet_handler(unsigned char *user_dat,
 
             if (!ids_event_list_add_event(event_queue, ev)) {
                 DPRINT("packet_handler: ids_event_list_add() failed\n");
-                return;
+                goto end;
             }
 
             DPRINT("pcap_io_task_read(): NEW DETECTED INTRUSION\n");
+            // Don't free domain name because it is added to event list
+            return;
+
         } else {
             DPRINT("Safe!\n");
         }
@@ -67,6 +70,8 @@ void packet_handler(unsigned char *user_dat,
         DPRINT("pcap_io_task_read(): ids_pcap_read_packet() failed\n");
     }
 
+end:
+	// If domain name is not added to event list, free it
     if (fields.domain != NULL) {
         free(fields.domain);
     }
