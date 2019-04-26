@@ -50,7 +50,7 @@ void packet_handler(unsigned char *user_dat,
             char *ioc_str;
             struct ids_event *ev;
 
-            ip.s_addr = htonl(fields.dest_ip);
+            ip.s_addr = fields.dest_ip;
             ioc_str = fields.domain ? fields.domain : strdup(inet_ntoa(ip));
             ev = new_ids_event(iface_name, fields.src_ip, ioc_str);
 
@@ -127,8 +127,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 		ip_hdr = (struct ip *)(pcap_data + sizeof(*eth_hdr));
 		DPRINT("ids_pcap_read_packet(): destination IP: %s\n", inet_ntoa(ip_hdr->ip_dst));
 		DPRINT("ids_pcap_read_packet(): source IP: %s\n", inet_ntoa(ip_hdr->ip_src));
-		out->dest_ip = ntohl(ip_hdr->ip_dst.s_addr);
-		out->src_ip = ntohl(ip_hdr->ip_src.s_addr);
+		out->dest_ip = ip_hdr->ip_dst.s_addr;
+		out->src_ip = ip_hdr->ip_src.s_addr;
 
 		switch (ip_hdr->ip_p)
 		{
@@ -186,8 +186,8 @@ int
 ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_blacklist *dn_bl)
 {
 	struct in_addr src_ip_buf, dst_ip_buf;
-	src_ip_buf.s_addr = htonl(f->src_ip);
-	dst_ip_buf.s_addr = htonl(f->dest_ip);
+	src_ip_buf.s_addr = f->src_ip;
+	dst_ip_buf.s_addr = f->dest_ip;
 
 	char *src = strdup(inet_ntoa(src_ip_buf));
 

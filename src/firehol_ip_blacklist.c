@@ -177,7 +177,7 @@ read_firehol_ip_blacklist(FILE *fp)
 			}
 			else prefix_len = 32;
 
-			ip4_address_range_add(&list, new_ip4_address_range(ntohl(addr.s_addr), prefix_len));
+			ip4_address_range_add(&list, new_ip4_address_range(addr.s_addr, prefix_len));
 		}
 
 		if (line_buf) free(line_buf);
