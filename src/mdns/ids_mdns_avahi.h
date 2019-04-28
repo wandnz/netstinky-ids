@@ -25,11 +25,12 @@ typedef struct AvahiMdnsContext
 {
 	AvahiSimplePoll *simple_poll;
 	char *name;
+	int port;
 	AvahiClient *client;
 	AvahiEntryGroup *group;
 } AvahiMdnsContext;
 
-bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns);
+bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port);
 
 /**
  * Perform one non-blocking iteration of the Avahi event loop.

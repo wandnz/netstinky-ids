@@ -494,12 +494,12 @@ int main(int argc, char **argv)
 
     if (!setup_pcap_handle(loop)) goto done;
 
-    if (!ids_mdns_setup_mdns(&mdns)) goto done;
+    if (!ids_mdns_setup_mdns(&mdns, server_port)) goto done;
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
     		|| !mdns_check_start(&mdns_handle)) goto done;
 
     printf("setting up event server...\n");
-    if (0 != setup_event_server(loop, &server_handle, 8000)) goto done;
+    if (0 != setup_event_server(loop, &server_handle, server_port, event_queue)) goto done;
     printf("setup event server...\n");
 
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;

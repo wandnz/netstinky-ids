@@ -105,7 +105,7 @@ void create_services(AvahiMdnsContext *mdns)
 	if (avahi_entry_group_is_empty(mdns->group))
 	{
 		if (0 > (ret = avahi_entry_group_add_service(mdns->group, AVAHI_IF_UNSPEC,
-				AVAHI_PROTO_UNSPEC, 0, mdns->name, "_ids._tcp", NULL, NULL, 651, NULL)))
+				AVAHI_PROTO_UNSPEC, 0, mdns->name, "_ids._tcp", NULL, NULL, mdns->port, NULL)))
 		{
 			if (AVAHI_ERR_COLLISION == ret)
 				goto collision;
@@ -167,11 +167,12 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
 	}
 }
 
-bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns)
+bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port)
 {
 	int error;
 
 	mdns->name = avahi_strdup("NetStinky");
+	mdns->port = port;
 	mdns->simple_poll = avahi_simple_poll_new();
 	if (!mdns->simple_poll) return false;
 
