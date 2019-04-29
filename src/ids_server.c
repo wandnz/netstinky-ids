@@ -8,10 +8,11 @@
 #include "ids_server.h"
 
 static char *fmt_ioc = "IOC: %s\n";
-static char *fmt_timestamp = "Last seen: %11d.%.9ld\n";
+static char *fmt_timestamp = "Last seen: %11d\n";
 static char *fmt_event_count = "Number of times seen: %d\n";
 static char *fmt_iface = "Interface: %s\n";
-static char *fmt_src_ip = "Source IP: %s\n\n";
+static char *fmt_src_ip = "Source IP: %s\n";
+static char *fmt_src_mac = "Source MAC: %02x:%02x:%02x:%02x:%02x:%02x\n\n";
 
 /**
  * Frees write requests. This should only be called after the request has been
@@ -37,14 +38,13 @@ static size_t ids_event_len(struct ids_event *event)
 	size_t char_count = 0;
 	int ret;
 
-	char buf[1];
+	char buf[30];
 
 	ret = snprintf(buf, 30, fmt_ioc, event->ioc);
 	if (ret >= 0) char_count += ret;
 
 	ret = snprintf(buf, 30, fmt_timestamp,
-			(long long)event->times_seen->tm_stamp.tv_sec,
-			event->times_seen->tm_stamp.tv_nsec);
+			(long long)event->times_seen->tm_stamp.tv_sec);
 	if (ret >= 0) char_count += ret;
 
 	ret = snprintf(buf, 30, fmt_event_count, event->num_times);
@@ -53,7 +53,12 @@ static size_t ids_event_len(struct ids_event *event)
 	ret = snprintf(buf, 30, fmt_iface, event->iface);
 	if (ret >= 0) char_count += ret;
 
-	ret = snprintf(buf, 30, fmt_src_ip, inet_ntop(AF_INET, &ip, ip_str, 20));
+	ip.s_addr = event->src_ip;
+	ret = snprintf(buf, 30, fmt_src_ip, inet_ntop(AF_INET, &ip, ip_str, 30));
+	if (ret >= 0) char_count += ret;
+
+	ret = snprintf(buf, 30, fmt_src_mac, event->mac.m_addr[0], event->mac.m_addr[1],
+			event->mac.m_addr[2], event->mac.m_addr[3], event->mac.m_addr[4], event->mac.m_addr[5]);
 	if (ret >= 0) char_count += ret;
 
 	return char_count;
@@ -90,8 +95,7 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 	buf_idx += ret;
 
 	ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_timestamp,
-			(long long)event->times_seen->tm_stamp.tv_sec,
-			event->times_seen->tm_stamp.tv_nsec);
+			(long long)event->times_seen->tm_stamp.tv_sec);
 	assert(ret < buf_sz - buf_idx);
 	buf_idx += ret;
 
@@ -105,9 +109,15 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 	buf_idx += ret;
 
 	ip.s_addr = event->src_ip;
-	// Source IP is stored in network order
+
 	ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_src_ip,
 			inet_ntop(AF_INET, &ip, ip_str, 20));
+	assert(ret < buf_sz - buf_idx);
+	buf_idx += ret;
+
+	ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_src_mac,
+			event->mac.m_addr[0], event->mac.m_addr[1], event->mac.m_addr[2], event->mac.m_addr[3],
+			event->mac.m_addr[4], event->mac.m_addr[5]);
 	assert(ret < buf_sz - buf_idx);
 	buf_idx += ret;
 

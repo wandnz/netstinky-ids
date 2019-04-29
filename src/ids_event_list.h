@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 
+#include "common.h"
 #include "linked_list.h"
 
 struct ids_event
@@ -19,6 +20,7 @@ struct ids_event
 	unsigned int num_times;
 	char *iface;
 	uint32_t src_ip;
+	mac_addr mac;
 	char *ioc;	/* may be a stringify-ed IP address or domain */
 	struct ids_event *next;
 	struct ids_event *previous;
@@ -98,7 +100,7 @@ ids_event_list_enforce_max_events(struct ids_event_list *list);
  * could not be created.
  */
 struct ids_event *
-new_ids_event(char *iface, uint32_t src_ip, char *ioc);
+new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac);
 
 /**
  * Creates a new IDS event list with the given number of maximum events and

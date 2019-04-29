@@ -5,21 +5,17 @@
 #ifndef IDS_PCAP_H_
 #define IDS_PCAP_H_
 
+#include "common.h"
 #include "ip_blacklist.h"
 #include "domain_blacklist.h"
 #include "ids_event_list.h"
-
-struct ids_pcap_mac
-{
-	uint8_t mac_addr[6];
-};
 
 struct ids_pcap_fields
 {
 	uint32_t src_ip;
 	uint32_t dest_ip;
-	struct ids_pcap_mac src_mac;	/* In network order */
-	struct ids_pcap_mac dest_mac;
+	mac_addr src_mac;	/* In network order */
+	mac_addr dest_mac;
 	uint16_t src_port;
 	uint16_t dest_port;
 	char *domain;

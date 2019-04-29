@@ -52,7 +52,7 @@ void packet_handler(unsigned char *user_dat,
 
             ip.s_addr = fields.dest_ip;
             ioc_str = fields.domain ? fields.domain : strdup(inet_ntoa(ip));
-            ev = new_ids_event(iface_name, fields.src_ip, ioc_str);
+            ev = new_ids_event(iface_name, fields.src_ip, ioc_str, fields.src_mac);
 
             if (!ids_event_list_add_event(event_queue, ev)) {
                 DPRINT("packet_handler: ids_event_list_add() failed\n");
@@ -111,9 +111,11 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 					pcap_hdr->len);
 			goto error;
 		}
+
+		// These are stored Most Significant Byte first
 		eth_hdr = (struct ether_header *)pcap_data;
-		out->src_mac = *(struct ids_pcap_mac *)eth_hdr->ether_shost;
-		out->dest_mac = *(struct ids_pcap_mac *)eth_hdr->ether_dhost;
+		out->src_mac = *(mac_addr *)eth_hdr->ether_shost;
+		out->dest_mac = *(mac_addr *)eth_hdr->ether_dhost;
 
 		/* Not an error if not IP but not interested in it. */
 		if (ntohs(eth_hdr->ether_type) != ETHERTYPE_IP) return (0);
