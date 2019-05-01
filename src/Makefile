@@ -24,6 +24,7 @@ clean:
 	@rm -f utils/hat/*.o
 	@rm -f utils/ebvbl/*.o
 	@rm -f mdns/*.o
+	@rm -f blacklist/*.o
 
 .PHONY: clean
 
