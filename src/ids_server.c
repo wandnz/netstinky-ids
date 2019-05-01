@@ -7,6 +7,8 @@
 
 #include "ids_server.h"
 
+#define MAX_CONNS 128
+
 static char *fmt_ioc = "IOC: %s\n";
 static char *fmt_timestamp = "Last seen: %11d\n";
 static char *fmt_event_count = "Number of times seen: %d\n";
@@ -223,7 +225,7 @@ setup_event_server(uv_loop_t *loop, uv_tcp_t *handle, int port, struct ids_event
 	handle->data = list;
 	if (0 != uv_ip4_addr("0.0.0.0", port, &server_addr)) goto error;
 	if (0 != uv_tcp_bind(handle, (const struct sockaddr *)&server_addr, 0)) goto error;
-	ret = uv_listen((uv_stream_t *)handle, 128, on_new_connection);
+	ret = uv_listen((uv_stream_t *)handle, MAX_CONNS, on_new_connection);
 	if (ret) goto error;
 	return 0;
 

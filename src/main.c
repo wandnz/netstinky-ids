@@ -50,54 +50,54 @@ static uv_tcp_t server_handle;
 
 static void close_cb(uv_handle_t *handle)
 {
-	printf("Closed handle: %x\n", handle);
+	/* If handle is a TCP client connection (i.e. any TCP handle which is not
+	 * the global variable 'server_handle'), free it as it is dynamically
+	 * allocated.
+	 */
+	if (UV_TCP == handle->type && handle != (uv_handle_t *)&server_handle)
+		free(handle);
 }
 
 void
 stream_shutdown_cb(uv_shutdown_t *req, int status)
 {
 	if (status != 0)
-		fprintf(stderr, "Could not shutdown stream at %x\n", req->handle);
+		fprintf(stderr, "Could not shutdown stream: %s\n",
+				uv_strerror(status));
+
+	printf("Shutdown stream for writing.\n");
+	/* Close handle */
+	uv_close((uv_handle_t *)req->handle, close_cb);
 	free(req);
 }
 
-/**
- * Stop all global handles
- */
-static void stop_handles()
+void walk_and_close_handle_cb(uv_handle_t *handle, void *arg)
 {
-	uv_shutdown_t *shutdown_req;
+	int err = 0;
+	uv_shutdown_t *shutdown = NULL;
 
-	if (0 > uv_check_stop(&mdns_handle)) fprintf(stderr, "Could not stop mdns polling\n");
-	if (0 > uv_poll_stop(&pcap_handle)) fprintf(stderr, "Could not stop pcap\n");
+	if (!uv_is_closing(handle))
+	{
+		/* Stop reading and shutdown writing. Handle will be closed in a
+		 * separate callback */
+		if (UV_STREAM == handle->type)
+		{
+			if (0 > (err = uv_read_stop((uv_stream_t *)handle)))
+				fprintf(stderr, "Could not stop reading stream: %s",
+						uv_strerror(err));
+			if (NULL == (shutdown = malloc(sizeof(*shutdown))))
+				fprintf(stderr, "Could not allocate shutdown request\n");
+			else
+				if (0 > (err = uv_shutdown(shutdown, (uv_stream_t *)handle, stream_shutdown_cb)))
+					fprintf(stderr, "Could not shutdown stream: %s\n",
+							uv_strerror(err));
+				else
+					// Successfully started shutdown process of stream
+					return;
+		}
 
-	if (0 > uv_read_stop((uv_stream_t *)&stdin_pipe)) fprintf(stderr, "Could not stop reading stdin\n");
-	if (NULL == (shutdown_req = malloc(sizeof(*shutdown_req))))
-		fprintf(stderr, "Could not allocate shutdown request\n");
-	else
-		uv_shutdown(shutdown_req, (uv_stream_t *)&stdin_pipe, stream_shutdown_cb);
-
-	if (0 > uv_signal_stop(&sigterm_handle)) fprintf(stderr, "Could not stop SIGTERM handler\n");
-	if (0 > uv_signal_stop(&sigint_handle)) fprintf(stderr, "Could not stop SIGINT handler\n");
-
-	if (0 > uv_read_stop((uv_stream_t *)&stdin_pipe)) fprintf(stderr, "Could not stop reading server socket\n");
-	if (NULL == (shutdown_req = malloc(sizeof(*shutdown_req))))
-		fprintf(stderr, "Could not allocate shutdown request\n");
-	else
-		uv_shutdown(shutdown_req, (uv_stream_t *)&server_handle, stream_shutdown_cb);
-}
-
-/**
- * Close all global handles
- */
-static void close_handles()
-{
-	uv_close((uv_handle_t *)&mdns_handle, close_cb);
-	uv_close((uv_handle_t *)&stdin_pipe, close_cb);
-	uv_close((uv_handle_t *)&pcap_handle, close_cb);
-	uv_close((uv_handle_t *)&sigterm_handle, close_cb);
-	uv_close((uv_handle_t *)&sigint_handle, close_cb);
-	uv_close((uv_handle_t *)&server_handle, close_cb);
+		uv_close(handle, close_cb);
+	}
 }
 
 static void free_globals(void) {
@@ -254,9 +254,7 @@ static bool setup_stdin_pipe(uv_loop_t *loop)
 void signal_cb(uv_signal_t *handle, int signum)
 {
 	printf("received signal\n");
-	uv_signal_stop(handle);
-
-	uv_stop(loop);
+	uv_stop(handle->loop);
 }
 
 /**
@@ -305,10 +303,15 @@ static void walk_cb(uv_handle_t *handle, void *arg)
 {
     // KLUDGE: Don't close UV_POLL instances as it will be assumed that
     // they will be closed manually. Prevents double-closing errors
-    if (handle->type == UV_POLL)
+    /*if (handle->type == UV_POLL)
         return;
     else
         uv_close(handle, arg);
+    */
+	int fd;
+	if (0 == uv_fileno(handle, &fd))
+		if (0 != close(fd))
+			perror("Could not close pcap file descriptor");
 }
 
 static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
@@ -394,16 +397,15 @@ int main(int argc, char **argv)
     retval = 0;
 
 done:
-    if (loop) {
-    	stop_handles();
-    	close_handles();
-        int close_result;
-        while((close_result = uv_loop_close(loop)) == UV_EBUSY) {
-            uv_run(loop, UV_RUN_NOWAIT);
-        }
-    } else {
-        // Loop hasn't started yet, but pcap may need cleaning up
-    }
+	if (loop)
+	{
+		uv_walk(loop, walk_and_close_handle_cb, NULL);
+		int close_result;
+		while ((close_result = uv_loop_close(loop)) == UV_EBUSY)
+		{
+			uv_run(loop, UV_RUN_NOWAIT);
+		}
+	}
     free_globals();
     return retval;
 }
