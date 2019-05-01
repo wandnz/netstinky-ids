@@ -19,8 +19,20 @@
 #include "ids_pcap.h"
 #include "ids_server.h"
 
+/**
+ * Defining FUZZ_TEST enables different code paths which can be run repeatedly
+ * with fuzzed inputs.
+ */
+#ifdef FUZZ_TEST
+#include "test/fuzz_test_blacklist.c"
+#endif // FUZZ_TEST
+
 #define MAX_EVENTS 5
 #define MAX_TS 5
+
+// For debugging with valgrind, which cannot handle programs with extra
+// capabilities
+#define IGNORE_PCAP_ERRORS (true)
 
 /* Structure to hold command line argument values. None of these will need to
  * be freed as the strings will be pointers to static memory.
@@ -352,6 +364,11 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+#ifdef FUZZ_TEST
+    fuzz_test_blacklists(args.ip_filename, args.domain_filename);
+    exit(EXIT_SUCCESS);
+#endif // FUZZ_TEST
+
     if (!setup_ip_blacklist(&ip_bl, args.ip_filename)) {
         DPRINT("setup_ip_blacklist() failed\n");
         exit(EXIT_FAILURE);
@@ -366,7 +383,8 @@ int main(int argc, char **argv)
     // loop here.
     event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
 
-    if ((retval = configure_pcap(&pcap, filter, args.iface, err) != 0)) goto done;
+    if ((retval = configure_pcap(&pcap, filter, args.iface, err) != 0)
+    		&& !IGNORE_PCAP_ERRORS) goto done;
 
     memset(&pcap_handle, 0, sizeof(pcap_handle));
     if (NULL == (loop = uv_default_loop()))
@@ -374,7 +392,8 @@ int main(int argc, char **argv)
     	DPRINT("loop could not be allocated\n");
     	goto done;
     }
-    if (!setup_pcap_handle(loop, &pcap_handle, pcap)) goto done;
+
+    if (pcap != NULL && !setup_pcap_handle(loop, &pcap_handle, pcap)) goto done;
 
     if (!setup_stdin_pipe(loop)) goto done;
     if (!setup_sigterm_handling(loop, &sigterm_handle)) goto done;
