@@ -108,6 +108,9 @@ ebvbl_get_bv_index(EBVBL *e, void *element);
 bool
 ebvbl_contains(EBVBL *e, void *element);
 
+void
+ebvbl_clear(EBVBL *e, freeElement free_item);
+
 /**
  * Frees an EBVBL and all substructures. Takes a function pointer argument which
  * can be used to clean up each element (but can also be NULL if this is not
@@ -121,6 +124,14 @@ ebvbl_free(EBVBL *e, freeElement e_free);
 
 SA_INDEX
 ebvbl_insert_element(EBVBL *e, void *element);
+
+/**
+ * Removes the element at the given index.
+ * @param e	The address of an EBVBL structure.
+ * @param index	The index of the element to remove.
+ */
+void
+ebvbl_remove_element(EBVBL *e, unsigned int index);
 
 /**
  * Sort the SortedArray structure within the EBVBL. Will not sort if it is
