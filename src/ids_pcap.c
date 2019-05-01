@@ -21,8 +21,6 @@
 #include <netinet/udp.h>
 
 #include "utils/common.h"
-#include "ip_blacklist.h"
-#include "domain_blacklist.h"
 #include "dns.h"
 #include "ids_pcap.h"
 
@@ -204,4 +202,126 @@ ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_b
 	else return (ip_blacklist_lookup(ip_bl, f->dest_ip));
 
 	return (0);
+}
+
+int set_filter(pcap_t *pcap, const char *filter, char *err)
+{
+    int rc = -1;
+    struct bpf_program fp;
+
+    if (pcap == NULL || filter == NULL) return 0;
+
+    memset(&fp, 0, sizeof(fp));
+
+    if ((rc = pcap_compile(pcap, &fp, filter, 0, PCAP_NETMASK_UNKNOWN)) != 0) {
+        fprintf(stderr, "Error in filter expression: %s\n", err);
+        goto done;
+    }
+    if ((rc = pcap_setfilter(pcap, &fp)) != 0) {
+        fprintf(stderr, "Can't set filter expression: %s\n", err);
+        goto done;
+    }
+
+    pcap_freecode(&fp);
+    rc = 0;
+done:
+    return rc;
+}
+
+/**
+ * Called when an event occurs on the pcap file descriptor.
+ * @param handle: The handle of the libuv poll handle.
+ * @param status: status < 0 indicates that an error occurred, 0 means success.
+ * @param events: A bitmask of events.
+ */
+static void pcap_data_cb(uv_poll_t *handle, int status, int events)
+{
+	int pkt_num = 0, cnt = -1;
+	pcap_t *pcap = (pcap_t *)handle->data;
+
+    if (status < 0) {
+        fprintf(stderr, "Error while polling fd: %s\n", uv_strerror(status));
+        return;
+    }
+
+    assert(status==0);
+
+    if (events & UV_READABLE) {
+        // If we are here, the fd is ready to read
+        // cnt = 0 or -1 means read all packets (but -1 will work with older versions of pcap,
+        // where 0 does not)
+        pkt_num = pcap_dispatch(pcap, cnt, packet_handler, NULL);
+
+        if (pkt_num == PCAP_ERROR) {
+            fprintf(stderr, "Error processing packet\n%s\n",
+                    pcap_geterr(pcap));
+        } else if (pkt_num == PCAP_ERROR_BREAK) {
+            fprintf(stderr, "Pcap requested loop close.\n");
+            uv_stop(handle->loop);
+        }
+    }
+}
+
+bool setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap)
+{
+	assert(loop);
+	assert(pcap_handle);
+	assert(pcap);
+
+	int fd;
+
+	if (PCAP_ERROR == (fd = pcap_get_selectable_fd(pcap))) return false;
+
+    if (0 > uv_poll_init(loop, pcap_handle, fd))
+    {
+    	printf("polling could not be initialized\n");
+    	return false;
+    }
+
+    if (0 > uv_poll_start(pcap_handle, UV_READABLE, pcap_data_cb))
+    {
+    	printf("could not start polling\n");
+    	return false;
+    }
+
+    pcap_handle->data = pcap;
+
+    return true;
+}
+
+int configure_pcap(pcap_t **pcap, const char *filter, const char *dev, char *err)
+{
+    int retval = -1;
+    int pcap_fd;
+    if ((*pcap = pcap_create(dev, err)) == NULL) {
+        fprintf(stderr, "Can't open %s: %s\n", dev, err);
+        retval = -2;
+        goto done;
+    }
+    if (pcap_set_promisc(*pcap, 1) != 0) {
+        fprintf(stderr, "pcap_set_promisc failed\n");
+        retval = -4;
+        goto done;
+    }
+    if (pcap_activate(*pcap) != 0) {
+        fprintf(stderr, "pcap_activate failed\n");
+        retval = -5;
+        goto done;
+    }
+    if (set_filter(*pcap, filter, err) != 0) {
+        fprintf(stderr, "Who even cares?\n");
+        retval = -3;
+        goto done;
+    }
+
+    pcap_fd = pcap_get_selectable_fd(*pcap);
+    if (pcap_fd == -1) {
+        fprintf(stderr, "pcap_get_sel_fd failed\n");
+        retval = -6;
+        goto done;
+    }
+
+    retval = 0;
+done:
+    return retval;
 }

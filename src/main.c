@@ -1,64 +1,115 @@
 #include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <signal.h>
 #include <ctype.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <getopt.h>
-
 #include <pcap.h>
+#include <unistd.h>
 #include <uv.h>
 
+#include "blacklist/ids_blacklist.h"
+#include "mdns/ids_mdns_avahi.h"
+#include "mdns/mdns_libuv_integration.h"
 #include "utils/common.h"
-#include "linked_list.h"
-#include "ip_blacklist.h"
-#include "domain_blacklist.h"
-#include "firehol_ip_blacklist.h"
-#include "urlhaus_domain_blacklist.h"
 #include "ids_event_list.h"
 #include "ids_pcap.h"
 #include "ids_server.h"
-#include "mdns/ids_mdns_avahi.h"
-#include "mdns/mdns_libuv_integration.h"
 
 #define MAX_EVENTS 5
 #define MAX_TS 5
 
-// Forward declarations
-void packet_handler(unsigned char *userData, const struct pcap_pkthdr* pkthdr,
-                    const unsigned char *packet);
-int configure_pcap(const char *filter, const char *dev, char *err);
+/* Structure to hold command line argument values. None of these will need to
+ * be freed as the strings will be pointers to static memory.
+ */
+struct IdsArgs
+{
+	char *domain_filename;
+	char *ip_filename;
+	char *iface;
+	int server_port;
+};
 
-// Global state
-static pcap_t *pcap = NULL;
-static int pcap_fd = -1;
+// Variables that MUST be global so exit callback can free them
 static uv_loop_t *loop = NULL;
-static uv_poll_t pcap_handle;
-static uv_pipe_t stdin_pipe;
-
+static pcap_t *pcap = NULL;
 AvahiMdnsContext mdns;
-
-struct linked_list *iface_list = NULL;
-static int server_port = -1;
-char *ip_bl_file = NULL;
-char *dn_bl_file = NULL;
 ip_blacklist *ip_bl = NULL;
 domain_blacklist *dn_bl = NULL;
 struct ids_event_list *event_queue = NULL;
 
+// libuv handles
+static uv_check_t mdns_handle;
+static uv_pipe_t stdin_pipe;
+static uv_poll_t pcap_handle;
+static uv_signal_t sigterm_handle, sigint_handle;
+static uv_tcp_t server_handle;
+
+static void close_cb(uv_handle_t *handle)
+{
+	printf("Closed handle: %x\n", handle);
+}
+
+void
+stream_shutdown_cb(uv_shutdown_t *req, int status)
+{
+	if (status != 0)
+		fprintf(stderr, "Could not shutdown stream at %x\n", req->handle);
+	free(req);
+}
+
+/**
+ * Stop all global handles
+ */
+static void stop_handles()
+{
+	uv_shutdown_t *shutdown_req;
+
+	if (0 > uv_check_stop(&mdns_handle)) fprintf(stderr, "Could not stop mdns polling\n");
+	if (0 > uv_poll_stop(&pcap_handle)) fprintf(stderr, "Could not stop pcap\n");
+
+	if (0 > uv_read_stop((uv_stream_t *)&stdin_pipe)) fprintf(stderr, "Could not stop reading stdin\n");
+	if (NULL == (shutdown_req = malloc(sizeof(*shutdown_req))))
+		fprintf(stderr, "Could not allocate shutdown request\n");
+	else
+		uv_shutdown(shutdown_req, (uv_stream_t *)&stdin_pipe, stream_shutdown_cb);
+
+	if (0 > uv_signal_stop(&sigterm_handle)) fprintf(stderr, "Could not stop SIGTERM handler\n");
+	if (0 > uv_signal_stop(&sigint_handle)) fprintf(stderr, "Could not stop SIGINT handler\n");
+
+	if (0 > uv_read_stop((uv_stream_t *)&stdin_pipe)) fprintf(stderr, "Could not stop reading server socket\n");
+	if (NULL == (shutdown_req = malloc(sizeof(*shutdown_req))))
+		fprintf(stderr, "Could not allocate shutdown request\n");
+	else
+		uv_shutdown(shutdown_req, (uv_stream_t *)&server_handle, stream_shutdown_cb);
+}
+
+/**
+ * Close all global handles
+ */
+static void close_handles()
+{
+	uv_close((uv_handle_t *)&mdns_handle, close_cb);
+	uv_close((uv_handle_t *)&stdin_pipe, close_cb);
+	uv_close((uv_handle_t *)&pcap_handle, close_cb);
+	uv_close((uv_handle_t *)&sigterm_handle, close_cb);
+	uv_close((uv_handle_t *)&sigint_handle, close_cb);
+	uv_close((uv_handle_t *)&server_handle, close_cb);
+}
+
 static void free_globals(void) {
+	DPRINT("Freeing globals...\n");
     if (pcap) pcap_close(pcap);
-    if (pcap_fd != -1) close(pcap_fd);
-    if (iface_list) free_linked_list(&iface_list, NULL);
     if (event_queue) free_ids_event_list(&event_queue);
     if (ip_bl) free_ip_blacklist(&ip_bl);
     if (dn_bl) free_domain_blacklist(&dn_bl);
     ids_mdns_free_mdns(&mdns);
 }
 
-int parse_args(int argc, char **argv)
+int parse_args(struct IdsArgs *args, int argc, char **argv)
 {
 	char *getopt_args = "hp:i:";
 	struct option long_options[] = {
@@ -74,6 +125,8 @@ int parse_args(int argc, char **argv)
     int iface_num = 0;
     int success = 1;
     int option_index = 0;
+
+    memset(args, 0, sizeof(*args));
 
     if (argc < 1) return 0;
 
@@ -92,7 +145,7 @@ int parse_args(int argc, char **argv)
 				} else {
 					fprintf(stderr, "Argument --ipbl (IP blacklist file): %s\n",
 							optarg);
-					ip_bl_file = optarg;
+					args->ip_filename = optarg;
 				}
         	}
         	else if (1 == option_index)
@@ -103,7 +156,7 @@ int parse_args(int argc, char **argv)
         		} else {
         			fprintf(stderr, "Argument --dnbl (domain blacklist file): %s\n",
         					optarg);
-        			dn_bl_file = optarg;
+        			args->domain_filename = optarg;
         		}
         	}
         	break;
@@ -118,7 +171,7 @@ int parse_args(int argc, char **argv)
             }
 
             iface_num++;
-            linked_list_add_item(&iface_list, optarg);
+            args->iface = optarg;
 
             fprintf(stderr, "Argument -i (interface): %s\n", optarg);
             break;
@@ -130,14 +183,14 @@ int parse_args(int argc, char **argv)
             }
 
             // -p must be given a port number > 0
-            server_port = atoi(optarg);
-            if (server_port <= 0) {
+            args->server_port = atoi(optarg);
+            if (args->server_port <= 0) {
                 fprintf(stderr, "-p was given an invalid argument: %s\n",
                         optarg);
                 success = 0;
             }
 
-            fprintf(stderr, "Argument -p (port number): %d\n", server_port);
+            fprintf(stderr, "Argument -p (port number): %d\n", args->server_port);
             break;
         case '?':
             // options which require an argument
@@ -155,101 +208,19 @@ int parse_args(int argc, char **argv)
         }
     }
 
-    if (iface_num <= 0) {
-        fprintf(stderr, "Required argument -i not received\n");
+    if (iface_num <= 0 || iface_num > 1) {
+    	fprintf(stderr, "Received %d -i arguments. Require exactly 1.\n",
+    			iface_num);
         success = 0;
     }
 
     // Check every required option has been received
-    if (server_port <= 0) {
+    if (args->server_port <= 0) {
         fprintf(stderr, "Required argument -p not received\n");
         success = 0;
     }
 
     return success;
-}
-
-int setup_ip_blacklist()
-{
-    struct ip4_address_range *firehol_list = NULL;
-    FILE *fp = NULL;
-
-    ip_bl = new_ip_blacklist();
-    if (!ip_bl) goto error;
-
-    if (ip_bl_file)
-    {
-        fp = fopen(ip_bl_file, "r");
-        if (!fp) exit(EXIT_FAILURE);
-
-        firehol_list = read_firehol_ip_blacklist(fp);
-        fclose(fp);
-        fp = NULL;
-
-        struct ip4_address_range *ip4_iter = firehol_list;
-        while (ip4_iter)
-        {
-            /* Don't add really large address ranges */
-            if (ip4_iter->prefix_len >= 28)
-            {
-                uint32_t addr_iter;
-                uint32_t max_addr = ip4_address_range_get_max_addr(ip4_iter);
-
-                for (addr_iter = ip4_address_range_get_min_addr(ip4_iter); addr_iter < max_addr; addr_iter++)
-                {
-                    if (!ip_blacklist_add(ip_bl, addr_iter)) goto error;
-                }
-
-                if (!ip_blacklist_add(ip_bl, max_addr)) goto error;
-            }
-
-            ip4_iter = ip4_iter->next;
-        }
-
-        free_ip4_address_range(&firehol_list);
-    }
-
-    return (1);
-error:
-    if (fp) fclose(fp);
-    free_ip4_address_range(&firehol_list);
-    free_ip_blacklist(&ip_bl);
-    free_domain_blacklist(&dn_bl);
-    return (0);
-}
-
-/**
- * Open the domain blacklist provided at the command line and insert all domains into the blacklist
- * structure. Should only be run once. Checks that dn_bl is NULL so an existing data structure is
- * not leaked.
- */
-int setup_domain_blacklist()
-{
-	FILE *bl_fp = NULL;
-	if (dn_bl_file)
-	{
-		assert(!dn_bl);
-	    dn_bl = new_domain_blacklist();
-	    if (!dn_bl) goto error;
-
-		bl_fp = fopen(dn_bl_file, "r");
-		if (!bl_fp) goto error;
-
-		char *domain = NULL;
-		while (NULL != (domain = urlhaus_get_next_domain(bl_fp)))
-		{
-			domain_blacklist_add(dn_bl, domain);
-			free(domain);
-		}
-		fclose(bl_fp);
-	}
-
-	DPRINT("domain blacklist setup complete...\n");
-	return 1;
-
-error:
-	if (bl_fp) fclose(bl_fp);
-	return 0;
 }
 
 static bool setup_stdin_pipe(uv_loop_t *loop)
@@ -271,81 +242,6 @@ static bool setup_stdin_pipe(uv_loop_t *loop)
     }
 
     printf("initialized stdin\n");
-
-    return true;
-}
-
-static int set_filter(pcap_t *pcap, const char *filter, char *err)
-{
-    int rc = -1;
-    struct bpf_program fp;
-
-    if (pcap == NULL || filter == NULL) return 0;
-
-    memset(&fp, 0, sizeof(fp));
-
-    if ((rc = pcap_compile(pcap, &fp, filter, 0, PCAP_NETMASK_UNKNOWN)) != 0) {
-        fprintf(stderr, "Error in filter expression: %s\n", err);
-        goto done;
-    }
-    if ((rc = pcap_setfilter(pcap, &fp)) != 0) {
-        fprintf(stderr, "Can't set filter expression: %s\n", err);
-        goto done;
-    }
-
-    pcap_freecode(&fp);
-    rc = 0;
-done:
-    return rc;
-}
-
-/**
- * Called when an event occurs on the pcap file descriptor.
- * @param handle: The handle of the libuv poll handle.
- * @param status: status < 0 indicates that an error occurred, 0 means success.
- * @param events: A bitmask of events.
- */
-static void pcap_data_cb(uv_poll_t *handle, int status, int events)
-{
-    if (status < 0) {
-        fprintf(stderr, "Error while polling fd: %s\n", uv_strerror(status));
-        return;
-    }
-
-    assert(status==0);
-
-    if (events & UV_READABLE) {
-        int pkt_num = 0;
-        // If we are here, the fd is ready to read
-        // cnt = 0 or -1 means read all packets (but -1 will work with older versions of pcap,
-        // where 0 does not)
-        int cnt = -1;
-        pkt_num = pcap_dispatch(pcap, cnt, packet_handler, NULL);
-
-        if (pkt_num == PCAP_ERROR) {
-            fprintf(stderr, "Error processing packet\n%s\n",
-                    pcap_geterr(pcap));
-        } else if (pkt_num == PCAP_ERROR_BREAK) {
-            fprintf(stderr, "Pcap requested loop close.\n");
-            uv_stop(loop);
-        }
-    }
-}
-
-static bool setup_pcap_handle(uv_loop_t *loop)
-{
-	assert(loop);
-    if (0 > uv_poll_init(loop, &pcap_handle, pcap_fd))
-    {
-    	printf("polling could not be initialized\n");
-    	return false;
-    }
-
-    if (0 > uv_poll_start(&pcap_handle, UV_READABLE, pcap_data_cb))
-    {
-    	printf("could not start polling\n");
-    	return false;
-    }
 
     return true;
 }
@@ -438,33 +334,27 @@ static void read_stdin(uv_stream_t *stream, ssize_t nread,
         free(buf->base);
 }
 
-static void close_pcap_handle(uv_handle_t *handle)
-{
-    free_globals();
-}
-
 int main(int argc, char **argv)
 {
+	struct IdsArgs args;
     int retval = -1;
     const char *filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0\
  and tcp[tcpflags] & tcp-ack == 0)";
     char err[PCAP_ERRBUF_SIZE];
-    uv_check_t mdns_handle;
-    uv_tcp_t server_handle;
 
     memset(&mdns, 0, sizeof(mdns));
 
-    if (!parse_args(argc, argv)) {
+    if (!parse_args(&args, argc, argv)) {
         DPRINT("parse_args() failed\n");
         exit(EXIT_FAILURE);
     }
 
-    if (!setup_ip_blacklist()) {
+    if (!setup_ip_blacklist(&ip_bl, args.ip_filename)) {
         DPRINT("setup_ip_blacklist() failed\n");
         exit(EXIT_FAILURE);
     }
 
-    if (!setup_domain_blacklist()) {
+    if (!setup_domain_blacklist(&dn_bl, args.domain_filename)) {
     	DPRINT("setup_domain_blacklist() failed\n");
     	exit(EXIT_FAILURE);
     }
@@ -473,8 +363,7 @@ int main(int argc, char **argv)
     // loop here.
     event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
 
-
-    if ((retval = configure_pcap(filter, (char *)iface_list->item, err) != 0)) goto done;
+    if ((retval = configure_pcap(&pcap, filter, args.iface, err) != 0)) goto done;
 
     memset(&pcap_handle, 0, sizeof(pcap_handle));
     if (NULL == (loop = uv_default_loop()))
@@ -482,87 +371,40 @@ int main(int argc, char **argv)
     	DPRINT("loop could not be allocated\n");
     	goto done;
     }
+    if (!setup_pcap_handle(loop, &pcap_handle, pcap)) goto done;
 
     if (!setup_stdin_pipe(loop)) goto done;
-
-    uv_signal_t sigterm_handle, sigint_handle;
     if (!setup_sigterm_handling(loop, &sigterm_handle)) goto done;
     if (!setup_sigint_handling(loop, &sigint_handle)) goto done;
     printf("setup sigterm\n");
 
     if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
 
-    if (!setup_pcap_handle(loop)) goto done;
-
-    if (!ids_mdns_setup_mdns(&mdns, server_port)) goto done;
+    if (!ids_mdns_setup_mdns(&mdns, args.server_port)) goto done;
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
     		|| !mdns_check_start(&mdns_handle)) goto done;
 
     printf("setting up event server...\n");
-    if (0 != setup_event_server(loop, &server_handle, server_port, event_queue)) goto done;
+    if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
     printf("setup event server...\n");
 
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
-
-    if (0 > uv_poll_stop(&pcap_handle)) printf("warning: could not stop polling\n");
-
-    // Close the polling loop with a callback, as it will need to close the
-    // pcap fd when the polling fd is closed (must wait for polling fd to
-    // close to prevent leaks)
-    uv_close((uv_handle_t *) &pcap_handle, close_pcap_handle);
-    // Close the remaining handles on the running loop
-    uv_walk(loop, walk_cb, NULL);
-
     printf("\n\nCapture finished.\n\n");
 
     retval = 0;
 
 done:
     if (loop) {
+    	stop_handles();
+    	close_handles();
         int close_result;
         while((close_result = uv_loop_close(loop)) == UV_EBUSY) {
             uv_run(loop, UV_RUN_NOWAIT);
         }
     } else {
         // Loop hasn't started yet, but pcap may need cleaning up
-        free_globals();
     }
-    return retval;
-}
-
-int configure_pcap(const char *filter, const char *dev, char *err)
-{
-    int retval = -1;
-    if ((pcap = pcap_create(dev, err)) == NULL) {
-        fprintf(stderr, "Can't open %s: %s\n", dev, err);
-        retval = -2;
-        goto done;
-    }
-    if (pcap_set_promisc(pcap, 1) != 0) {
-        fprintf(stderr, "pcap_set_promisc failed\n");
-        retval = -4;
-        goto done;
-    }
-    if (pcap_activate(pcap) != 0) {
-        fprintf(stderr, "pcap_activate failed\n");
-        retval = -5;
-        goto done;
-    }
-    if (set_filter(pcap, filter, err) != 0) {
-        fprintf(stderr, "Who even cares?\n");
-        retval = -3;
-        goto done;
-    }
-
-    pcap_fd = pcap_get_selectable_fd(pcap);
-    if (pcap_fd == -1) {
-        fprintf(stderr, "pcap_get_sel_fd failed\n");
-        retval = -6;
-        goto done;
-    }
-
-    retval = 0;
-done:
+    free_globals();
     return retval;
 }
 

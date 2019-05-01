@@ -14,18 +14,7 @@ static char *fmt_iface = "Interface: %s\n";
 static char *fmt_src_ip = "Source IP: %s\n";
 static char *fmt_src_mac = "Source MAC: %02x:%02x:%02x:%02x:%02x:%02x\n\n";
 
-/**
- * Frees write requests. This should only be called after the request has been
- * handled (i.e. the write callback called when writing is complete).
- */
-static void free_write_req(uv_write_t **req)
-{
-	assert(req);
-
-	// TODO: Check how to release uv_write_t properly
-}
-
-void echo_write(uv_write_t *req, int status);
+void ids_server_write_cb(uv_write_t *req, int status);
 
 /**
  * Calculates the length of a string required to hold an IDS event (excluding
@@ -127,7 +116,7 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 		fprintf(stderr, "write_ids_event: could not allocate uv_write_t\n");
 		return;
 	}
-	if (0 > (ret = uv_write(ioc_req, stream, &ioc_buf, 1, echo_write)))
+	if (0 > (ret = uv_write(ioc_req, stream, &ioc_buf, 1, ids_server_write_cb)))
 	{
 		fprintf(stderr, "write_ids_event: write error occurred\n");
 		return;
@@ -152,14 +141,14 @@ void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 	else buf->len = 0;
 }
 
-void echo_write(uv_write_t *req, int status)
+void ids_server_write_cb(uv_write_t *req, int status)
 {
-	printf("server write\n");
 	if (status) fprintf(stderr, "write error: %s\n", uv_strerror(status));
-	if (req) free_write_req(&req);
+	//free(req->bufsml->base);
+	free(req);
 }
 
-static void echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
+static void ids_server_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
 	uv_write_t *req;
 	uv_buf_t wrbuf;
@@ -174,7 +163,7 @@ static void echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 	{
 		if (NULL == (req = malloc(sizeof(*req)))) goto error;
 		wrbuf = uv_buf_init(buf->base, nread);
-		if (0 > (err = uv_write(req, client, &wrbuf, 1, echo_write))) goto msg;
+		if (0 > (err = uv_write(req, client, &wrbuf, 1, ids_server_write_cb))) goto msg;
 	}
 
 	goto finally;
@@ -183,6 +172,7 @@ msg:
 	fprintf(stderr, "read error: %s\n", uv_strerror(err));
 error:
 	uv_close((uv_handle_t *)client, NULL);
+	free(client);
 
 // Free the buffer in all cases
 finally:
@@ -205,7 +195,7 @@ static void on_new_connection(uv_stream_t *server, int status)
 	client->data = server->data;
 
 	if (0 != (err = uv_accept(server, (uv_stream_t *)client))) goto msg;
-	if (0 != (err = uv_read_start((uv_stream_t *)client, alloc_buffer, echo_read))) goto msg;
+	if (0 != (err = uv_read_start((uv_stream_t *)client, alloc_buffer, ids_server_read_cb))) goto msg;
 
 	write_ids_event_list((uv_stream_t *)client);
 	// Write the current list to the new connection
