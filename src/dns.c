@@ -675,6 +675,7 @@ dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
 	assert(*buf_pos);
 	assert(packet_start);
 	assert(packet_end);
+	assert(packet_start <= *buf_pos && *buf_pos < packet_end);
 
 	struct dns_answer *first_answer = NULL;
 	struct dns_answer *last_answer = NULL;
@@ -682,6 +683,9 @@ dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
 
 	for (i = 0; i < num_answers; i++)
 	{
+		// Check that position is valid prior to each answer
+		if (*buf_pos >= packet_end) goto error;
+
 		struct dns_answer *new_answer = NULL;
 		if (!(new_answer = dns_parse_answer(buf_pos, packet_start, packet_end)))
 			goto error;
