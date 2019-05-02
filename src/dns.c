@@ -169,7 +169,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.qdcount))
 		{
-			if (!(pkt->questions = dns_parse_question_section(count, &pkt_pos,
+			if (pkt_pos >= packet_end || !(pkt->questions = dns_parse_question_section(count, &pkt_pos,
 					packet_start, packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_question_section() failed\n");
@@ -179,7 +179,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.ancount))
 		{
-			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos, packet_start,
+			if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos, packet_start,
 					packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
@@ -189,7 +189,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.nscount))
 		{
-			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
+			if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
 					packet_start, packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
@@ -199,7 +199,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.arcount))
 		{
-			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
+			if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
 					packet_start, packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
