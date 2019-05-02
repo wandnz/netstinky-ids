@@ -24,7 +24,9 @@
  * with fuzzed inputs.
  */
 #ifdef FUZZ_TEST
-#include "test/fuzz_test_blacklist.c"
+#include "test/load_packet.h"
+#include "test/fuzz_test_blacklist.h"
+#include "test/fuzz_test_pcap.h"
 #endif // FUZZ_TEST
 
 #define MAX_EVENTS 5
@@ -41,6 +43,7 @@ struct IdsArgs
 {
 	char *domain_filename;
 	char *ip_filename;
+	char *fuzz_filename;
 	char *iface;
 	int server_port;
 };
@@ -127,6 +130,7 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
 	struct option long_options[] = {
 	    {"ipbl", 1, 0, 0},
 		{"dnbl", 1, 0, 0},
+		{"fuzz", 1, 0, 0},
 		{0, 0, 0, 0}
 	};
 	const static char *getopt_usage =
@@ -169,6 +173,17 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
         			fprintf(stderr, "Argument --dnbl (domain blacklist file): %s\n",
         					optarg);
         			args->domain_filename = optarg;
+        		}
+        	}
+        	else if (2 == option_index)
+        	{
+        		if (!optarg) {
+        			fprintf(stderr, "Did not receive an option for %s\n",
+        					long_options[option_index].name);
+        		} else {
+        			fprintf(stderr, "Argument --fuzz (fuzz packet file): %s\n",
+        					optarg);
+        			args->fuzz_filename = optarg;
         		}
         	}
         	break;
@@ -358,6 +373,7 @@ int main(int argc, char **argv)
     char err[PCAP_ERRBUF_SIZE];
 
     memset(&mdns, 0, sizeof(mdns));
+    memset(&args, 0, sizeof(args));
 
     if (!parse_args(&args, argc, argv)) {
         DPRINT("parse_args() failed\n");
@@ -365,8 +381,9 @@ int main(int argc, char **argv)
     }
 
 #ifdef FUZZ_TEST
+    printf("Fuzz testing blacklists...\n");
     fuzz_test_blacklists(args.ip_filename, args.domain_filename);
-    exit(EXIT_SUCCESS);
+    if (!args.fuzz_filename) exit(EXIT_SUCCESS);
 #endif // FUZZ_TEST
 
     if (!setup_ip_blacklist(&ip_bl, args.ip_filename)) {
@@ -382,6 +399,11 @@ int main(int argc, char **argv)
     // pcap_io_task_setup, configure and add the pcap task to the event
     // loop here.
     event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
+
+#ifdef FUZZ_TEST
+    printf("Fuzz testing packet capturing...\n");
+    fuzz_test_pcap(args.fuzz_filename);
+#endif // FUZZ_TEST
 
     if ((retval = configure_pcap(&pcap, filter, args.iface, err) != 0)
     		&& !IGNORE_PCAP_ERRORS) goto done;
@@ -410,7 +432,9 @@ int main(int argc, char **argv)
     if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
     printf("setup event server...\n");
 
+#ifndef FUZZ_TEST
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
+#endif
     printf("\n\nCapture finished.\n\n");
 
     retval = 0;

@@ -3,7 +3,8 @@ src = $(wildcard *.c) \
       $(wildcard utils/ebvbl/*.c) \
       $(wildcard utils/hat/*.c) \
       $(wildcard mdns/*.c) \
-      $(wildcard blacklist/*.c)
+      $(wildcard blacklist/*.c) \
+      $(wildcard test/*.c)
 obj = $(src:.c=.o)
 
 CFLAGS:=-Wall -ggdb -std=c11
@@ -11,7 +12,7 @@ LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common
 
 # Add _GNU_SOURCE define on Linux
 ifeq ($(shell uname -s), Linux)
-	CFLAGS += -D_GNU_SOURCE
+	CFLAGS += -D_GNU_SOURCE -DFUZZ_TEST
 endif
 
 nsids: $(obj)

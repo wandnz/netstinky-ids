@@ -149,8 +149,10 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 				out->dest_port = udp_hdr->dest;
 				out->src_port = udp_hdr->source;
 				payload_pos = (uint8_t *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
-				dns_pkt = dns_parse(payload_pos,
-						(uint8_t *) payload_pos + (pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr))));
+
+				uint8_t *payload_end = (uint8_t *) payload_pos + (pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
+				if (payload_pos >= payload_end) goto error;
+				dns_pkt = dns_parse(payload_pos, payload_end);
 
 				if (!dns_pkt)
 				{
@@ -164,6 +166,7 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 					/* TODO: Check multiple questions */
 					out->domain = dns_name_to_readable((unsigned char *)
                             dns_pkt->questions->qname);
+					DPRINT("ids_pcap_read_packet(): domain %s\n", out->domain);
 				}
 
 				free_dns_packet(&dns_pkt);
@@ -296,32 +299,35 @@ int configure_pcap(pcap_t **pcap, const char *filter, const char *dev, char *err
     if ((*pcap = pcap_create(dev, err)) == NULL) {
         fprintf(stderr, "Can't open %s: %s\n", dev, err);
         retval = -2;
-        goto done;
+        goto error;
     }
     if (pcap_set_promisc(*pcap, 1) != 0) {
         fprintf(stderr, "pcap_set_promisc failed\n");
         retval = -4;
-        goto done;
+        goto error;
     }
     if (pcap_activate(*pcap) != 0) {
         fprintf(stderr, "pcap_activate failed\n");
         retval = -5;
-        goto done;
+        goto error;
     }
     if (set_filter(*pcap, filter, err) != 0) {
         fprintf(stderr, "Who even cares?\n");
         retval = -3;
-        goto done;
+        goto error;
     }
 
     pcap_fd = pcap_get_selectable_fd(*pcap);
     if (pcap_fd == -1) {
         fprintf(stderr, "pcap_get_sel_fd failed\n");
         retval = -6;
-        goto done;
+        goto error;
     }
 
     retval = 0;
-done:
     return retval;
+error:
+	if (*pcap) pcap_close(*pcap);
+	*pcap = NULL;
+	return retval;
 }

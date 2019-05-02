@@ -598,6 +598,7 @@ dns_name_to_readable(uint8_t *name)
 		/* Move to next length byte */
 		readable_pos += label_len;
 		label_ptr += label_len;
+		if (remaining < label_len + 1) goto error;
 		remaining -= label_len + 1;
 
 		/* Get length byte */
@@ -742,7 +743,7 @@ dns_parse_domain(uint8_t **buffer_pos, const uint8_t *packet_start,
 
 		/* Copy label. Won't be NULL terminated until after last label has been
 		 * copied. */
-		strncpy((char *)domain_out_pos, (char *)domain_in_pos, label_length);
+		memcpy((void *)domain_out_pos, (void *)domain_in_pos, label_length);
 
 		if (label_length <= 1) break;	/* Done */
 
