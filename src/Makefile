@@ -1,11 +1,13 @@
 src = $(wildcard *.c) \
       $(wildcard utils/*.c) \
       $(wildcard utils/ebvbl/*.c) \
-      $(wildcard utils/hat/*.c)
+      $(wildcard utils/hat/*.c) \
+      $(wildcard mdns/*.c) \
+      $(wildcard blacklist/*.c)
 obj = $(src:.c=.o)
 
 CFLAGS:=-Wall -ggdb -std=c11
-LDFLAGS:=-luv -lpcap
+LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common
 
 # Add _GNU_SOURCE define on Linux
 ifeq ($(shell uname -s), Linux)
@@ -21,6 +23,8 @@ clean:
 	@rm -f utils/*.o
 	@rm -f utils/hat/*.o
 	@rm -f utils/ebvbl/*.o
+	@rm -f mdns/*.o
+	@rm -f blacklist/*.o
 
 .PHONY: clean
 

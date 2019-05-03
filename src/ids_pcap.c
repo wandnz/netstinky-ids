@@ -21,8 +21,6 @@
 #include <netinet/udp.h>
 
 #include "utils/common.h"
-#include "ip_blacklist.h"
-#include "domain_blacklist.h"
 #include "dns.h"
 #include "ids_pcap.h"
 
@@ -45,20 +43,24 @@ void packet_handler(unsigned char *user_dat,
     if (result == 1) {
         if (ids_pcap_is_blacklisted(&fields, ip_bl, dn_bl)) {
             struct in_addr ip;
-            char *iface_name = strdup("eth0");  // TODO: Fix this
+            // TODO: A name is required, but has proved difficult to get
+            char *iface_name = "placeholder";
             char *ioc_str;
             struct ids_event *ev;
 
-            ip.s_addr = htonl(fields.dest_ip);
+            ip.s_addr = fields.dest_ip;
             ioc_str = fields.domain ? fields.domain : strdup(inet_ntoa(ip));
-            ev = new_ids_event(iface_name, fields.src_ip, ioc_str);
+            ev = new_ids_event(iface_name, fields.src_ip, ioc_str, fields.src_mac);
 
             if (!ids_event_list_add_event(event_queue, ev)) {
                 DPRINT("packet_handler: ids_event_list_add() failed\n");
-                return;
+                goto end;
             }
 
             DPRINT("pcap_io_task_read(): NEW DETECTED INTRUSION\n");
+            // Don't free domain name because it is added to event list
+            return;
+
         } else {
             DPRINT("Safe!\n");
         }
@@ -66,6 +68,8 @@ void packet_handler(unsigned char *user_dat,
         DPRINT("pcap_io_task_read(): ids_pcap_read_packet() failed\n");
     }
 
+end:
+	// If domain name is not added to event list, free it
     if (fields.domain != NULL) {
         free(fields.domain);
     }
@@ -107,7 +111,11 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 					pcap_hdr->len);
 			goto error;
 		}
+
+		// These are stored Most Significant Byte first
 		eth_hdr = (struct ether_header *)pcap_data;
+		out->src_mac = *(mac_addr *)eth_hdr->ether_shost;
+		out->dest_mac = *(mac_addr *)eth_hdr->ether_dhost;
 
 		/* Not an error if not IP but not interested in it. */
 		if (ntohs(eth_hdr->ether_type) != ETHERTYPE_IP) return (0);
@@ -120,19 +128,18 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 		}
 		ip_hdr = (struct ip *)(pcap_data + sizeof(*eth_hdr));
 
-        strncpy(src_str, inet_ntoa(ip_hdr->ip_src), 18);
-        strncpy(dst_str, inet_ntoa(ip_hdr->ip_dst), 18);
-
-        DPRINT("ids_pcap_read_packet(): IP packet %s -> %s\n",
-               src_str, dst_str);
-		out->dest_ip = ntohl(ip_hdr->ip_dst.s_addr);
-		out->src_ip = ntohl(ip_hdr->ip_src.s_addr);
+		DPRINT("ids_pcap_read_packet(): destination IP: %s\n", inet_ntoa(ip_hdr->ip_dst));
+		DPRINT("ids_pcap_read_packet(): source IP: %s\n", inet_ntoa(ip_hdr->ip_src));
+		out->dest_ip = ip_hdr->ip_dst.s_addr;
+		out->src_ip = ip_hdr->ip_src.s_addr;
 
 		switch (ip_hdr->ip_p)
 		{
 			case IPPROTO_TCP:
 				DPRINT("ids_pcap_read_packet(): tcp packet\n");
 				tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*eth_hdr) + sizeof(*ip_hdr));
+				out->dest_port = tcp_hdr->dest;
+				out->src_port = tcp_hdr->source;
 
 				/* Check header is correct */
 				assert((tcp_hdr->th_flags & TH_SYN) && !(tcp_hdr->th_flags & TH_ACK));
@@ -142,6 +149,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 			case IPPROTO_UDP:
 				DPRINT("ids_pcap_read_packet(): udp packet\n");
 				udp_hdr = (struct udphdr *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr)));
+				out->dest_port = udp_hdr->dest;
+				out->src_port = udp_hdr->source;
 				payload_pos = (uint8_t *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
 				dns_pkt = dns_parse(payload_pos,
 						(uint8_t *) payload_pos + (pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr))));
@@ -180,8 +189,8 @@ int
 ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_blacklist *dn_bl)
 {
 	struct in_addr src_ip_buf, dst_ip_buf;
-	src_ip_buf.s_addr = htonl(f->src_ip);
-	dst_ip_buf.s_addr = htonl(f->dest_ip);
+	src_ip_buf.s_addr = f->src_ip;
+	dst_ip_buf.s_addr = f->dest_ip;
 
 	char *src = strdup(inet_ntoa(src_ip_buf));
 
@@ -196,4 +205,126 @@ ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_b
 	else return (ip_blacklist_lookup(ip_bl, f->dest_ip));
 
 	return (0);
+}
+
+int set_filter(pcap_t *pcap, const char *filter, char *err)
+{
+    int rc = -1;
+    struct bpf_program fp;
+
+    if (pcap == NULL || filter == NULL) return 0;
+
+    memset(&fp, 0, sizeof(fp));
+
+    if ((rc = pcap_compile(pcap, &fp, filter, 0, PCAP_NETMASK_UNKNOWN)) != 0) {
+        fprintf(stderr, "Error in filter expression: %s\n", err);
+        goto done;
+    }
+    if ((rc = pcap_setfilter(pcap, &fp)) != 0) {
+        fprintf(stderr, "Can't set filter expression: %s\n", err);
+        goto done;
+    }
+
+    pcap_freecode(&fp);
+    rc = 0;
+done:
+    return rc;
+}
+
+/**
+ * Called when an event occurs on the pcap file descriptor.
+ * @param handle: The handle of the libuv poll handle.
+ * @param status: status < 0 indicates that an error occurred, 0 means success.
+ * @param events: A bitmask of events.
+ */
+static void pcap_data_cb(uv_poll_t *handle, int status, int events)
+{
+	int pkt_num = 0, cnt = -1;
+	pcap_t *pcap = (pcap_t *)handle->data;
+
+    if (status < 0) {
+        fprintf(stderr, "Error while polling fd: %s\n", uv_strerror(status));
+        return;
+    }
+
+    assert(status==0);
+
+    if (events & UV_READABLE) {
+        // If we are here, the fd is ready to read
+        // cnt = 0 or -1 means read all packets (but -1 will work with older versions of pcap,
+        // where 0 does not)
+        pkt_num = pcap_dispatch(pcap, cnt, packet_handler, NULL);
+
+        if (pkt_num == PCAP_ERROR) {
+            fprintf(stderr, "Error processing packet\n%s\n",
+                    pcap_geterr(pcap));
+        } else if (pkt_num == PCAP_ERROR_BREAK) {
+            fprintf(stderr, "Pcap requested loop close.\n");
+            uv_stop(handle->loop);
+        }
+    }
+}
+
+bool setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap)
+{
+	assert(loop);
+	assert(pcap_handle);
+	assert(pcap);
+
+	int fd;
+
+	if (PCAP_ERROR == (fd = pcap_get_selectable_fd(pcap))) return false;
+
+    if (0 > uv_poll_init(loop, pcap_handle, fd))
+    {
+    	printf("polling could not be initialized\n");
+    	return false;
+    }
+
+    if (0 > uv_poll_start(pcap_handle, UV_READABLE, pcap_data_cb))
+    {
+    	printf("could not start polling\n");
+    	return false;
+    }
+
+    pcap_handle->data = pcap;
+
+    return true;
+}
+
+int configure_pcap(pcap_t **pcap, const char *filter, const char *dev, char *err)
+{
+    int retval = -1;
+    int pcap_fd;
+    if ((*pcap = pcap_create(dev, err)) == NULL) {
+        fprintf(stderr, "Can't open %s: %s\n", dev, err);
+        retval = -2;
+        goto done;
+    }
+    if (pcap_set_promisc(*pcap, 1) != 0) {
+        fprintf(stderr, "pcap_set_promisc failed\n");
+        retval = -4;
+        goto done;
+    }
+    if (pcap_activate(*pcap) != 0) {
+        fprintf(stderr, "pcap_activate failed\n");
+        retval = -5;
+        goto done;
+    }
+    if (set_filter(*pcap, filter, err) != 0) {
+        fprintf(stderr, "Who even cares?\n");
+        retval = -3;
+        goto done;
+    }
+
+    pcap_fd = pcap_get_selectable_fd(*pcap);
+    if (pcap_fd == -1) {
+        fprintf(stderr, "pcap_get_sel_fd failed\n");
+        retval = -6;
+        goto done;
+    }
+
+    retval = 0;
+done:
+    return retval;
 }

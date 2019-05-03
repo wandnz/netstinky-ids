@@ -153,6 +153,7 @@ read_firehol_ip_blacklist(FILE *fp)
 	assert(fp);
 
 	struct ip4_address_range *list = NULL;
+	struct ip4_address_range *range = NULL;
 	if (fp)
 	{
 		char *line_buf = NULL;
@@ -177,7 +178,8 @@ read_firehol_ip_blacklist(FILE *fp)
 			}
 			else prefix_len = 32;
 
-			ip4_address_range_add(&list, new_ip4_address_range(ntohl(addr.s_addr), prefix_len));
+			if (NULL != (range = new_ip4_address_range(addr.s_addr, prefix_len)))
+				ip4_address_range_add(&list, range);
 		}
 
 		if (line_buf) free(line_buf);

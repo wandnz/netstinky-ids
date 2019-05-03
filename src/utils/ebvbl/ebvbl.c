@@ -115,6 +115,18 @@ ebvbl_init(size_t elementSize, cmpElement cmp, unsigned int f, first_bits fb)
     return e;
 }
 
+/**
+ * Helper function for clearing a bit vector. WARNING: After running this, most functions will not
+ * find any entries in the SortedArray even if they are still there.
+ */
+void
+_ebvbl_clear_bv(EBVBL *e)
+{
+	assert(e);
+	size_t sz_bytes = ebvbl_get_bit_vector_size(e->_f) / 8;
+	memset(e->_bv, 0, sz_bytes);
+}
+
 void *
 ebvbl_get_element(EBVBL *e, unsigned int index)
 {
@@ -249,6 +261,21 @@ ebvbl_contains(EBVBL *e, void *element)
         result = sa_contains_element(e->_sa, element);
     
     return result;
+}
+
+void
+ebvbl_clear(EBVBL *e, freeElement free_item)
+{
+	assert(e);
+	_ebvbl_clear_bv(e);
+
+	// Save values stored in sorted array
+	size_t element_sz = sa_get_element_size(e->_sa);
+	cmpElement cmp = sa_compare(e->_sa);
+
+	// Free and re-initialize SortedArray
+	sa_free(e->_sa, free_item);
+	e->_sa = sa_initialize(element_sz, cmp);
 }
 
 EBVBL *

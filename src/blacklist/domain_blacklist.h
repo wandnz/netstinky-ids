@@ -8,7 +8,7 @@
 #ifndef DOMAIN_BLACKLIST_H_
 #define DOMAIN_BLACKLIST_H_
 
-#include "utils/hat/hat-trie.h"
+#include "../utils/hat/hat-trie.h"
 
 /**
  * Hide the specific implementation details of the domain
@@ -32,6 +32,13 @@ domain_blacklist_add(domain_blacklist *b, char *domain);
  */
 int
 domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain);
+
+/**
+ * Empty all domains in the blacklist.
+ * @param b The blacklist structure.
+ */
+void
+domain_blacklist_clear(domain_blacklist *b);
 
 /*
  * Free memory associated with the domain blacklist and set the pointer at

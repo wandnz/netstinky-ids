@@ -6,13 +6,39 @@
  * interface they were detected, indicator of compromise and time.
  */
 
+#ifndef IDS_EVENT_LIST_H
+#define IDS_EVENT_LIST_H
+
 #include <stdint.h>
 
+#include "common.h"
 #include "linked_list.h"
 
-struct ids_event;
-struct ids_event_ts;
-struct ids_event_list;
+struct ids_event
+{
+	struct ids_event_ts *times_seen;
+	unsigned int num_times;
+	char *iface;
+	uint32_t src_ip;
+	mac_addr mac;
+	char *ioc;	/* may be a stringify-ed IP address or domain */
+	struct ids_event *next;
+	struct ids_event *previous;
+};
+
+struct ids_event_list
+{
+	struct ids_event *head;
+	unsigned int max_events;
+	unsigned int max_timestamps;
+	unsigned int num_events;
+};
+
+struct ids_event_ts
+{
+	struct timespec tm_stamp;
+	struct ids_event_ts *next;
+};
 
 /**
  * Free an ids_event structure and any further entries in the list.
@@ -74,7 +100,7 @@ ids_event_list_enforce_max_events(struct ids_event_list *list);
  * could not be created.
  */
 struct ids_event *
-new_ids_event(char *iface, uint32_t src_ip, char *ioc);
+new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac);
 
 /**
  * Creates a new IDS event list with the given number of maximum events and
@@ -96,3 +122,5 @@ new_ids_event_list(unsigned int max_events, unsigned int max_timestamps);
  */
 struct ids_event_ts *
 new_ids_event_ts(void);
+
+#endif

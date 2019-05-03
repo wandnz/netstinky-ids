@@ -16,31 +16,6 @@
 
 /* Both of these structures are linked lists. */
 
-struct ids_event_list
-{
-	struct ids_event *head;
-	unsigned int max_events;
-	unsigned int max_timestamps;
-	unsigned int num_events;
-};
-
-struct ids_event_ts
-{
-	struct timespec tm_stamp;
-	struct ids_event_ts *next;
-};
-
-struct ids_event
-{
-	struct ids_event_ts *times_seen;
-	unsigned int num_times;
-	char *iface;
-	uint32_t src_ip;
-	char *ioc;	/* may be a stringify-ed IP address or domain */
-	struct ids_event *next;
-	struct ids_event *previous;
-};
-
 /**
  * Add a timestamp to the front of a list of times.
  * @param list The address of a pointer to the head of the list. May not be
@@ -102,6 +77,7 @@ void
 free_ids_event_ts(struct ids_event_ts **t)
 {
 	assert(t);
+	assert(*t);
 
 	struct ids_event_ts *time_iter = *t, *tmp;
 
@@ -137,13 +113,20 @@ ids_event_list_add_event(struct ids_event_list *list, struct ids_event *e)
 			if (ids_event_time_list_add(list, existing, e->times_seen))
 			{
 				/* Move existing event to the front of the queue. */
-				if (existing->previous) existing->previous->next = existing->next;
-				if (existing->next) existing->next->previous = existing->previous;
+				if (existing->previous)
+					existing->previous->next = existing->next;
+				else
+					// Completely remove for now, to prevent a loop
+					list->head = existing->next;
+				if (existing->next)
+					existing->next->previous = existing->previous;
 
 				existing->previous = NULL;
 				existing->next = list->head;
 
 				list->head = existing;
+
+				existing->num_times++;
 
 				/* Most of the ids_event is no longer needed, but don't free
 				 * the time */
@@ -198,6 +181,7 @@ ids_event_list_enforce_max_events(struct ids_event_list *list)
 			tail = tail->next;
 		}
 
+		if (!tail || !tail->next) return;
 		/* Remove all events older than tail */
 		free_ids_event(&(tail->next));
 	}
@@ -247,6 +231,7 @@ ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
 			tail = tail->next;
 		}
 
+		if (!tail || !tail->next) return;
 		/* Remove all timestamps after tail */
 		free_ids_event_ts(&(tail->next));
 	}
@@ -260,7 +245,7 @@ ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
  * Will release IOC if cannot make a new event.
  */
 struct ids_event *
-new_ids_event(char *iface, uint32_t src_ip, char *ioc)
+new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac)
 {
 	assert(iface);
 	assert(ioc);
@@ -273,9 +258,11 @@ new_ids_event(char *iface, uint32_t src_ip, char *ioc)
 		if (!(e = malloc(sizeof(*e)))) goto error;
 		if (!(t = new_ids_event_ts())) goto error;
 
+		e->num_times = 1;
 		e->times_seen = t;
 		e->iface = iface;
 		e->src_ip = src_ip;
+		e->mac = mac;
 		e->ioc = ioc;
 
 		e->next = NULL;

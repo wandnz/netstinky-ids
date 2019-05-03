@@ -15,6 +15,12 @@
 /* Do not want other modules to depend on ebvbl */
 typedef struct ebvbl ip_blacklist;
 
+/**
+ * Empty all entries in the blacklist.
+ */
+void
+ip_blacklist_clear(ip_blacklist *b);
+
 void
 free_ip_blacklist(ip_blacklist **b);
 

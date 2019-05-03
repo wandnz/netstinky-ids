@@ -5,17 +5,30 @@
 #ifndef IDS_PCAP_H_
 #define IDS_PCAP_H_
 
-#include "ip_blacklist.h"
-#include "domain_blacklist.h"
+#include <uv.h>
+
+#include "common.h"
 #include "ids_event_list.h"
+#include "blacklist/domain_blacklist.h"
+#include "blacklist/ip_blacklist.h"
 
 struct ids_pcap_fields
 {
 	uint32_t src_ip;
 	uint32_t dest_ip;
+	mac_addr src_mac;	/* In network order */
+	mac_addr dest_mac;
+	uint16_t src_port;
+	uint16_t dest_port;
 	char *domain;
 	char *iface;	/* Not set in the read_packet function */
 };
+
+int
+configure_pcap(pcap_t **pcap, const char *filter, const char *dev, char *err);
+
+bool
+setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap);
 
 /**
  * Checks the domain name blacklist if a domain name is present in F, otherwise
@@ -26,6 +39,9 @@ struct ids_pcap_fields
  */
 int
 ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_blacklist *dn_bl);
+
+int
+set_filter(pcap_t *pcap, const char *filter, char *err);
 
 pcap_t *
 ids_pcap_get_pcap(const char *if_name);
