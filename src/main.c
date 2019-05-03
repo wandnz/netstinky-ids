@@ -380,10 +380,17 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+	// pcap_io_task_setup, configure and add the pcap task to the event
+	// loop here.
+	event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
+
 #ifdef FUZZ_TEST
     printf("Fuzz testing blacklists...\n");
     fuzz_test_blacklists(args.ip_filename, args.domain_filename);
     if (!args.fuzz_filename) exit(EXIT_SUCCESS);
+
+    printf("Fuzz testing packet capturing...\n");
+    fuzz_test_pcap(args.fuzz_filename);
 #endif // FUZZ_TEST
 
     if (!setup_ip_blacklist(&ip_bl, args.ip_filename)) {
@@ -395,15 +402,6 @@ int main(int argc, char **argv)
     	DPRINT("setup_domain_blacklist() failed\n");
     	exit(EXIT_FAILURE);
     }
-
-    // pcap_io_task_setup, configure and add the pcap task to the event
-    // loop here.
-    event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
-
-#ifdef FUZZ_TEST
-    printf("Fuzz testing packet capturing...\n");
-    fuzz_test_pcap(args.fuzz_filename);
-#endif // FUZZ_TEST
 
     if ((retval = configure_pcap(&pcap, filter, args.iface, err) != 0)
     		&& !IGNORE_PCAP_ERRORS) goto done;
