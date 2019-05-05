@@ -169,7 +169,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.qdcount))
 		{
-			if (!(pkt->questions = dns_parse_question_section(count, &pkt_pos,
+			if (pkt_pos >= packet_end || !(pkt->questions = dns_parse_question_section(count, &pkt_pos,
 					packet_start, packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_question_section() failed\n");
@@ -179,7 +179,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.ancount))
 		{
-			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos, packet_start,
+			if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos, packet_start,
 					packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
@@ -189,7 +189,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.nscount))
 		{
-			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
+			if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
 					packet_start, packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
@@ -199,7 +199,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
 		if ((count = pkt->header.arcount))
 		{
-			if (!(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
+			if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
 					packet_start, packet_end)))
 			{
 				DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
@@ -598,6 +598,7 @@ dns_name_to_readable(uint8_t *name)
 		/* Move to next length byte */
 		readable_pos += label_len;
 		label_ptr += label_len;
+		if (remaining < label_len + 1) goto error;
 		remaining -= label_len + 1;
 
 		/* Get length byte */
@@ -675,6 +676,7 @@ dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
 	assert(*buf_pos);
 	assert(packet_start);
 	assert(packet_end);
+	assert(packet_start <= *buf_pos && *buf_pos < packet_end);
 
 	struct dns_answer *first_answer = NULL;
 	struct dns_answer *last_answer = NULL;
@@ -682,6 +684,9 @@ dns_parse_answer_section(uint16_t num_answers, uint8_t **buf_pos,
 
 	for (i = 0; i < num_answers; i++)
 	{
+		// Check that position is valid prior to each answer
+		if (*buf_pos >= packet_end) goto error;
+
 		struct dns_answer *new_answer = NULL;
 		if (!(new_answer = dns_parse_answer(buf_pos, packet_start, packet_end)))
 			goto error;
@@ -738,7 +743,7 @@ dns_parse_domain(uint8_t **buffer_pos, const uint8_t *packet_start,
 
 		/* Copy label. Won't be NULL terminated until after last label has been
 		 * copied. */
-		strncpy((char *)domain_out_pos, (char *)domain_in_pos, label_length);
+		memcpy((void *)domain_out_pos, (void *)domain_in_pos, label_length);
 
 		if (label_length <= 1) break;	/* Done */
 
