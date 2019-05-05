@@ -10,13 +10,19 @@ obj = $(src:.c=.o)
 CFLAGS:=-Wall -ggdb -std=c11
 LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common
 
+CC:=gcc
+
 # Add _GNU_SOURCE define on Linux
 ifeq ($(shell uname -s), Linux)
-	CFLAGS += -D_GNU_SOURCE -DFUZZ_TEST
+	CFLAGS += -D_GNU_SOURCE
 endif
 
 nsids: $(obj)
 	$(CC) -o $@ $^ $(LDFLAGS)
+
+fuzztest: CC=afl-gcc
+fuzztest: CFLAGS+= -DFUZZ_TEST
+fuzztest: clean nsids
 
 clean:
 	@rm -f nsids
