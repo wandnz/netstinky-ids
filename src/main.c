@@ -12,6 +12,8 @@
 #include <uv.h>
 
 #include "blacklist/ids_blacklist.h"
+#include "blacklist/updates/multi_uv.h"
+#include "blacklist/updates/ids_update.h"
 #include "mdns/ids_mdns_avahi.h"
 #include "mdns/mdns_libuv_integration.h"
 #include "utils/common.h"
@@ -372,6 +374,9 @@ int main(int argc, char **argv)
  and tcp[tcpflags] & tcp-ack == 0)";
     char err[PCAP_ERRBUF_SIZE];
 
+    uv_timer_t *update_timer;
+    curl_globals_t *curl_handle = NULL;
+
     memset(&mdns, 0, sizeof(mdns));
     memset(&args, 0, sizeof(args));
 
@@ -426,6 +431,13 @@ int main(int argc, char **argv)
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
     		|| !mdns_check_start(&mdns_handle)) goto done;
 
+    // Setup libcurl and timer for updating blacklists
+    curl_handle = multi_uv_setup(loop);
+    if (NULL == curl_handle) goto done;
+
+    update_timer = ids_update_setup_timer(loop, curl_handle);
+    if (NULL == update_timer) goto done;
+
     printf("setting up event server...\n");
     if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
     printf("setup event server...\n");
@@ -438,6 +450,7 @@ int main(int argc, char **argv)
     retval = 0;
 
 done:
+	multi_uv_free(&curl_handle);
 	if (loop)
 	{
 		uv_walk(loop, walk_and_close_handle_cb, NULL);
