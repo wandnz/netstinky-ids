@@ -16,7 +16,7 @@
 typedef struct curl_globals_s curl_globals_t;
 
 void
-add_download(curl_globals_t *globals, const char *url, int num);
+add_download_to_file(curl_globals_t *globals, const char *url, const char *target_file);
 
 curl_globals_t *
 multi_uv_setup(uv_loop_t *loop);

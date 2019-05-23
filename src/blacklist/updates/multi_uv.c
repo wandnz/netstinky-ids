@@ -136,10 +136,11 @@ static void destroy_curl_context(curl_context_t *context)
 }
 
 /**
- * Add a new download to a curl multi handle.
- *
+ * Start a download to a file using curl.
+ * @param url The url of the file to download
+ * @param target_file String containing path or name of file
  */
-void add_download(curl_globals_t *globals, const char *url, int num)
+void add_download_to_file(curl_globals_t *globals, const char *url, const char *target_file)
 {
 	int result = 0;
 	char filename[50];
@@ -151,10 +152,7 @@ void add_download(curl_globals_t *globals, const char *url, int num)
 	assert(NULL != globals);
 	assert(NULL != url);
 
-	result = snprintf(filename, 50, "%d.download", num);
-	if (50 <= result) goto error;
-
-	file = fopen(filename, "wb");
+	file = fopen(target_file, "wb");
 	if(!file) {
 		fprintf(stderr, "Error opening %s\n", filename);
 		return;
@@ -175,7 +173,7 @@ void add_download(curl_globals_t *globals, const char *url, int num)
 	multi_result = curl_multi_add_handle(globals->curl_handle, handle);
 	if (CURLM_OK != multi_result) goto error;
 
-	fprintf(stderr, "Added download %s -> %s\n", url, filename);
+	fprintf(stderr, "Added download %s -> %s\n", url, target_file);
 	return;
 
 error:

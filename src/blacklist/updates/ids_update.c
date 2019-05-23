@@ -20,8 +20,8 @@ update_timer_cb(uv_timer_t *handle)
 	curl_globals_t *ctx = (curl_globals_t *)handle->data;
 	assert(ctx);
 
-	add_download(ctx, ip_blacklist_src, 0);
-	add_download(ctx, domain_blacklist_src, 1);
+	add_download_to_file(ctx, ip_blacklist_src, "ip_blacklist");
+	add_download_to_file(ctx, domain_blacklist_src, "domain_blacklist");
 }
 
 static void
