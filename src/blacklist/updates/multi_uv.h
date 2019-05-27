@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <curl/curl.h>
 #include <uv.h>
 
 typedef struct curl_globals_s curl_globals_t;

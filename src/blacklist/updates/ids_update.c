@@ -11,10 +11,72 @@ static const uint64_t update_interval_ms = 600000;	// 10 minutes
 static const char ip_blacklist_src[] = "https://iplists.firehol.org/files/firehol_level1.netset";
 static const char domain_blacklist_src[] = "https://urlhaus.abuse.ch/downloads/text/";
 
-static void
-on_complete_cb(CURLcode result, void *userdata)
+#define IP_BLACKLIST_FILE "ip_blacklist.temp"
+#define DOMAIN_BLACKLIST_FILE "domain_blacklist.temp"
+
+/**
+ * This will be stored in the update timer's data field. It should be freed
+ * when the update timer is closed.
+ * TODO: Find a way to close the update_timer_data. This is not a high priority
+ * because the update timer should run until the program ends.
+ */
+typedef struct
+update_timer_data
 {
-	printf("Download completed with CURLcode (%d)\n", result);
+	curl_globals_t *ctx;
+	ip_blacklist **ip_blacklist;
+	domain_blacklist **domain_blacklist;
+} update_timer_data_t;
+
+static update_timer_data_t *
+bundle_update_timer_data(curl_globals_t *ctx, ip_blacklist **ip_blacklist,
+		domain_blacklist **domain_blacklist)
+{
+	update_timer_data_t *bundle = NULL;
+
+	bundle = malloc(sizeof *bundle);
+	if (bundle)
+	{
+		bundle->ctx = ctx;
+		bundle->ip_blacklist = ip_blacklist;
+		bundle->domain_blacklist = domain_blacklist;
+	}
+
+	return bundle;
+}
+
+static void
+on_ip_blacklist_complete(CURLcode result, void *userdata)
+{
+	ip_blacklist **old_blacklist = userdata;
+
+	if (CURLE_OK == result)
+	{
+		free_ip_blacklist(old_blacklist);
+
+		if (0 == setup_ip_blacklist(old_blacklist, IP_BLACKLIST_FILE))
+		{
+			fprintf(stderr, "ERROR: Could not load IP blacklist.\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+}
+
+static void
+on_domain_blacklist_complete(CURLcode result, void *userdata)
+{
+	domain_blacklist **old_blacklist = userdata;
+
+	if (CURLE_OK == result)
+	{
+		free_domain_blacklist(old_blacklist);
+
+		if (0 == setup_domain_blacklist(old_blacklist, DOMAIN_BLACKLIST_FILE))
+		{
+			fprintf(stderr, "ERROR: Could not load domain blacklist.\n");
+			exit(EXIT_FAILURE);
+		}
+	}
 }
 
 /**
@@ -23,11 +85,14 @@ on_complete_cb(CURLcode result, void *userdata)
 static void
 update_timer_cb(uv_timer_t *handle)
 {
-	curl_globals_t *ctx = (curl_globals_t *)handle->data;
+	update_timer_data_t *data = (update_timer_data_t *)handle->data;
+	curl_globals_t *ctx = data->ctx;
 	assert(ctx);
 
-	add_download_to_file(ctx, ip_blacklist_src, "ip_blacklist", on_complete_cb, NULL);
-	add_download_to_file(ctx, domain_blacklist_src, "domain_blacklist", on_complete_cb, NULL);
+	add_download_to_file(ctx, ip_blacklist_src, IP_BLACKLIST_FILE,
+			on_ip_blacklist_complete, data->ip_blacklist);
+	add_download_to_file(ctx, domain_blacklist_src, DOMAIN_BLACKLIST_FILE,
+			on_domain_blacklist_complete, data->domain_blacklist);
 }
 
 static void
@@ -39,15 +104,9 @@ close_cb(uv_handle_t *handle)
 		free(timer);
 }
 
-/**
- * Setup a repeating uv_timer_t which will start a download of the latest
- * blacklists.
- * @param loop The main event loop
- * @param ctx Context containing a curl multi handle
- * @returns An initialized uv_timer_t or NULL if unsuccessful.
- */
 uv_timer_t *
-ids_update_setup_timer(uv_loop_t *loop, curl_globals_t *ctx)
+ids_update_setup_timer(uv_loop_t *loop, curl_globals_t *ctx,
+		ip_blacklist **ip_bl, domain_blacklist **domain_bl)
 {
 	int uv_result = 0;
 	uv_timer_t *timer = NULL;
@@ -60,7 +119,10 @@ ids_update_setup_timer(uv_loop_t *loop, curl_globals_t *ctx)
 	// Prepare timer
 	uv_result = uv_timer_init(loop, timer);
 	if (0 > uv_result) goto pre_init_err;
-	timer->data = ctx;
+
+	update_timer_data_t *bundle = bundle_update_timer_data(ctx, ip_bl, domain_bl);
+	if (NULL == bundle) goto pre_init_err;
+	timer->data = bundle;
 
 	// Start timer
 	uv_result = uv_timer_start(timer, update_timer_cb,
@@ -69,20 +131,22 @@ ids_update_setup_timer(uv_loop_t *loop, curl_globals_t *ctx)
 
 	return timer;
 
-
 pre_init_err:
+// If error occurred before adding timer to event loop
 	if (timer)
 	{
 		free(timer);
 	}
 	goto error;
 post_init_err:
-	// Must wait for callback to free timer
+/* If error occurred after adding timer to event loop, the handle must be freed
+ * during a callback */
 	if (timer)
 	{
 		uv_close((uv_handle_t *)timer, close_cb);
 	}
 error:
+	if (bundle) free(bundle);
 	fprintf(stderr, "Error: ids_update_setup_timer(): %s\n",
 			uv_strerror(uv_result));
 	return NULL;

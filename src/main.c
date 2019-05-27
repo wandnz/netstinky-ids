@@ -435,7 +435,7 @@ int main(int argc, char **argv)
     curl_handle = multi_uv_setup(loop);
     if (NULL == curl_handle) goto done;
 
-    update_timer = ids_update_setup_timer(loop, curl_handle);
+    update_timer = ids_update_setup_timer(loop, curl_handle, &ip_bl, &dn_bl);
     if (NULL == update_timer) goto done;
 
     printf("setting up event server...\n");
