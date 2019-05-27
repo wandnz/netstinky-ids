@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <curl/curl.h>
+
 #include "multi_uv.h"
 
 uv_timer_t *

@@ -11,6 +11,12 @@ static const uint64_t update_interval_ms = 600000;	// 10 minutes
 static const char ip_blacklist_src[] = "https://iplists.firehol.org/files/firehol_level1.netset";
 static const char domain_blacklist_src[] = "https://urlhaus.abuse.ch/downloads/text/";
 
+static void
+on_complete_cb(CURLcode result, void *userdata)
+{
+	printf("Download completed with CURLcode (%d)\n", result);
+}
+
 /**
  * Begin downloading of blacklists. Called when update interval has passed.
  */
@@ -20,8 +26,8 @@ update_timer_cb(uv_timer_t *handle)
 	curl_globals_t *ctx = (curl_globals_t *)handle->data;
 	assert(ctx);
 
-	add_download_to_file(ctx, ip_blacklist_src, "ip_blacklist");
-	add_download_to_file(ctx, domain_blacklist_src, "domain_blacklist");
+	add_download_to_file(ctx, ip_blacklist_src, "ip_blacklist", on_complete_cb, NULL);
+	add_download_to_file(ctx, domain_blacklist_src, "domain_blacklist", on_complete_cb, NULL);
 }
 
 static void

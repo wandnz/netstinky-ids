@@ -53,6 +53,40 @@ typedef struct curl_context_s {
 } curl_context_t;
 
 /**
+ * Structure that will be stored in the private data field of a curl easy
+ * handle for each download.
+ */
+struct curl_easy_private_data_s {
+	FILE *output_file;	// output file to be closed when complete
+	multi_uv_download_complete_cb on_complete;
+	void *userdata;	// data to be provided to callback
+};
+
+/**
+ * Bundle the file pointer and the download completion callback.
+ * @param output_file File pointer
+ * @param cb Download completion callback, may be NULL
+ * @returns A dynamically allocated bundle
+ */
+static struct curl_easy_private_data_s *
+create_curl_easy_private_data(FILE *output_file, multi_uv_download_complete_cb cb,
+		void *userdata)
+{
+	assert(NULL != output_file);
+	// cb can be NULL
+
+	struct curl_easy_private_data_s *data = NULL;
+	data = malloc(sizeof *data);
+	if (NULL == data) return NULL;
+
+	data->output_file = output_file;
+	data->on_complete = cb;
+	data->userdata = userdata;
+
+	return data;
+}
+
+/**
  * The following warning functions can be used to wrap around functions which
  * return a error code, when the execution will not be changed if the function
  * fails.
@@ -140,14 +174,16 @@ static void destroy_curl_context(curl_context_t *context)
  * @param url The url of the file to download
  * @param target_file String containing path or name of file
  */
-void add_download_to_file(curl_globals_t *globals, const char *url, const char *target_file)
+void add_download_to_file(curl_globals_t *globals, const char *url,
+		const char *target_file, multi_uv_download_complete_cb cb, void *userdata)
 {
-	int result = 0;
 	char filename[50];
 	FILE *file = NULL;
 	CURL *handle = NULL;
 	CURLcode easy_result = CURLE_OK;
 	CURLMcode multi_result = CURLM_OK;
+
+	struct curl_easy_private_data_s *private_data = NULL;
 
 	assert(NULL != globals);
 	assert(NULL != url);
@@ -158,13 +194,16 @@ void add_download_to_file(curl_globals_t *globals, const char *url, const char *
 		return;
 	}
 
+	private_data = create_curl_easy_private_data(file, cb, userdata);
+	if (NULL == private_data) goto error;
+
 	handle = curl_easy_init();
 	if (NULL == handle) goto error;
 
 	easy_result = curl_easy_setopt(handle, CURLOPT_WRITEDATA, file);
 	if (CURLE_OK != easy_result) goto error;
 
-	easy_result = curl_easy_setopt(handle, CURLOPT_PRIVATE, file);
+	easy_result = curl_easy_setopt(handle, CURLOPT_PRIVATE, private_data);
 	if (CURLE_OK != easy_result) goto error;
 
 	easy_result = curl_easy_setopt(handle, CURLOPT_URL, url);
@@ -178,6 +217,7 @@ void add_download_to_file(curl_globals_t *globals, const char *url, const char *
 
 error:
 	if (NULL != handle) curl_easy_cleanup(handle);
+	if (NULL != private_data) free(private_data);
 	if (NULL != file) fclose(file);
 }
 
@@ -187,7 +227,9 @@ static void check_multi_info(curl_globals_t *globals)
 	CURLMsg *message = NULL;
 	int pending;
 	CURL *easy_handle = NULL;
-	FILE *file = NULL;
+	bool transfer_success;
+
+	struct curl_easy_private_data_s *private_data = NULL;
 
 	while((message = curl_multi_info_read(globals->curl_handle, &pending))) {
 		switch(message->msg) {
@@ -200,15 +242,22 @@ static void check_multi_info(curl_globals_t *globals)
 			easy_handle = message->easy_handle;
 
 			curl_easy_warning(curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &done_url));
-			curl_easy_warning(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &file));
+			curl_easy_warning(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &private_data));
 
 			if (NULL != done_url) printf("%s DONE\n", done_url);
 			curl_multi_warning(curl_multi_remove_handle(globals->curl_handle, easy_handle));
 
+			// Notify user of download completion by running callback
+			if (private_data->on_complete)
+				private_data->on_complete(message->data.result, private_data->userdata);
+
+			// Clean up download resources
 			curl_easy_cleanup(easy_handle);
-			if(file) {
-				fclose(file);
+			if(private_data->output_file) {
+				fclose(private_data->output_file);
 			}
+			free(private_data);
+
 			break;
 
 		default:
