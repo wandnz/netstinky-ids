@@ -11,7 +11,7 @@ obj = $(src:.c=.o)
 CFLAGS:=-Wall -ggdb -std=c11
 LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common -lcurl
 
-CC:=gcc
+CC?=gcc
 
 # Add _GNU_SOURCE define on Linux
 ifeq ($(shell uname -s), Linux)

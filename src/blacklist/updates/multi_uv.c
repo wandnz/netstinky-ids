@@ -221,13 +221,18 @@ error:
 	if (NULL != file) fclose(file);
 }
 
+void
+add_download_to_memory(curl_globals_t *globals, const char *url,
+		multi_uv_download_to_memory_cb cb, void *userdata)
+{
+}
+
 static void check_multi_info(curl_globals_t *globals)
 {
 	char *done_url = NULL;
 	CURLMsg *message = NULL;
 	int pending;
 	CURL *easy_handle = NULL;
-	bool transfer_success;
 
 	struct curl_easy_private_data_s *private_data = NULL;
 

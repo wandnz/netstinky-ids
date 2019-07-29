@@ -14,6 +14,7 @@
 #include "blacklist/ids_blacklist.h"
 #include "blacklist/updates/multi_uv.h"
 #include "blacklist/updates/ids_update.h"
+#include "blacklist/updates/ids_tls_update.h"
 #include "mdns/ids_mdns_avahi.h"
 #include "mdns/mdns_libuv_integration.h"
 #include "utils/common.h"
@@ -37,6 +38,9 @@
 // For debugging with valgrind, which cannot handle programs with extra
 // capabilities
 #define IGNORE_PCAP_ERRORS (true)
+
+static const char *server_ip = "192.168.122.104";
+static const int server_port = 15000;
 
 /* Structure to hold command line argument values. None of these will need to
  * be freed as the strings will be pointers to static memory.
@@ -63,7 +67,12 @@ static uv_check_t mdns_handle;
 static uv_pipe_t stdin_pipe;
 static uv_poll_t pcap_handle;
 static uv_signal_t sigterm_handle, sigint_handle;
+
+// Handle for event server which transmits recently detected events
 static uv_tcp_t server_handle;
+
+// Handles for updating blacklists from the server
+static ids_update_ctx_t ids_update_ctx;
 
 static void close_cb(uv_handle_t *handle)
 {
@@ -432,11 +441,17 @@ int main(int argc, char **argv)
     		|| !mdns_check_start(&mdns_handle)) goto done;
 
     // Setup libcurl and timer for updating blacklists
-    curl_handle = multi_uv_setup(loop);
+    /*curl_handle = multi_uv_setup(loop);
     if (NULL == curl_handle) goto done;
 
     update_timer = ids_update_setup_timer(loop, curl_handle, &ip_bl, &dn_bl);
-    if (NULL == update_timer) goto done;
+    if (NULL == update_timer) goto done;*/
+
+    if (0 != setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
+    {
+    	printf("Could not setup updates.\n");
+    	goto done;
+    }
 
     printf("setting up event server...\n");
     if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
