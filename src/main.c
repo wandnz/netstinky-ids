@@ -73,6 +73,7 @@ static uv_tcp_t server_handle;
 
 // Handles for updating blacklists from the server
 static ids_update_ctx_t ids_update_ctx;
+static uv_timer_t update_timer;
 
 static void close_cb(uv_handle_t *handle)
 {
@@ -450,6 +451,12 @@ int main(int argc, char **argv)
     if (0 != setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
     {
     	printf("Could not setup updates.\n");
+    	goto done;
+    }
+
+    if (0 != setup_timer(&update_timer, loop, &ids_update_ctx))
+    {
+    	printf("Could not setup update timer.\n");
     	goto done;
     }
 

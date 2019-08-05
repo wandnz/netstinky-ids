@@ -9,10 +9,10 @@
 
 int setup_ip_blacklist(ip_blacklist **bl, char *bl_file)
 {
-	assert(bl_file);
-
     struct ip4_address_range *firehol_list = NULL;
     FILE *fp = NULL;
+
+    if (!bl) goto error;
 
     *bl = new_ip_blacklist();
     if (!*bl) goto error;
@@ -64,15 +64,14 @@ error:
  */
 int setup_domain_blacklist(domain_blacklist **bl, char *bl_file)
 {
-	assert(bl_file);
-
 	FILE *bl_fp = NULL;
+
+	if (!bl) goto error;
+    *bl = new_domain_blacklist();
+    if (!*bl) goto error;
+
 	if (bl_file)
 	{
-		assert(!*bl);
-	    *bl = new_domain_blacklist();
-	    if (!*bl) goto error;
-
 		bl_fp = fopen(bl_file, "r");
 		if (!bl_fp) goto error;
 

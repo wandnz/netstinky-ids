@@ -20,6 +20,14 @@ typedef struct tls_stream_s tls_stream_t;
 typedef void (*tls_str_handshake_cb)(tls_stream_t *, int status);
 typedef void (*tls_str_read_cb)(tls_stream_t *, int status,
 		const uv_buf_t *buf);
+
+/**
+ * Called when a write operation has completed. Status will be 0 if the
+ * operation was successful. The buffers which were written will be returned
+ * to the user. The user must free the base field of each buffer.
+ */
+typedef void (*tls_str_write_cb)(tls_stream_t *, int status, uv_buf_t *buf,
+		unsigned int nbufs);
 typedef void (*tls_str_shutdown_cb)(tls_stream_t *, int status);
 typedef void (*tls_str_close_cb) (tls_stream_t *);
 
@@ -40,7 +48,35 @@ struct tls_stream_s
 	tls_str_read_cb on_read;
 	uv_write_cb on_write;
 	void *data;	// user data
+	int handshake_complete;
 };
+
+/**
+ * Libuv will discard references to the buffers submitted to uv_write. This
+ * data structure will be used for keeping references to the written buffers
+ * until the write_cb is called.
+ * @field nbufs: The number of buffers in the buf array.
+ * @field bufs: A dynamically allocated array of buffers associated with the
+ * write request.
+ */
+typedef struct buf_array_s
+{
+	unsigned int nbufs;
+	uv_buf_t *bufs;
+} buf_array_t;
+
+/**
+ * Keeps references to both the plaintext buffers and the encrypted buffers.
+ * The encrypted buffers will be freed internally within tls_stream functions
+ * but the plaintext buffers will be returned to the user within the write_cb.
+ */
+typedef struct write_cb_data_s
+{
+	tls_stream_t *stream;
+	buf_array_t plaintext;
+	buf_array_t encrypted;
+	tls_str_write_cb cb;
+} write_cb_data_t;
 
 enum
 {
@@ -101,10 +137,12 @@ tls_stream_listen(tls_stream_t *stream, int backlog, uv_connection_cb cb);
  * Accept a client connection.
  * @param server: The server tls_stream_t.
  * @param client: An initialized tls_stream_t for the client connection.
- * @param on_read: A callback to be called when data is received.
+ * @param hshake_cb: A callback to be called when the handshake is complete.
+ * @param read_cb: A callback to be called when data is received.
  */
 int
-tls_stream_accept(tls_stream_t *server, tls_stream_t *client, uv_read_cb cb);
+tls_stream_accept(tls_stream_t *server, tls_stream_t *client,
+		tls_str_handshake_cb hshake_cb, tls_str_read_cb read_cb);
 
 int
 tls_stream_read_start(tls_stream_t *stream, uv_read_cb cb);
@@ -112,9 +150,19 @@ tls_stream_read_start(tls_stream_t *stream, uv_read_cb cb);
 int
 tls_stream_read_stop(tls_stream_t *stream);
 
+/**
+ * Encrypt and write the data in the buffers through the stream. The memory
+ * allocated to each buffer must remain valid until the callback is called, but
+ * the uv_buf_t structs themselves can be freed as the memory address and
+ * length of each buffer is copied within the function.
+ *
+ * The write callback will receive the written buffers when the operation is
+ * complete, so that the user knows which write succeeded or failed, and so
+ * the user can free the base field of each buffer.
+ */
 int
 tls_stream_write(tls_stream_t *stream, const uv_buf_t bufs[],
-		unsigned int nbufs, uv_write_cb cb);
+		unsigned int nbufs, tls_str_write_cb cb);
 
 /**
  * Closes a stream. Will shutdown first if necessary.

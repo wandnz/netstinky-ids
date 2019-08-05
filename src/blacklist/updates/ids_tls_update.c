@@ -7,6 +7,8 @@
  *      Author: mfletche
  */
 
+#include <string.h>
+
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
@@ -20,11 +22,14 @@ const static int server_port = 15000;
 static void
 update_timer_cb(uv_timer_t *timer);
 
+static void
+update_timer_on_shutdown(tls_stream_t *stream, int status);
+
 SSL_CTX *
 setup_context()
 {
 	SSL_CTX *ctx = NULL;
-	const SSL_METHOD *method = TLS_server_method();
+	const SSL_METHOD *method = SSLv23_method();
 	print_if_NULL(method);
 	if (!method) return NULL;
 
@@ -69,7 +74,7 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	if (NULL == update_ctx->ctx) return -1;
 
 	// Setup actual TLS stream
-	rc = tls_stream_init(update_ctx->stream, loop, update_ctx->ctx);
+	rc = tls_stream_init(&update_ctx->stream, loop, update_ctx->ctx);
 	if (0 != rc) return -1;
 
 	// Save blacklist pointers
@@ -78,7 +83,7 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 
 	update_ctx->proto.state = NS_PROTO_VERSION_WAITING;
 
-	update_ctx->stream->data = update_ctx;
+	update_ctx->stream.data = update_ctx;
 
 	return 0;
 }
@@ -105,13 +110,11 @@ teardown_update_context(ids_update_ctx_t *update_ctx)
 	if (update_ctx->ctx)
 		SSL_CTX_free(update_ctx->ctx);
 
-	if (update_ctx->stream)
-	{
-		// If stream cannot be closed by conventional means, wipe it now
-		rc = tls_stream_close(update_ctx->stream,
-				teardown_update_context_close_cb);
-		if (rc != 0) update_ctx->stream = NULL;
-	}
+	// If stream cannot be closed by conventional means, wipe it now
+	rc = tls_stream_close(&update_ctx->stream,
+			teardown_update_context_close_cb);
+	if (rc != 0)
+		memset(&update_ctx->stream, 0,sizeof(update_ctx->stream));
 
 	return 0;
 }
@@ -146,9 +149,9 @@ perform_protocol_action(tls_stream_t *stream, ns_action_t action)
 }
 
 static void
-update_timer_on_write(uv_write_t *req, int status)
+update_timer_on_write(uv_write_t *req, int status, uv_buf_t *bufs, unsigned int nbufs)
 {
-	int rc;
+	int rc, buf_idx;
 	ns_action_t action;
 	ids_update_ctx_t *ctx = NULL;
 	tls_stream_t *stream = NULL;
@@ -159,14 +162,23 @@ update_timer_on_write(uv_write_t *req, int status)
 	print_if_NULL(stream->data);
 	ctx = stream->data;
 
+	// Free buffers
+	if (bufs)
+	{
+		for (buf_idx = 0; buf_idx < nbufs; buf_idx++)
+		{
+			if (&bufs[buf_idx]) free(&bufs[buf_idx]);
+		}
+	}
+
 	if (status)
 	{
 		// Error state
-		rc = tls_stream_shutdown(ctx->stream, NULL);
+		rc = tls_stream_shutdown(&ctx->stream, update_timer_on_shutdown);
 		// Ignore return value
 	}
 
-	rc = ns_cl_proto_on_send(&action, &ctx->proto.state, ctx->stream, status);
+	rc = ns_cl_proto_on_send(&action, &ctx->proto.state, &ctx->stream, status);
 	if (rc != 0) return;
 	rc = perform_protocol_action(stream, action);
 }
@@ -175,6 +187,11 @@ static void
 update_timer_on_shutdown(tls_stream_t *stream, int status)
 {
 	if (!stream) return;
+
+	/**
+	 * Do not finalize or free the stream as it will be re-used for the next
+	 * update.
+	 */
 }
 
 static void
@@ -193,12 +210,30 @@ update_timer_on_read(tls_stream_t *stream, int status, const uv_buf_t *buf)
 		return;
 	}
 
+	if (!buf) return;
 	ctx = stream->data;
+
+	if (!buf->base) return;
+	fwrite(buf->base, buf->len, 1, stdout);
 	rc = ns_cl_proto_on_recv(&action, &ctx->proto.state, stream, buf);
+	free(buf->base);
 	if (0 != rc)
 	{
 		rc = tls_stream_shutdown(stream, update_timer_on_shutdown);
 		return;
+	}
+
+	switch(action.type)
+	{
+	case NS_ACTION_WRITE:
+		rc = tls_stream_write(stream, &action.send_buffer, 1, update_timer_on_write);
+		if (rc) tls_stream_shutdown(stream, update_timer_on_shutdown);
+		break;
+	case NS_ACTION_CLOSE:
+		rc = tls_stream_shutdown(stream, update_timer_on_shutdown);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -206,6 +241,7 @@ static void
 update_timer_on_handshake(tls_stream_t *stream, int status)
 {
 	int rc;
+	ns_action_t action;
 
 	print_if_NULL(stream);
 	if (!stream) return;
@@ -218,8 +254,8 @@ update_timer_on_handshake(tls_stream_t *stream, int status)
 		return;
 	}
 
-	// Normal operations: continue waiting. If this changes, use
-	// the on_handshake function of the protocol.
+	action = ns_cl_proto_on_handshake(stream->data, stream);
+
 	return;
 }
 
@@ -242,7 +278,7 @@ update_timer_cb(uv_timer_t *timer)
 	print_error(check_uv_error(rc));
 	if (0 != rc) return;
 
-	rc = tls_stream_connect(ctx->stream, (const struct sockaddr *)&addr,
+	rc = tls_stream_connect(&ctx->stream, (const struct sockaddr *)&addr,
 			update_timer_on_handshake, update_timer_on_read);
 	if (0 != rc) return;
 }

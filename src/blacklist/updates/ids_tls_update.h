@@ -45,7 +45,7 @@ typedef struct
 typedef struct
 {
 	SSL_CTX *ctx;	// May only be needed once
-	tls_stream_t *stream;
+	tls_stream_t stream;
 	ns_cli_proto_t proto;
 	domain_blacklist **domain;
 	ip_blacklist **ip;
@@ -58,6 +58,9 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 int
 ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
 		tls_stream_t *stream, int status);
+
+ns_action_t
+ns_cl_proto_on_handshake(ns_cli_state_t *state, tls_stream_t *stream);
 
 /**
  * Initialize an ids_update_ctx_t.

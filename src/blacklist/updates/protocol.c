@@ -246,7 +246,10 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
 	// TODO: Check that update is valid before freeing blacklists so we don't
 	// accidentally end up with empry blacklist.
 	free_ip_blacklist(update_ctx->ip);
+	*update_ctx->ip = new_ip_blacklist();
+
 	free_domain_blacklist(update_ctx->domain);
+	*update_ctx->domain = new_domain_blacklist();
 
 	do
 	{
