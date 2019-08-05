@@ -25,6 +25,10 @@ update_timer_cb(uv_timer_t *timer);
 static void
 update_timer_on_shutdown(tls_stream_t *stream, int status);
 
+static void
+update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
+		unsigned int nbufs);
+
 SSL_CTX *
 setup_context()
 {
@@ -119,9 +123,6 @@ teardown_update_context(ids_update_ctx_t *update_ctx)
 	return 0;
 }
 
-static void
-update_timer_on_write(uv_write_t *req, int status);
-
 static int
 perform_protocol_action(tls_stream_t *stream, ns_action_t action)
 {
@@ -149,16 +150,13 @@ perform_protocol_action(tls_stream_t *stream, ns_action_t action)
 }
 
 static void
-update_timer_on_write(uv_write_t *req, int status, uv_buf_t *bufs, unsigned int nbufs)
+update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
+		unsigned int nbufs)
 {
 	int rc, buf_idx;
 	ns_action_t action;
 	ids_update_ctx_t *ctx = NULL;
-	tls_stream_t *stream = NULL;
 
-	if (!req) return;
-
-	stream = req->data;
 	print_if_NULL(stream->data);
 	ctx = stream->data;
 
@@ -167,18 +165,18 @@ update_timer_on_write(uv_write_t *req, int status, uv_buf_t *bufs, unsigned int 
 	{
 		for (buf_idx = 0; buf_idx < nbufs; buf_idx++)
 		{
-			if (&bufs[buf_idx]) free(&bufs[buf_idx]);
+			if (bufs[buf_idx].base) free(bufs[buf_idx].base);
 		}
 	}
 
 	if (status)
 	{
 		// Error state
-		rc = tls_stream_shutdown(&ctx->stream, update_timer_on_shutdown);
+		rc = tls_stream_shutdown(stream, update_timer_on_shutdown);
 		// Ignore return value
 	}
 
-	rc = ns_cl_proto_on_send(&action, &ctx->proto.state, &ctx->stream, status);
+	rc = ns_cl_proto_on_send(&action, &ctx->proto.state, stream, status);
 	if (rc != 0) return;
 	rc = perform_protocol_action(stream, action);
 }
@@ -255,6 +253,9 @@ update_timer_on_handshake(tls_stream_t *stream, int status)
 	}
 
 	action = ns_cl_proto_on_handshake(stream->data, stream);
+	rc = perform_protocol_action(stream, action);
+	if (rc)
+		print_error("Could not perform protocol action");
 
 	return;
 }

@@ -99,17 +99,9 @@ fail:
 int
 tls_stream_fini(tls_stream_t *stream)
 {
-	int bio_rc;
 	int ret = TLS_STR_OK;
 
-	/*
-	bio_rc = BIO_free(stream->internal);
-	if (1 != bio_rc) ret = TLS_STR_FAIL;
-
-	bio_rc = BIO_free(stream->network);
-	if (1 != bio_rc) ret = TLS_STR_FAIL;
-	*/
-
+	// Do not free BIOs separately, they are cleaned up by SSL_free
 	SSL_free(stream->ssl);
 
 	return ret;
@@ -449,7 +441,6 @@ static void
 tls_stream_on_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
 	tls_stream_t *tls = NULL;
-	int nwrite;
 	int decrypt_rc;
 	uv_buf_t decrypted;
 
@@ -463,10 +454,10 @@ tls_stream_on_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
-	decrypt_rc = tls_stream_decrypt_buffer(&decrypted, stream, nread, buf);
+	decrypt_rc = tls_stream_decrypt_buffer(&decrypted, tls, nread, buf);
 	if (decrypt_rc == TLS_STR_OK && decrypted.len == 0) return;
 
-	tls->on_read(stream, decrypt_rc, &decrypted);
+	tls->on_read(tls, decrypt_rc, &decrypted);
 	return;
 }
 
@@ -1016,6 +1007,8 @@ tls_stream_close(tls_stream_t *stream, tls_str_close_cb cb)
 
 	// tcp
 	uv_rc = uv_read_stop((uv_stream_t *)&stream->tcp);
+	if (uv_rc)
+		return TLS_STR_FAIL;
 	req = malloc(sizeof(*req));
 	if (req)
 	{

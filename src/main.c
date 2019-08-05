@@ -39,9 +39,6 @@
 // capabilities
 #define IGNORE_PCAP_ERRORS (true)
 
-static const char *server_ip = "192.168.122.104";
-static const int server_port = 15000;
-
 /* Structure to hold command line argument values. None of these will need to
  * be freed as the strings will be pointers to static memory.
  */
@@ -338,21 +335,6 @@ bool setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
 	return true;
 }
 
-static void walk_cb(uv_handle_t *handle, void *arg)
-{
-    // KLUDGE: Don't close UV_POLL instances as it will be assumed that
-    // they will be closed manually. Prevents double-closing errors
-    /*if (handle->type == UV_POLL)
-        return;
-    else
-        uv_close(handle, arg);
-    */
-	int fd;
-	if (0 == uv_fileno(handle, &fd))
-		if (0 != close(fd))
-			perror("Could not close pcap file descriptor");
-}
-
 static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
              uv_buf_t *buf)
 {
@@ -383,9 +365,6 @@ int main(int argc, char **argv)
     const char *filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0\
  and tcp[tcpflags] & tcp-ack == 0)";
     char err[PCAP_ERRBUF_SIZE];
-
-    uv_timer_t *update_timer;
-    curl_globals_t *curl_handle = NULL;
 
     memset(&mdns, 0, sizeof(mdns));
     memset(&args, 0, sizeof(args));
@@ -472,7 +451,6 @@ int main(int argc, char **argv)
     retval = 0;
 
 done:
-	multi_uv_free(&curl_handle);
 	if (loop)
 	{
 		uv_walk(loop, walk_and_close_handle_cb, NULL);
