@@ -181,15 +181,24 @@ update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
 	rc = perform_protocol_action(stream, action);
 }
 
+/**
+ * Finalizes the update timer after the stream is closed.
+ */
+static void
+update_timer_on_close(tls_stream_t *stream)
+{
+	tls_stream_fini(stream);
+	memset(&stream->tcp, 0, sizeof(stream->tcp));
+}
+
 static void
 update_timer_on_shutdown(tls_stream_t *stream, int status)
 {
 	if (!stream) return;
 
-	/**
-	 * Do not finalize or free the stream as it will be re-used for the next
-	 * update.
-	 */
+	// Have tried keeping the structure for the next connection but get an
+	// 'operation not permitted' error from uv_connect.
+	tls_stream_close(stream, update_timer_on_close);
 }
 
 static void
@@ -263,9 +272,6 @@ update_timer_on_handshake(tls_stream_t *stream, int status)
 static void
 update_timer_cb(uv_timer_t *timer)
 {
-
-	//TODO: Check that tls stream is not currently active. (Shouldn't be still
-	// active after 15 minutes but something odd might happen.)
 	int rc;
 	ids_update_ctx_t *ctx = NULL;
 	struct sockaddr_in addr;
@@ -274,6 +280,30 @@ update_timer_cb(uv_timer_t *timer)
 	print_if_NULL(timer);
 	if (!timer) return;
 	ctx = timer->data;
+
+	// Re-init protocol
+	ctx->proto.state = NS_PROTO_VERSION_WAITING;
+
+	// Close the uv_handle and return if the previous update is still running.
+	// uv_is_active will return 0 if the tcp handle has been zeroed, so this
+	// works even if the handle hasn't been properly initialized.
+	if (uv_is_active((uv_handle_t *)&ctx->stream.tcp))
+	{
+		rc = tls_stream_close(&ctx->stream, update_timer_on_close);
+		if (rc)
+			// Callback is not going to happen, so free and continue
+			tls_stream_fini(&ctx->stream);
+		else
+			// Must wait for callback
+			return;
+	}
+	rc = tls_stream_init(&ctx->stream, timer->loop, ctx->ctx);
+	if (rc)
+	{
+		print_error("Could not initialize TLS stream");
+		return;
+	}
+	ctx->stream.data = ctx;
 
 	rc = uv_ip4_addr(server_ip, server_port, &addr);
 	print_error(check_uv_error(rc));
