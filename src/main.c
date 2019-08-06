@@ -12,6 +12,9 @@
 #include <uv.h>
 
 #include "blacklist/ids_blacklist.h"
+#include "blacklist/updates/multi_uv.h"
+#include "blacklist/updates/ids_update.h"
+#include "blacklist/updates/ids_tls_update.h"
 #include "mdns/ids_mdns_avahi.h"
 #include "mdns/mdns_libuv_integration.h"
 #include "utils/common.h"
@@ -61,7 +64,13 @@ static uv_check_t mdns_handle;
 static uv_pipe_t stdin_pipe;
 static uv_poll_t pcap_handle;
 static uv_signal_t sigterm_handle, sigint_handle;
+
+// Handle for event server which transmits recently detected events
 static uv_tcp_t server_handle;
+
+// Handles for updating blacklists from the server
+static ids_update_ctx_t ids_update_ctx;
+static uv_timer_t update_timer;
 
 static void close_cb(uv_handle_t *handle)
 {
@@ -326,21 +335,6 @@ bool setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
 	return true;
 }
 
-static void walk_cb(uv_handle_t *handle, void *arg)
-{
-    // KLUDGE: Don't close UV_POLL instances as it will be assumed that
-    // they will be closed manually. Prevents double-closing errors
-    /*if (handle->type == UV_POLL)
-        return;
-    else
-        uv_close(handle, arg);
-    */
-	int fd;
-	if (0 == uv_fileno(handle, &fd))
-		if (0 != close(fd))
-			perror("Could not close pcap file descriptor");
-}
-
 static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
              uv_buf_t *buf)
 {
@@ -425,6 +419,25 @@ int main(int argc, char **argv)
     if (!ids_mdns_setup_mdns(&mdns, args.server_port)) goto done;
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
     		|| !mdns_check_start(&mdns_handle)) goto done;
+
+    // Setup libcurl and timer for updating blacklists
+    /*curl_handle = multi_uv_setup(loop);
+    if (NULL == curl_handle) goto done;
+
+    update_timer = ids_update_setup_timer(loop, curl_handle, &ip_bl, &dn_bl);
+    if (NULL == update_timer) goto done;*/
+
+    if (0 != setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
+    {
+    	printf("Could not setup updates.\n");
+    	goto done;
+    }
+
+    if (0 != setup_timer(&update_timer, loop, &ids_update_ctx))
+    {
+    	printf("Could not setup update timer.\n");
+    	goto done;
+    }
 
     printf("setting up event server...\n");
     if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;

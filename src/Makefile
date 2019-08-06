@@ -4,13 +4,14 @@ src = $(wildcard *.c) \
       $(wildcard utils/hat/*.c) \
       $(wildcard mdns/*.c) \
       $(wildcard blacklist/*.c) \
-      $(wildcard test/*.c)
+      $(wildcard test/*.c) \
+      $(wildcard blacklist/updates/*.c)
 obj = $(src:.c=.o)
 
 CFLAGS:=-Wall -ggdb -std=c11
-LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common
+LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common -lcurl
 
-CC:=gcc
+CC?=gcc
 
 # Add _GNU_SOURCE define on Linux
 ifeq ($(shell uname -s), Linux)
@@ -20,6 +21,7 @@ endif
 nsids: $(obj)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
+# Compiles using the AFL compiler and makes the compiler use the FUZZ_TEST code
 fuzztest: CC=afl-gcc
 fuzztest: CFLAGS+= -DFUZZ_TEST
 fuzztest: clean nsids

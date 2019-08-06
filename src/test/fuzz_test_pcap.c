@@ -14,7 +14,6 @@ void fuzz_test_pcap(char *packet_file)
 	// Open packet file
 	struct packet_s test_packet;
 	struct pcap_pkthdr pcap_hdr;
-	struct ids_pcap_fields fields;
 
 	FILE *fp = fopen(packet_file, "rb");
 	if (NULL == fp)

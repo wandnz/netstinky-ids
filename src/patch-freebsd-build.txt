@@ -1,0 +1,116 @@
+diff --git a/src/Makefile b/src/Makefile
+index 72a3050..6f1ed43 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -7,10 +7,10 @@ src = $(wildcard *.c) \
+       $(wildcard test/*.c)
+ obj = $(src:.c=.o)
+ 
+-CFLAGS:=-Wall -ggdb -std=c11
+-LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common
++CFLAGS+=-Wall -ggdb -std=c11
++LDFLAGS+=-luv -lpcap -lavahi-client -lavahi-common
+ 
+-CC:=gcc
++CC?=gcc
+ 
+ # Add _GNU_SOURCE define on Linux
+ ifeq ($(shell uname -s), Linux)
+diff --git a/src/blacklist/firehol_ip_blacklist.c b/src/blacklist/firehol_ip_blacklist.c
+index 1f02969..0c297de 100644
+--- a/src/blacklist/firehol_ip_blacklist.c
++++ b/src/blacklist/firehol_ip_blacklist.c
+@@ -8,12 +8,18 @@
+ #ifndef FIREHOL_IP_BLACKLIST_C_
+ #define FIREHOL_IP_BLACKLIST_C_
+ 
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++
+ #include <stdlib.h>
+ #include <string.h>
+ 
+-#include <assert.h>
++#define _WITH_GETLINE
++#include <stdio.h>
+ 
+-#include <arpa/inet.h>
++#include <assert.h>
+ 
+ #include "firehol_ip_blacklist.h"
+ 
+diff --git a/src/blacklist/urlhaus_domain_blacklist.c b/src/blacklist/urlhaus_domain_blacklist.c
+index 966861d..01cac96 100644
+--- a/src/blacklist/urlhaus_domain_blacklist.c
++++ b/src/blacklist/urlhaus_domain_blacklist.c
+@@ -4,6 +4,10 @@
+  *  Created on: 11/04/2019
+  *      Author: mfletche
+  */
++
++#define _WITH_GETLINE
++#include <stdio.h>
++
+ #include <assert.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+diff --git a/src/ids_pcap.c b/src/ids_pcap.c
+index 5c04b81..ae5c457 100644
+--- a/src/ids_pcap.c
++++ b/src/ids_pcap.c
+@@ -5,6 +5,10 @@
+  *      Author: mfletche
+  */
+ 
++#if defined(__linux__)
++#define __FAVOR_BSD
++#endif
++
+ #include <stdlib.h>
+ #include <string.h>
+ 
+@@ -138,8 +142,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
+ 			case IPPROTO_TCP:
+ 				DPRINT("ids_pcap_read_packet(): tcp packet\n");
+ 				tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*eth_hdr) + sizeof(*ip_hdr));
+-				out->dest_port = tcp_hdr->dest;
+-				out->src_port = tcp_hdr->source;
++				out->dest_port = tcp_hdr->th_dport;
++				out->src_port = tcp_hdr->th_sport;
+ 
+ 				/* Check header is correct */
+ 				assert((tcp_hdr->th_flags & TH_SYN) && !(tcp_hdr->th_flags & TH_ACK));
+@@ -149,8 +153,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
+ 			case IPPROTO_UDP:
+ 				DPRINT("ids_pcap_read_packet(): udp packet\n");
+ 				udp_hdr = (struct udphdr *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr)));
+-				out->dest_port = udp_hdr->dest;
+-				out->src_port = udp_hdr->source;
++				out->dest_port = udp_hdr->uh_dport;
++				out->src_port = udp_hdr->uh_sport;
+ 				payload_pos = (uint8_t *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
+ 
+ 				uint8_t *payload_end = (uint8_t *) payload_pos + (pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
+diff --git a/src/ids_server.c b/src/ids_server.c
+index 2646dbc..5d4c0e1 100644
+--- a/src/ids_server.c
++++ b/src/ids_server.c
+@@ -183,13 +183,13 @@ finally:
+ 
+ static void on_new_connection(uv_stream_t *server, int status)
+ {
+-	int err;
+-	uv_tcp_t *client;
++	int err = status;
++	uv_tcp_t *client = NULL;
+ 	uv_loop_t *loop;
+ 
+ 	printf("new connection\n");
+ 	loop = ((uv_handle_t *)server)->loop;
+-	if (0 > (err = status)) goto msg;
++	if (0 > err) goto msg;
+ 	if (NULL == (client = (uv_tcp_t *)malloc(sizeof(*client)))) goto error;
+ 	if (0 != (err = uv_tcp_init(loop, client))) goto msg;
+ 

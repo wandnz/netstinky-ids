@@ -64,4 +64,12 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
                      const unsigned char *pcap_data,
                      struct ids_pcap_fields *out);
 
+/**
+ * Packet handler callback for libpcap.
+ */
+void
+packet_handler(unsigned char *user_dat,
+               const struct pcap_pkthdr* pcap_hdr,
+               const unsigned char *packet);
+
 #endif /* IDS_PCAP_H_ */
