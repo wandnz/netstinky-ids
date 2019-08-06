@@ -1,15 +1,15 @@
 src = $(wildcard *.c) \
+      $(wildcard error/*.c) \
       $(wildcard utils/*.c) \
       $(wildcard utils/ebvbl/*.c) \
       $(wildcard utils/hat/*.c) \
-      $(wildcard mdns/*.c) \
       $(wildcard blacklist/*.c) \
       $(wildcard test/*.c) \
       $(wildcard blacklist/updates/*.c)
 obj = $(src:.c=.o)
 
-CFLAGS:=-Wall -ggdb -std=c11
-LDFLAGS:=-luv -lpcap -lavahi-client -lavahi-common -lcurl
+CFLAGS:=-Wall -ggdb -std=c11 -DNO_MDNS -DNO_UPDATES
+LDFLAGS:=-luv -lpcap -lssl -lcrypto -lcurl
 
 CC?=gcc
 

@@ -11,12 +11,16 @@
 #include <unistd.h>
 #include <uv.h>
 
+#ifndef NO_UPDATES
 #include "blacklist/ids_blacklist.h"
 #include "blacklist/updates/multi_uv.h"
 #include "blacklist/updates/ids_update.h"
 #include "blacklist/updates/ids_tls_update.h"
+#endif
+#ifndef NO_MDS
 #include "mdns/ids_mdns_avahi.h"
 #include "mdns/mdns_libuv_integration.h"
+#endif
 #include "utils/common.h"
 #include "ids_event_list.h"
 #include "ids_pcap.h"
@@ -57,13 +61,17 @@ struct IdsArgs
 // Variables that MUST be global so exit callback can free them
 static uv_loop_t *loop = NULL;
 static pcap_t *pcap = NULL;
+#ifndef NO_MDNS
 AvahiMdnsContext mdns;
+#endif
 ip_blacklist *ip_bl = NULL;
 domain_blacklist *dn_bl = NULL;
 struct ids_event_list *event_queue = NULL;
 
 // libuv handles
+#ifndef NO_MDNS
 static uv_check_t mdns_handle;
+#endif
 static uv_pipe_t stdin_pipe;
 static uv_poll_t pcap_handle;
 static uv_signal_t sigterm_handle, sigint_handle;
@@ -72,7 +80,9 @@ static uv_signal_t sigterm_handle, sigint_handle;
 static uv_tcp_t server_handle;
 
 // Handles for updating blacklists from the server
+#ifndef NO_UPDATES
 static ids_update_ctx_t ids_update_ctx;
+#endif
 
 static void close_cb(uv_handle_t *handle)
 {
@@ -132,7 +142,9 @@ static void free_globals(void) {
     if (event_queue) free_ids_event_list(&event_queue);
     if (ip_bl) free_ip_blacklist(&ip_bl);
     if (dn_bl) free_domain_blacklist(&dn_bl);
+#ifndef NO_MDNS
     ids_mdns_free_mdns(&mdns);
+#endif
 }
 
 int parse_args(struct IdsArgs *args, int argc, char **argv)
@@ -383,10 +395,14 @@ int main(int argc, char **argv)
  and tcp[tcpflags] & tcp-ack == 0)";
     char err[PCAP_ERRBUF_SIZE];
 
+#ifndef NO_UPDATES
     uv_timer_t *update_timer;
     curl_globals_t *curl_handle = NULL;
+#endif
 
+#ifndef NO_MDNS
     memset(&mdns, 0, sizeof(mdns));
+#endif
     memset(&args, 0, sizeof(args));
 
     if (!parse_args(&args, argc, argv)) {
@@ -436,9 +452,11 @@ int main(int argc, char **argv)
 
     if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
 
+#ifndef NO_MDNS
     if (!ids_mdns_setup_mdns(&mdns, args.server_port)) goto done;
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
     		|| !mdns_check_start(&mdns_handle)) goto done;
+#endif
 
     // Setup libcurl and timer for updating blacklists
     /*curl_handle = multi_uv_setup(loop);
@@ -446,12 +464,13 @@ int main(int argc, char **argv)
 
     update_timer = ids_update_setup_timer(loop, curl_handle, &ip_bl, &dn_bl);
     if (NULL == update_timer) goto done;*/
-
+#ifndef NO_UPDATES
     if (0 != setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
     {
     	printf("Could not setup updates.\n");
     	goto done;
     }
+#endif
 
     printf("setting up event server...\n");
     if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
@@ -465,7 +484,9 @@ int main(int argc, char **argv)
     retval = 0;
 
 done:
+#ifndef NO_UPDATES
 	multi_uv_free(&curl_handle);
+#endif
 	if (loop)
 	{
 		uv_walk(loop, walk_and_close_handle_cb, NULL);
