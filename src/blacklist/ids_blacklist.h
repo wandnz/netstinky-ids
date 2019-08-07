@@ -18,10 +18,14 @@
 #include "ip_blacklist.h"
 #include "urlhaus_domain_blacklist.h"
 
-int
-setup_domain_blacklist(domain_blacklist **bl, char *bl_file);
+/**
+ * Initialize the domain blacklist.
+ */
+int setup_domain_blacklist(domain_blacklist **bl);
 
-int
-setup_ip_blacklist(ip_blacklist **bl, char *bl_file);
+/**
+ * Initialize the IP blacklist.
+ */
+int setup_ip_blacklist(ip_blacklist **bl);
 
 #endif /* SRC_BLACKLIST_IDS_BLACKLIST_H_ */

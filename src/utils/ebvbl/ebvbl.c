@@ -263,6 +263,20 @@ ebvbl_contains(EBVBL *e, void *element)
     return result;
 }
 
+const void *
+ebvbl_lookup(EBVBL *e, void *element)
+{
+	// Check bit vector
+	unsigned int p = e->_fb(element, e->_f);
+	uint8_t bit = _get_bit_at_index(e, p);
+
+	// Only do lookup if bit vector indicates there might be a match
+	if (bit)
+		return sa_lookup_element(e->_sa, element);
+
+	return NULL;
+}
+
 void
 ebvbl_clear(EBVBL *e, freeElement free_item)
 {

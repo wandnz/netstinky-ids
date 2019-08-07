@@ -35,10 +35,12 @@ setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap);
  * checks the IP address blacklist.
  * @param f The relevant fields from a packet capture.
  * @param ip_bl The ip_blacklist structure to check.
- * @return 1 if an IP address or domain name was in the blacklist
+ * @return Address of the value associated with the IOC if the IOC is in the
+ * blacklist.
  */
-int
-ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_blacklist *dn_bl);
+const ids_ioc_value_t *
+ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl,
+		domain_blacklist *dn_bl);
 
 int
 set_filter(pcap_t *pcap, const char *filter, char *err);
