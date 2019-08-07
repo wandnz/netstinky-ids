@@ -13,6 +13,7 @@
 
 #include "common.h"
 #include "linked_list.h"
+#include "blacklist/ids_storedvalues.h"
 
 struct ids_event
 {
@@ -22,6 +23,12 @@ struct ids_event
 	uint32_t src_ip;
 	mac_addr mac;
 	char *ioc;	/* may be a stringify-ed IP address or domain */
+
+	/* A copy of the value associated with the IOC. This is a copy since the
+	 * blacklist may change and the IOC/value pair may be removed but the event
+	 * should still be associated with the same botnet ID. */
+	ids_ioc_value_t ioc_value;
+
 	struct ids_event *next;
 	struct ids_event *previous;
 };
@@ -96,11 +103,13 @@ ids_event_list_enforce_max_events(struct ids_event_list *list);
  * @param src_ip The IP of the device which generated this event.
  * @param ioc A string containing the indicator of compromise (a domain name or
  * a string-ified IP address). May not be NULL.
+ * @param ioc_value The value stored in the blacklist for the particular IOC.
  * @return A pointer to a valid ids_event structure, or NULL if the ids_event
  * could not be created.
  */
 struct ids_event *
-new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac);
+new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac,
+		ids_ioc_value_t ioc_value);
 
 /**
  * Creates a new IDS event list with the given number of maximum events and

@@ -37,14 +37,17 @@ void packet_handler(unsigned char *user_dat,
                     const unsigned char *packet)
 {
     int result;
+
+    // Value retrieved from blacklist
+    ids_ioc_value_t *ioc_value;
+
     struct ids_pcap_fields fields;
     memset(&fields, 0, sizeof(fields));
     result = ids_pcap_read_packet(pcap_hdr, packet, &fields);
     if (result == 1) {
 
-    	// TODO: Do something with the return value (which is the value
-    	// associated with the IOC)
-        if (ids_pcap_is_blacklisted(&fields, ip_bl, dn_bl)) {
+    	// Value will be non-NULL if the domain/IP is blacklisted
+        if (NULL != (ioc_value = ids_pcap_is_blacklisted(&fields, ip_bl, dn_bl))) {
             struct in_addr ip;
             // TODO: A name is required, but has proved difficult to get
             char *iface_name = "placeholder";
@@ -53,7 +56,12 @@ void packet_handler(unsigned char *user_dat,
 
             ip.s_addr = fields.dest_ip;
             ioc_str = fields.domain ? fields.domain : strdup(inet_ntoa(ip));
-            ev = new_ids_event(iface_name, fields.src_ip, ioc_str, fields.src_mac);
+            ev = new_ids_event(
+            		iface_name,
+					fields.src_ip,
+					ioc_str,
+					fields.src_mac,
+					*ioc_value);
 
             if (!ids_event_list_add_event(event_queue, ev)) {
                 DPRINT("packet_handler: ids_event_list_add() failed\n");
