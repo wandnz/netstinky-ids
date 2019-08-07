@@ -67,7 +67,7 @@ error:
 }
 
 int
-domain_blacklist_add(domain_blacklist *b, char *domain)
+domain_blacklist_add(domain_blacklist *b, char *domain, ids_ioc_value_t *value)
 {
 	assert(b);
 	assert(domain);
@@ -82,12 +82,13 @@ domain_blacklist_add(domain_blacklist *b, char *domain)
 
 	len = strlen(reversed);
 	result = hattrie_get(h, reversed, len);
+	*result = (uintptr_t)value;
 	free(reversed);
 
 	return (result ? 1 : 0);
 }
 
-int
+ids_ioc_value_t *
 domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
 {
 	assert(b);
@@ -113,7 +114,7 @@ domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
 
 	free(reversed);
 
-	return (result ? 1 : 0);
+	return (ids_ioc_value_t *)result;
 }
 
 void

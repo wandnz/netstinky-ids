@@ -99,6 +99,15 @@ unsigned int
 ebvbl_get_bv_index(EBVBL *e, void *element);
 
 /**
+ * Returns the address of an element matching the argument. Returns NULL if no
+ * such element exists.
+ * @param e: The EBVBL structure.
+ * @param element: Element containing the key to lookup.
+ */
+const void *
+ebvbl_lookup(EBVBL *e, void *element);
+
+/**
  * Returns true if an element equivalent to the provided ELEMENT is in the
  * data structure.
  * @param e
