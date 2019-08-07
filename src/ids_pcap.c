@@ -39,7 +39,7 @@ void packet_handler(unsigned char *user_dat,
     int result;
 
     // Value retrieved from blacklist
-    ids_ioc_value_t *ioc_value;
+    const ids_ioc_value_t *ioc_value;
 
     struct ids_pcap_fields fields;
     memset(&fields, 0, sizeof(fields));
