@@ -15,7 +15,7 @@
 #include <curl/curl.h>
 
 #include "multi_uv.h"
-#include "../ids_blacklist.h"
+#include "../blacklist/ids_blacklist.h"
 
 /**
  * Setup a repeating uv_timer_t which will start a download of the latest

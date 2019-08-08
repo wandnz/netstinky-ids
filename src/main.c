@@ -13,9 +13,9 @@
 
 #ifndef NO_UPDATES
 #include "blacklist/ids_blacklist.h"
-#include "blacklist/updates/multi_uv.h"
-#include "blacklist/updates/ids_update.h"
-#include "blacklist/updates/ids_tls_update.h"
+#include "updates/multi_uv.h"
+#include "updates/ids_update.h"
+#include "updates/ids_tls_update.h"
 #endif
 #ifndef NO_MDS
 #include "mdns/ids_mdns_avahi.h"

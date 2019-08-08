@@ -11,9 +11,9 @@
 #include <stdlib.h>
 
 #include "uv_tls.h"
-#include "../domain_blacklist.h"
-#include "../ip_blacklist.h"
-#include "../../error/ids_error.h"
+#include "../blacklist/domain_blacklist.h"
+#include "../blacklist/ip_blacklist.h"
+#include "../error/ids_error.h"
 
 typedef enum
 {
