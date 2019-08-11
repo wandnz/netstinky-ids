@@ -17,7 +17,7 @@
 #include "updates/ids_update.h"
 #include "updates/ids_tls_update.h"
 #endif
-#ifndef NO_MDS
+#ifndef NO_MDNS
 #include "mdns/ids_mdns_avahi.h"
 #include "mdns/mdns_libuv_integration.h"
 #endif
