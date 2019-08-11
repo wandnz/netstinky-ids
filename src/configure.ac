@@ -1,9 +1,37 @@
 AC_INIT([nsids], [0.1], [amackint@waikato.ac.nz])
 
+AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE
+
+AC_PROG_LIBTOOL
 AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_MKDIR_P
+AC_LANG(C)
 LT_INIT
-AC_CONFIG_MACRO_DIRS([m4])
+
+AC_HEADER_ASSERT
+AC_HEADER_STDC
+AC_HEADER_STDBOOL
+AC_HEADER_TIME
+
+AC_CHECK_HEADER(arpa/inet.h)
+AC_CHECK_HEADER(errno.h)
+AC_CHECK_HEADER(getopt.h)
+AC_CHECK_HEADER(limits.h)
+AC_CHECK_HEADER(math.h)
+AC_CHECK_HEADER(net/ethernet.h)
+AC_CHECK_HEADER(netinet/in.h)
+AC_CHECK_HEADER(netinet/ip.h)
+AC_CHECK_HEADER(netinet/udp.h)
+AC_CHECK_HEADER(poll.h)
+AC_CHECK_HEADER(signal.h)
+AC_CHECK_HEADER(stddef.h)
+AC_CHECK_HEADER(stdint.h)
+AC_CHECK_HEADER(stdio.h)
+AC_CHECK_HEADER(strings.h)
+AC_CHECK_HEADER(sys/socket.h)
+AC_CHECK_HEADER(unistd.h)
 
 AC_CHECK_HEADER([uv.h], [], [
   AC_MSG_ERROR([required header uv.h not found])
@@ -37,7 +65,7 @@ AC_ARG_ENABLE([updates],
 AS_IF([test "x$enable_debug" != xno],
   [
   AM_CONDITIONAL(ENABLE_DEBUG, true)
-  AC_DEFINE(DEBUG,[],[])
+  AC_DEFINE(DEBUG,[1])
   ], [
   AM_CONDITIONAL(ENABLE_DEBUG, false)
   ]
@@ -50,7 +78,7 @@ AS_IF([test "x$enable_mdns" != xno],
   AM_CONDITIONAL(ENABLE_MDNS, true)
   ], [
   AM_CONDITIONAL(ENABLE_MDNS, false)
-  AC_DEFINE(NO_MDNS,[],[])
+  AC_DEFINE(NO_MDNS,[1])
   ]
 )
 
@@ -61,7 +89,7 @@ AS_IF([test "x$enable_updates" != xno],
   AM_CONDITIONAL(ENABLE_UPDATES, true)
   ], [
   AM_CONDITIONAL(ENABLE_UPDATES, false)
-  AC_DEFINE(NO_UPDATES,[],[])
+  AC_DEFINE(NO_UPDATES,[1])
   ]
 )
 

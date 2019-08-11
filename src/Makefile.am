@@ -1,21 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 AUTOMAKE_OPTIONS = foreign subdir-objects
 
-bootstrap-clean:
-	$(RM) -f Makefile.in aclocal.m4 compile config.* \
-		configure depcomp install-sh ltmain.sh missing \
-		mkinstalldirs stamp-h.in
-	$(RM) -rf autom4te.cache/
-
-
-if ENABLE_MDNS
-MDNS_OPT = mdns
-endif
-
-if ENABLE_UPDATES
-UPDATES_OPT = updates
-endif
-
 bin_PROGRAMS = nsids
 nsids_SOURCES = \
 	blacklist/domain_blacklist.c \
@@ -42,7 +27,7 @@ nsids_SOURCES = \
 	main.c
 
 nsids_CFLAGS = $(AM_CFLAGS)
-nsids_LDFLAGS = -luv -lpcap -lcrypto
+nsids_LDFLAGS = -luv -lpcap
 
 include_HEADERS = \
 	blacklist/domain_blacklist.h \
@@ -85,7 +70,7 @@ endif
 
 if ENABLE_UPDATES
 nsids_CFLAGS += $(UPDATES_CFLAGS)
-nsids_LDFLAGS += $(UPDATES_LIBS)
+nsids_LDFLAGS += -lcrypto $(UPDATES_LIBS)
 nsids_SOURCES += \
   updates/curl_uv_iface.c \
   updates/ids_tls_update.c \
@@ -102,4 +87,10 @@ include_HEADERS += \
   updates/uv_buf_helper.h \
   updates/uv_tls.h
 endif
+
+bootstrap-clean:
+	$(RM) -f Makefile.in aclocal.m4 compile config.* \
+             configure depcomp install-sh libtool ltmain.sh \
+			 missing mkinstalldirs stamp-h.in
+	$(RM) -rf m4/ autom4te.cache/
 
