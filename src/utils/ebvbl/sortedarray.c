@@ -209,6 +209,24 @@ sa_contains_element(SortedArray *sa, void *element)
     return 0 == sa->_cmp(sa_get_element(sa, i), element);
 }
 
+void *
+sa_lookup_element(SortedArray *sa, void *element)
+{
+	void *closest = NULL;
+
+	if (!sa || !element) return NULL;
+
+	// Find closest match
+	unsigned int idx = sa_binary_search(sa, element);
+	closest = sa_get_element(sa, idx);
+
+	// Exact match?
+	if (0 == sa->_cmp(closest, element))
+		return closest;
+
+	return NULL;
+}
+
 size_t
 sa_get_array_size(SortedArray *sa)
 {

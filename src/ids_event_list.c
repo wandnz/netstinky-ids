@@ -245,7 +245,8 @@ ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
  * Will release IOC if cannot make a new event.
  */
 struct ids_event *
-new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac)
+new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac,
+		ids_ioc_value_t ioc_value)
 {
 	assert(iface);
 	assert(ioc);
@@ -264,6 +265,7 @@ new_ids_event(char *iface, uint32_t src_ip, char *ioc, mac_addr mac)
 		e->src_ip = src_ip;
 		e->mac = mac;
 		e->ioc = ioc;
+		e->ioc_value = ioc_value;
 
 		e->next = NULL;
 		e->previous = NULL;

@@ -8,6 +8,7 @@
 #ifndef DOMAIN_BLACKLIST_H_
 #define DOMAIN_BLACKLIST_H_
 
+#include "ids_storedvalues.h"
 #include "../utils/hat/hat-trie.h"
 
 /**
@@ -16,21 +17,30 @@
 typedef hattrie_t domain_blacklist;
 
 /**
- * Add a domain to the blacklist.
+ * Add a domain to the blacklist. The value structure should not be freed until
+ * the key is removed from the blacklist. The address of the structure is
+ * stored in the hat-trie, rather than making a copy.
+ *
+ * Domain names that get stored in the hat-trie get stored in reverse label
+ * order but this is handled by this function. DO NOT reverse domains prior.
+ *
  * @param b The blacklist structure.
  * @param domain The domain to add to the blacklist.
+ * @param value: The value to associate with the domain.
  * @return 1 if successful, 0 if unsuccessful.
  */
 int
-domain_blacklist_add(domain_blacklist *b, char *domain);
+domain_blacklist_add(domain_blacklist *b, char *domain, ids_ioc_value_t *value);
 
 /**
- * Lookup a domain in the blacklist.
+ * Lookup a domain in the blacklist. Will handle reversing the labels of the
+ * domain which is being looked up.
  * @param b The blacklist structure.
  * @param domain The domain to lookup.
- * @return 1 if the domain is blacklisted, 0 if it is not.
+ * @return The address of the value struct if the name is blacklisted, or NULL
+ * if the key is not in the blacklist.
  */
-int
+ids_ioc_value_t *
 domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain);
 
 /**

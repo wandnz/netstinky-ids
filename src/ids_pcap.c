@@ -37,11 +37,17 @@ void packet_handler(unsigned char *user_dat,
                     const unsigned char *packet)
 {
     int result;
+
+    // Value retrieved from blacklist
+    const ids_ioc_value_t *ioc_value;
+
     struct ids_pcap_fields fields;
     memset(&fields, 0, sizeof(fields));
     result = ids_pcap_read_packet(pcap_hdr, packet, &fields);
     if (result == 1) {
-        if (ids_pcap_is_blacklisted(&fields, ip_bl, dn_bl)) {
+
+    	// Value will be non-NULL if the domain/IP is blacklisted
+        if (NULL != (ioc_value = ids_pcap_is_blacklisted(&fields, ip_bl, dn_bl))) {
             struct in_addr ip;
             // TODO: A name is required, but has proved difficult to get
             char *iface_name = "placeholder";
@@ -50,7 +56,12 @@ void packet_handler(unsigned char *user_dat,
 
             ip.s_addr = fields.dest_ip;
             ioc_str = fields.domain ? fields.domain : strdup(inet_ntoa(ip));
-            ev = new_ids_event(iface_name, fields.src_ip, ioc_str, fields.src_mac);
+            ev = new_ids_event(
+            		iface_name,
+					fields.src_ip,
+					ioc_str,
+					fields.src_mac,
+					*ioc_value);
 
             if (!ids_event_list_add_event(event_queue, ev)) {
                 DPRINT("packet_handler: ids_event_list_add() failed\n");
@@ -75,11 +86,11 @@ end:
     }
 }
 
-int
-ids_pcap_lookup_ip(ip_blacklist *b, uint32_t a)
+const ip_key_value_t *
+ids_pcap_lookup_ip(ip_blacklist *b, uint32_t addr, uint16_t port)
 {
 	assert(b);
-	return (ip_blacklist_lookup(b, a));
+	return (ip_blacklist_lookup(b, addr, port));
 }
 
 int
@@ -188,7 +199,7 @@ error:
 	return (-1);
 }
 
-int
+const ids_ioc_value_t *
 ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_blacklist *dn_bl)
 {
 	struct in_addr src_ip_buf, dst_ip_buf;
@@ -205,9 +216,9 @@ ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_b
 	{
 		return (domain_blacklist_is_blacklisted(dn_bl, f->domain));
 	}
-	else return (ip_blacklist_lookup(ip_bl, f->dest_ip));
+	else return (&ip_blacklist_lookup(ip_bl, f->dest_ip, f->dest_port)->value);
 
-	return (0);
+	return (NULL);
 }
 
 int set_filter(pcap_t *pcap, const char *filter, char *err)

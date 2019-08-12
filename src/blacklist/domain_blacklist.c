@@ -67,7 +67,7 @@ error:
 }
 
 int
-domain_blacklist_add(domain_blacklist *b, char *domain)
+domain_blacklist_add(domain_blacklist *b, char *domain, ids_ioc_value_t *value)
 {
 	assert(b);
 	assert(domain);
@@ -82,12 +82,13 @@ domain_blacklist_add(domain_blacklist *b, char *domain)
 
 	len = strlen(reversed);
 	result = hattrie_get(h, reversed, len);
+	*result = (uintptr_t)value;
 	free(reversed);
 
 	return (result ? 1 : 0);
 }
 
-int
+ids_ioc_value_t *
 domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
 {
 	assert(b);
@@ -113,14 +114,25 @@ domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
 
 	free(reversed);
 
-	return (result ? 1 : 0);
+	return (ids_ioc_value_t *)result;
 }
 
 void
 domain_blacklist_clear(domain_blacklist *b)
 {
 	assert(b);
+	bool sorted = false;
+	value_t *stored = NULL;
 	hattrie_t *h = (hattrie_t *)b;
+	hattrie_iter_t *iter = hattrie_iter_begin(h, sorted);
+
+	// Iterate through trie and free all stored values
+	while (!hattrie_iter_finished(iter))
+	{
+		stored = hattrie_iter_val(iter);
+		free_ids_ioc_value((ids_ioc_value_t *)stored);
+		hattrie_iter_next(iter);
+	}
 
 	hattrie_free(h);
 }

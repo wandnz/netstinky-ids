@@ -42,6 +42,9 @@ sa_remove_element(SortedArray *sa, unsigned int index);
 bool
 sa_contains_element(SortedArray *sa, void *element);
 
+void *
+sa_lookup_element(SortedArray *sa, void *element);
+
 unsigned int
 sa_get_number_of_elements(SortedArray *sa);
 

@@ -125,7 +125,7 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
  * performed on the line after this.
  */
 static int
-parse_ip_line(char *line, uint32_t *ip_out, uint32_t *port_out)
+parse_ip_line(char *line, ip_key_value_t *ioc)
 {
 	int rc;
 	char *token = NULL;
@@ -134,7 +134,7 @@ parse_ip_line(char *line, uint32_t *ip_out, uint32_t *port_out)
 	uint32_t port;
 	int quads[4];
 
-	if (!line || !ip_out || !port_out) return -1;
+	if (!line || !ioc) return -1;
 
 	// First token is label (which was already checked)
 	token = strtok(line, delim);
@@ -160,8 +160,11 @@ parse_ip_line(char *line, uint32_t *ip_out, uint32_t *port_out)
 	token = strtok(NULL, delim);
 	if (NULL != token) return -1;
 
-	*ip_out = ip;
-	*port_out = port;
+	ioc->ip_addr = ip;
+	ioc->port = port;
+
+	// TODO: Include botnet ID
+	ioc->value.botnet_id = 0;
 
 	return 0;
 }
@@ -172,9 +175,13 @@ parse_ip_line(char *line, uint32_t *ip_out, uint32_t *port_out)
  *
  * This is a destructive method. Line should not be read after this function
  * has been run. The OUT variable should only be read prior to freeing LINE.
+ *
+ * Also allocates the value to be associated with the domain name. This will
+ * write over whatever value was previously in the VALUE pointer, as it is
+ * assumed that that address has been inserted into the hat-trie.
  */
 static int
-parse_dn_line(char *line, char **out)
+parse_dn_line(char *line, char **out, ids_ioc_value_t **value)
 {
 	char *delim = " ";
 	char *token = NULL;
@@ -196,6 +203,11 @@ parse_dn_line(char *line, char **out)
 	if (token) return -1;
 
 	*out = domain;
+
+	// TODO: Include real botnet value
+	*value = new_ids_ioc_value(0);
+	if (!*value) return -1;
+
 	return 0;
 }
 
@@ -203,25 +215,32 @@ static int
 process_line(char *line, domain_blacklist **dn, ip_blacklist **ip)
 {
 	int rc;
-	uint32_t ip_addr;
-	uint32_t port;
-	char *domain = NULL;;
+	char *domain = NULL;
+
+	// IP value will be copied into blacklist data structure but domain value
+	// must be allocated and an address copied into the data structure.
+	ip_key_value_t ioc;
+	ids_ioc_value_t *domain_value = NULL;
 
 	if (!line || !dn || !ip) return -1;
 
 	if (0 == strncmp(dn_label, line, strlen(dn_label)))
 	{
-		rc = parse_dn_line(line, &domain);
+		rc = parse_dn_line(line, &domain, &domain_value);
 		if (rc < 0) return -1;
-		rc = domain_blacklist_add(*dn, domain);
+		rc = domain_blacklist_add(*dn, domain, domain_value);
 		if (rc < 0) return -1;
 	}
 	else if (0 == strncmp(ip_label, line, strlen(ip_label)))
 	{
-		rc = parse_ip_line(line, &ip_addr, &port);
+		rc = parse_ip_line(line, &ioc);
 		if (rc < 0) return -1;
-		rc = ip_blacklist_add(*ip, ip_addr);
-		if (rc < 0) return -1;
+		rc = ip_blacklist_add(*ip, &ioc);
+		if (rc < 0)
+		{
+			free_ids_ioc_value(domain_value);
+			return -1;
+		}
 	}
 	else
 		return -1;
