@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../blacklist/ids_storedvalues.h"
 #include "ids_tls_update.h"
 #include "uv_buf_helper.h"
 

@@ -4,21 +4,52 @@ This project is a component of the [NetStinky](https://git.cms.waikato.ac.nz/Net
 The NetStinky IDS is intended to be installed in a CPE device and provide
 real-time monitoring of network traffic for Indicators of Compromise (IoCs).
 
-# Building for \*nix
-For testing on a \*nix machine, you can simply run `make` in the source
-directory.
+# Building with Autotools
+This project uses GNU autotools in order to provide a configurable build. In order to generate the Makefile, you will need to have the following tools installed:
+- autoconf
+- automake
+- libtool
+- pkg-config
+
+To generate the `./configure` script on a Unix-like OS, run the following commands inside the `src/` directory:
 
 ```bash
-cd src/
-make
+$ libtoolize
+$ aclocal
+$ autoconf
+$ automake --add-missing
 ```
 
-You will need to ensure that you have the `libpcap` and `libuv` development
+You will only have to do this once, after which you should then be able to do a typical
+```bash
+./configure
+make
+```
+Which will generate the `nsids` binary whenever you need to recompile.
+
+## Minimal build
+For a minimal build, you will need to ensure that you have the `libpcap` and `libuv` development
 headers installed for compilation to succeed. On a Debian/Ubuntu system, run
 
-```bash
+```
 apt-get update
 apt-get -y install libpcap-dev libuv1-dev
+./configure --disable-mdns --disable-updates
+```
+
+## Enabling extra features
+For the mDNS adversisement feature, you will need to have the `avahi` daemon installed and running (which also requires D-Bus)
+```
+apt-get update
+apt-get -y install avahi-daemon libavahi-common-dev \
+    libavahi-client-dev
+```
+
+For live updates on the blacklists, you will need `openssl` and `curl`
+```
+apt-get update
+apt-get -y install libcurl4 libcurl4-openssl-dev \
+                   libssl-dev
 ```
 
 ## Running the tests

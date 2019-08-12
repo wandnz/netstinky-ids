@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "domain_blacklist.h"
+#include "ids_storedvalues.h"
 
 /**
  * At least for the HAT-trie, extra compression can be attained by reversing the labels so that

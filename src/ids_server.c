@@ -198,6 +198,15 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 	}
 }
 
+static void write_sock_shutdown(uv_shutdown_t *req, int status) {
+    if (status < 0) {
+        fprintf(stderr, "Failed to close write socket");
+    }
+    if (req != NULL) {
+        free(req);
+    }
+}
+
 void write_ids_event_list(uv_stream_t *stream)
 {
 	struct ids_event *event_iter;
@@ -206,6 +215,9 @@ void write_ids_event_list(uv_stream_t *stream)
 	{
 		write_ids_event(stream, event_iter);
 	}
+    uv_shutdown_t *req =
+            (uv_shutdown_t *) malloc(sizeof(uv_shutdown_t));
+    uv_shutdown(req, stream, write_sock_shutdown);
 }
 
 void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
