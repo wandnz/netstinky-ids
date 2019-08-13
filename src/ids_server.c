@@ -12,11 +12,11 @@
 #define MAX_CONNS 128
 
 static char *fmt_ioc = "IOC: %s\n";
-static char *fmt_timestamp = "Last seen: %11d\n";
-static char *fmt_event_count = "Number of times seen: %d\n";
+static char *fmt_timestamp = "Timestamp: %11d\n";
+static char *fmt_event_count = "Occurrences: %d\n";
 static char *fmt_iface = "Interface: %s\n";
-static char *fmt_src_ip = "Source IP: %s\n";
-static char *fmt_src_mac = "Source MAC: %02x:%02x:%02x:%02x:%02x:%02x\n\n";
+static char *fmt_src_ip = "Src-IP: %s\n";
+static char *fmt_src_mac = "Src-MAC: %02X:%02X:%02X:%02X:%02X:%02X\n\n";
 
 /**
  * A datatype to store the location of buffers used by uv_write. This should be
