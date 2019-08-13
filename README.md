@@ -45,11 +45,10 @@ apt-get -y install avahi-daemon libavahi-common-dev \
     libavahi-client-dev
 ```
 
-For live updates on the blacklists, you will need `openssl` and `curl`
+For live updates on the blacklists, you will need `openssl`
 ```
 apt-get update
-apt-get -y install libcurl4 libcurl4-openssl-dev \
-                   libssl-dev
+apt-get -y install libssl-dev
 ```
 
 ## Running the tests

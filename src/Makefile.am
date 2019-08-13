@@ -30,7 +30,9 @@ nsids_SOURCES = \
 nsids_CFLAGS = $(AM_CFLAGS)
 nsids_LDFLAGS = -luv -lpcap
 
-include_HEADERS = \
+nsids_SOURCES += \
+	common.h \
+	dns.h \
 	blacklist/domain_blacklist.h \
 	blacklist/firehol_ip_blacklist.h \
 	blacklist/ids_blacklist.h \
@@ -52,8 +54,6 @@ include_HEADERS = \
 	utils/hat/murmurhash3.h \
 	utils/hat/portable_endian.h \
 	utils/hat/pstdint.h \
-	common.h \
-	dns.h \
 	ids_event_list.h \
 	ids_pcap.h \
 	ids_server.h \
@@ -64,8 +64,7 @@ nsids_CFLAGS += $(AVAHI_CFLAGS)
 nsids_LDFLAGS += $(AVAHI_LIBS)
 nsids_SOURCES += \
   mdns/ids_mdns_avahi.c \
-  mdns/mdns_libuv_integration.c
-include_HEADERS += \
+  mdns/mdns_libuv_integration.c \
   mdns/ids_mdns_avahi.h \
   mdns/mdns_libuv_integration.h
 endif
@@ -77,8 +76,7 @@ nsids_SOURCES += \
   updates/ids_tls_update.c \
   updates/protocol.c \
   updates/uv_buf_helper.c \
-  updates/uv_tls.c
-include_HEADERS += \
+  updates/uv_tls.c \
   updates/ids_tls_update.h \
   updates/uv_buf_helper.h \
   updates/uv_tls.h

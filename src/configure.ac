@@ -85,7 +85,7 @@ AS_IF([test "x$enable_mdns" != xno],
 # Act on enable-updates option
 AS_IF([test "x$enable_updates" != xno],
   [
-  PKG_CHECK_MODULES([UPDATES], [libcurl >= 4 libssl libcrypto])
+  PKG_CHECK_MODULES([UPDATES], [libssl libcrypto])
   AM_CONDITIONAL(ENABLE_UPDATES, true)
   ], [
   AM_CONDITIONAL(ENABLE_UPDATES, false)
