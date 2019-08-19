@@ -18,14 +18,7 @@
 #ifndef SRC_URLHAUS_DOMAIN_BLACKLIST_H_
 #define SRC_URLHAUS_DOMAIN_BLACKLIST_H_
 
-/**
- * Get the next domain from a urlhaus file. If no more domains could be found, returns NULL.
- *
- * The returned string must be freed.
- *
- * @param fp: File pointer to the urlhaus file.
- */
-char *
-urlhaus_get_next_domain(FILE *fp);
+int
+import_urlhaus_blacklist_file(char *path, domain_blacklist *bl);
 
 #endif /* SRC_URLHAUS_DOMAIN_BLACKLIST_H_ */

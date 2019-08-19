@@ -11,7 +11,17 @@
 
 #include <errno.h>
 
+#include "domain_blacklist.h"
 #include "urlhaus_domain_blacklist.h"
+#include "ids_storedvalues.h"
+
+struct urlhaus_cb_data_s
+{
+	domain_blacklist *blacklist;
+	int n_entries;	// Count of number entries added
+};
+
+typedef struct urlhaus_cb_data_s urlhaus_cb_data_t;
 
 /**
  * Return 1 if the line is a comment. Assumes that the '#' character is the first character in the
@@ -26,20 +36,18 @@ int urlhaus_is_comment(char *line)
 	return 0;
 }
 
-/**
- * Change the contents of the LINE buffer to be the domain name only. Does not resize the buffer.
- */
-int
-urlhaus_process_line(char **line, size_t *line_sz)
+void
+handle_urlhaus_line(char *line, void *user_data)
 {
-	assert(line);
-	assert(*line);
-	assert(line_sz);
-	assert(*line_sz);
+	int rc;
+	urlhaus_cb_data_t *data = (urlhaus_cb_data_t *)user_data;
+	ids_ioc_value_t *value = NULL;
 
-	if (urlhaus_is_comment(*line)) return 0;
+	if (!line) return;
 
-	char *domain_name_pos = *line + strlen("http://");
+	if (urlhaus_is_comment(line)) return;
+
+	char *domain_name_pos = line + strlen("http://");
 	if ('/' == *domain_name_pos) domain_name_pos++;	// Append extra in case prefix was 'https://'
 
 	// Find first '/' character
@@ -55,49 +63,43 @@ urlhaus_process_line(char **line, size_t *line_sz)
 	// May overlap, so can't use strcpy or memmove.
 	size_t domain_name_len = strlen(domain_name_pos);
 	for (size_t it = 0; it <= domain_name_len; it++)
-		(*line)[it] = domain_name_pos[it];
+		line[it] = domain_name_pos[it];
 
-	return 1;
+	value = malloc(sizeof(*value));
+	if (!value) return;
+	value->botnet_id = 0;
+
+	rc = domain_blacklist_add(data->blacklist, line, value);
+	if (!rc)
+	{
+		free(value);
+		return;
+	}
+
+	data->n_entries++;
 }
 
 /**
- * Return a pointer to a string which contains the next domain in a urlhaus file. Will return a
- * NULL pointer if the EOF is reached or an error occurs.
- *
- * @param fp: The current file pointer.
- * @return A pointer to a dynamically allocated string containing the domain name, or NULL if no
- * more domains could be found.
+ * Bridge between getline and handle_urlhaus_line since if a line contains a NULL
+ * character we don't want to bother reading past it.
  */
-char *
-urlhaus_get_next_domain(FILE *fp)
+void
+getline_urlhaus_cb(char *line, size_t line_sz, void *user_data)
 {
-	assert(fp);
+	handle_urlhaus_line(line, user_data);
+}
 
-	char *line = NULL;
-	char *retval = NULL;
-	size_t line_sz = 0;
+int
+import_urlhaus_blacklist_file(char *path, domain_blacklist *bl)
+{
+	int n_lines;
+	urlhaus_cb_data_t usr_data = {.blacklist = bl, .n_entries = 0};
+	FILE *fp = fopen(path, "r");
 
-	// Process lines until EOF/error or a valid domain is found
-	while (-1 != getline(&line, &line_sz, fp))
-	{
-		if (urlhaus_process_line(&line, &line_sz))
-		{
-			retval = strdup(line);
-			break;
-		}
-	}
+	if (!fp) return -errno;
 
-	// Check if error occurred, or EOF
-	if (NULL == retval)
-	{
-		int problem = errno;
-		if (problem == 0 || problem == EINVAL || problem == ENOMEM)
-		{
-			if (errno != 0)
-				perror("urlhaus_get_next_domain");
-		}
-	}
+	n_lines = file_do_for_each_line(fp, getline_urlhaus_cb, &usr_data);
+	if (n_lines < 0) return n_lines;
 
-	free(line);
-	return retval;
+	return usr_data.n_entries;
 }

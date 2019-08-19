@@ -11,8 +11,10 @@
 #include <unistd.h>
 #include <uv.h>
 
-#ifndef NO_UPDATES
 #include "blacklist/ids_blacklist.h"
+#include "blacklist/feodo_ip_blacklist.h"
+
+#ifndef NO_UPDATES
 #include "updates/ids_tls_update.h"
 #endif
 #ifndef NO_MDNS
@@ -373,6 +375,7 @@ static void read_stdin(uv_stream_t *stream, ssize_t nread,
 
 int main(int argc, char **argv)
 {
+	int n_ip_entries = 0, n_dn_entries = 0;
 	struct IdsArgs args;
     int retval = -1;
     const char *filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0\
@@ -406,11 +409,23 @@ int main(int argc, char **argv)
         DPRINT("setup_ip_blacklist() failed\n");
         exit(EXIT_FAILURE);
     }
+    if (args.ip_filename && 0 > (n_ip_entries = import_feodo_blacklist(args.ip_filename, ip_bl)))
+    {
+    	fprintf(stderr, "Could not import Feodo blacklist from %s\n", args.ip_filename);
+    	exit(EXIT_FAILURE);
+    }
+    fprintf(stdout, "Imported %d IP blacklist entries\n", n_ip_entries);
 
     if (!setup_domain_blacklist(&dn_bl)) {
     	DPRINT("setup_domain_blacklist() failed\n");
     	exit(EXIT_FAILURE);
     }
+    if (args.domain_filename && 0 > (n_dn_entries = import_urlhaus_blacklist_file(args.domain_filename, dn_bl)))
+    {
+    	fprintf(stderr, "Could not import domain blacklist from %s\n", args.domain_filename);
+    	exit(EXIT_FAILURE);
+    }
+    fprintf(stdout, "Imported %d domain blacklist entries\n", n_dn_entries);
 
     if ((retval = configure_pcap(&pcap, filter, args.iface, err) != 0)
     		&& !IGNORE_PCAP_ERRORS) goto done;
@@ -436,13 +451,6 @@ int main(int argc, char **argv)
     if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
     		|| !mdns_check_start(&mdns_handle)) goto done;
 #endif
-
-    // Setup libcurl and timer for updating blacklists
-    /*curl_handle = multi_uv_setup(loop);
-    if (NULL == curl_handle) goto done;
-
-    update_timer = ids_update_setup_timer(loop, curl_handle, &ip_bl, &dn_bl);
-    if (NULL == update_timer) goto done;*/
 #ifndef NO_UPDATES
     if (0 != setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
     {

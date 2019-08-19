@@ -4,7 +4,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 bin_PROGRAMS = nsids
 nsids_SOURCES = \
 	blacklist/domain_blacklist.c \
-	blacklist/firehol_ip_blacklist.c \
+	blacklist/feodo_ip_blacklist.c \
 	blacklist/ids_blacklist.c \
 	blacklist/ids_blacklist_update.c \
 	blacklist/ip_blacklist.c \
@@ -20,6 +20,7 @@ nsids_SOURCES = \
 	utils/hat/hat-trie.c \
 	utils/hat/misc.c \
 	utils/hat/murmurhash3.c \
+	utils/file_processing.c \
 	dns.c \
 	ids_event_list.c \
 	ids_pcap.c \
@@ -34,7 +35,7 @@ nsids_SOURCES += \
 	common.h \
 	dns.h \
 	blacklist/domain_blacklist.h \
-	blacklist/firehol_ip_blacklist.h \
+	blacklist/feodo_ip_blacklist.h \
 	blacklist/ids_blacklist.h \
 	blacklist/ids_blacklist_update.h \
 	blacklist/ip_blacklist.h \
@@ -54,6 +55,7 @@ nsids_SOURCES += \
 	utils/hat/murmurhash3.h \
 	utils/hat/portable_endian.h \
 	utils/hat/pstdint.h \
+	utils/file_processing.h \
 	ids_event_list.h \
 	ids_pcap.h \
 	ids_server.h \

@@ -11,7 +11,6 @@
 #include <stdint.h>
 
 #include "ids_storedvalues.h"
-#include "firehol_ip_blacklist.h"
 
 /* Do not want other modules to depend on ebvbl */
 typedef struct ebvbl ip_blacklist;
