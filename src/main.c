@@ -457,13 +457,13 @@ int main(int argc, char **argv)
     	printf("Could not setup updates.\n");
     	goto done;
     }
-#endif
 
     if (0 != setup_timer(&update_timer, loop, &ids_update_ctx))
     {
     	printf("Could not setup update timer.\n");
     	goto done;
     }
+#endif
 
     printf("setting up event server...\n");
     if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;

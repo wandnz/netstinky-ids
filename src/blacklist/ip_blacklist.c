@@ -4,7 +4,7 @@
 
 #include "ip_blacklist.h"
 
-#include "firehol_ip_blacklist.h"
+/* #include "firehol_ip_blacklist.h" */
 #include "../utils/ebvbl/ebvbl.h"
 
 int ip_blacklist_cmp(void *a, void *b)

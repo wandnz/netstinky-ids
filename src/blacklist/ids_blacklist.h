@@ -14,7 +14,7 @@
 
 #include "../utils/common.h"
 #include "domain_blacklist.h"
-#include "firehol_ip_blacklist.h"
+/* #include "firehol_ip_blacklist.h" */
 #include "ip_blacklist.h"
 #include "urlhaus_domain_blacklist.h"
 
