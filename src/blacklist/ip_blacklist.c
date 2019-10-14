@@ -97,8 +97,10 @@ ip_blacklist_lookup(ip_blacklist *b, uint32_t addr, uint16_t port)
 	ip_key_value_t key;	// Only key fields will be filled
 
 	// Should be safe to ignore (not even zero) non-key fields
-	key.ip_addr = addr;
-	key.port = port;
+	// Make sure address and port are in host byte-order as that is what
+	// the EBVBL is expecting
+	key.ip_addr = ntohl(addr);
+	key.port = ntohs(port);
 
 	return (const ip_key_value_t *)ebvbl_lookup((EBVBL *)b, &key);
 }
