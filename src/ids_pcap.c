@@ -216,9 +216,19 @@ ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_b
 	{
 		return (domain_blacklist_is_blacklisted(dn_bl, f->domain));
 	}
-	else return (&ip_blacklist_lookup(ip_bl, f->dest_ip, f->dest_port)->value);
+	else
+    {
+        const ip_key_value_t *ip_value =
+            ip_blacklist_lookup(ip_bl, f->dest_ip, f->dest_port);
 
-	return (NULL);
+        if (ip_value) {
+            return &(ip_value->value);
+        }
+        else
+        {
+            return NULL;
+        }
+    }
 }
 
 int set_filter(pcap_t *pcap, const char *filter, char *err)
