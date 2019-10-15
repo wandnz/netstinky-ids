@@ -189,6 +189,9 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 		return;
 	}
 
+	// Attach write data to write request to ensure it gets freed later
+	ioc_req->data = (void *) write_req_data;
+
 	if (0 > (ret = uv_write(ioc_req, stream, &ioc_buf, 1, ids_server_write_cb)))
 	{
 		fprintf(stderr, "write_ids_event: write error occurred\n");
@@ -243,16 +246,18 @@ void ids_server_write_cb(uv_write_t *req, int status)
 	usr_data = req->data;
 	free(req);
 
-	if (usr_data->bufs)
-	{
-		for (buf_idx = 0; buf_idx < usr_data->nbufs; buf_idx++)
+	if (usr_data) {
+		if (usr_data->bufs)
 		{
-			if (usr_data->bufs[buf_idx].base)
-				free(usr_data->bufs[buf_idx].base);
+			for (buf_idx = 0; buf_idx < usr_data->nbufs; buf_idx++)
+			{
+				if (usr_data->bufs[buf_idx].base)
+					free(usr_data->bufs[buf_idx].base);
+			}
 		}
-	}
 
-	free_usr_data(usr_data);
+		free_usr_data(usr_data);
+	}
 }
 
 static void ids_server_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
