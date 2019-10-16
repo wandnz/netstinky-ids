@@ -71,7 +71,7 @@ static uv_check_t mdns_handle;
 #endif
 static uv_pipe_t stdin_pipe;
 static uv_poll_t pcap_handle;
-static uv_signal_t sigterm_handle, sigint_handle, sigpipe_handle;
+static uv_signal_t sigterm_handle, sigint_handle;
 
 // Handle for event server which transmits recently detected events
 static uv_tcp_t server_handle;
@@ -356,23 +356,6 @@ bool setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
 	return true;
 }
 
-bool setup_sigpipe_handling(uv_loop_t *loop, uv_signal_t *handle)
-{
-    assert(loop);
-    assert(handle);
-    if (0 > uv_signal_init(loop, handle))
-    {
-        fprintf(stderr, "Could not initialize signal handle\n");
-        return false;
-    }
-    if (0 > uv_signal_start(handle, signal_cb, SIGPIPE))
-    {
-        fprintf(stderr, "Could not start signal handling\n");
-        return false;
-    }
-    return true;
-}
-
 static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
              uv_buf_t *buf)
 {
@@ -394,6 +377,20 @@ static void read_stdin(uv_stream_t *stream, ssize_t nread,
 
     if (buf->base)
         free(buf->base);
+}
+
+static bool setup_sigpipe(void)
+{
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sa.sa_flags = 0;
+    if (sigaction(SIGPIPE, &sa, 0) == -1)
+    {
+        perror("sigaction");
+        return false;
+    } else {
+        return true;
+    }
 }
 
 int main(int argc, char **argv)
@@ -465,7 +462,7 @@ int main(int argc, char **argv)
     if (!setup_stdin_pipe(loop)) goto done;
     if (!setup_sigterm_handling(loop, &sigterm_handle)) goto done;
     if (!setup_sigint_handling(loop, &sigint_handle)) goto done;
-    if (!setup_sigpipe_handling(loop, &sigpipe_handle)) goto done;
+    if (!setup_sigpipe()) goto done;
     printf("setup sigterm\n");
 
     if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
