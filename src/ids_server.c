@@ -251,8 +251,9 @@ void ids_server_write_cb(uv_write_t *req, int status)
 		{
 			for (buf_idx = 0; buf_idx < usr_data->nbufs; buf_idx++)
 			{
-				if (usr_data->bufs[buf_idx].base)
-					free(usr_data->bufs[buf_idx].base);
+				void *buf_base = usr_data->bufs[buf_idx].base;
+				if (buf_base)
+					free(buf_base);
 			}
 		}
 
