@@ -312,6 +312,7 @@ import_feodo_blacklist(char *path, ip_blacklist *bl)
 	if (!fp) return -errno;
 
 	n_lines = file_do_for_each_line(fp, getline_feodo_cb, &usr_data);
+	fclose(fp);
 	if (n_lines < 0) return n_lines;
 
 	return usr_data.n_entries;
