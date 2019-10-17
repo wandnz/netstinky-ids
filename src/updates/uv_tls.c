@@ -355,6 +355,7 @@ tls_stream_decrypt_data(tls_stream_t *stream, uv_buf_t *decrypted)
 	{
 		decrypted->len = 0;
 		free(decrypted->base);
+		decrypted->base = NULL;
 	}
 	else decrypted->len = nread;
 
@@ -382,6 +383,7 @@ tls_stream_decrypt_buffer(uv_buf_t *decrypted, tls_stream_t *stream, ssize_t nre
 	decrypted->base = NULL;
 	decrypted->len = 0;
 	temp_buf.base = NULL;
+	temp_buf.len = 0;
 
 	while (total_written < nread)
 	{
