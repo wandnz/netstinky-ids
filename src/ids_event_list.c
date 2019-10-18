@@ -131,6 +131,8 @@ ids_event_list_add_event(struct ids_event_list *list, struct ids_event *e)
 				/* Most of the ids_event is no longer needed, but don't free
 				 * the time */
 
+				// Free IOC string since it's a duplicate
+				free(e->ioc);
 				free(e);
 				result = 1;
 			}
