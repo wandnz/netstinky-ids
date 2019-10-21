@@ -70,9 +70,9 @@ handle_urlhaus_line(char *line, void *user_data)
 	value->botnet_id = 0;
 
 	rc = domain_blacklist_add(data->blacklist, line, value);
+	free(value);
 	if (!rc)
 	{
-		free(value);
 		return;
 	}
 
@@ -99,6 +99,7 @@ import_urlhaus_blacklist_file(char *path, domain_blacklist *bl)
 	if (!fp) return -errno;
 
 	n_lines = file_do_for_each_line(fp, getline_urlhaus_cb, &usr_data);
+	fclose(fp);
 	if (n_lines < 0) return n_lines;
 
 	return usr_data.n_entries;

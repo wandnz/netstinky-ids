@@ -20,6 +20,9 @@ static const char *COMMENT_CHAR = "#";
 static const char *FIRST_SEEN_DATETIME_FMT = "%Y-%m-%d %H:%M:%S";
 static const char *LAST_ONLINE_DATE_FMT = "%Y-%m-%d";
 
+#define TM_MON_APRIL 3
+#define TM_MON_SEPTEMBER 8
+
 /**
  * Fields of a Feodo blacklist file.
  */
@@ -90,6 +93,10 @@ parse_first_seen_datetime(char *field, time_t *result)
 	// Parse the datetime string and convert into time_t
 	str_rc = strptime(field, FIRST_SEEN_DATETIME_FMT, &first_seen);
 	if (!str_rc) return -1;
+
+	// According to manpage for mktime, tm_isdst must be set explicitly
+	// prior to calling mktime. UTC never uses DST.
+	first_seen.tm_isdst = 0;
 	temp = mktime(&first_seen);
 	if (temp == (time_t)-1) return -1;
 	*result = temp;
@@ -305,6 +312,7 @@ import_feodo_blacklist(char *path, ip_blacklist *bl)
 	if (!fp) return -errno;
 
 	n_lines = file_do_for_each_line(fp, getline_feodo_cb, &usr_data);
+	fclose(fp);
 	if (n_lines < 0) return n_lines;
 
 	return usr_data.n_entries;
