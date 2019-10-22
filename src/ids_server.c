@@ -12,7 +12,7 @@
 #define MAX_CONNS 128
 
 static char *fmt_ioc = "IOC: %s\n";
-static char *fmt_timestamp = "Timestamp: %11d\n";
+static char *fmt_timestamp = "Timestamp: %11lu\n";
 static char *fmt_event_count = "Occurrences: %d\n";
 static char *fmt_iface = "Interface: %s\n";
 static char *fmt_src_ip = "Src-IP: %s\n";
@@ -148,7 +148,7 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 	buf_idx += ret;
 
 	ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_timestamp,
-			(long long)event->times_seen->tm_stamp.tv_sec);
+			(long) event->times_seen->tm_stamp.tv_sec);
 	assert(ret < buf_sz - buf_idx);
 	buf_idx += ret;
 
