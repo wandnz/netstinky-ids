@@ -25,9 +25,9 @@ struct ids_pcap_fields
 };
 
 int
-configure_pcap(pcap_t **pcap, const char *filter, const char *dev, char *err);
+configure_pcap(pcap_t **pcap, const char *filter, const char *dev);
 
-bool
+int
 setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap);
 
 /**

@@ -21,14 +21,14 @@
  * @param check An uninitialized uv_check_t handle.
  * @returns True if successful.
  */
-bool mdns_check_setup(uv_loop_t *loop, uv_check_t *check, AvahiSimplePoll *poll);
+int mdns_setup_event_handle(uv_loop_t *loop, uv_check_t *check, AvahiSimplePoll *poll);
 
 /**
  * Start calling the MDNS functions within the event loop.
  * @param check An initialized uv_check_t structure.
  * @returns True if successful.
  */
-bool mdns_check_start(uv_check_t *check);
+int mdns_check_start(uv_check_t *check);
 
 /**
  * Stop running the MDNS functions within the event loop.

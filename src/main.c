@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <uv.h>
 
+#include "error/ids_error.h"
 #include "blacklist/ids_blacklist.h"
 #include "blacklist/feodo_ip_blacklist.h"
 
@@ -53,6 +54,7 @@ struct IdsArgs
 	char *fuzz_filename;
 	char *iface;
 	int server_port;
+	int help_flag;
 };
 
 // Variables that MUST be global so exit callback can free them
@@ -148,6 +150,32 @@ static void free_globals(void) {
 #endif
 }
 
+/**
+ * Print command line help text.
+ * @param prog_name Name of program from command line. Must not be NULL.
+ */
+void
+print_usage(char *prog_name)
+{
+	assert(prog_name);
+	printf("Usage:\n");
+	printf("\t%s [-h | --help]\n", prog_name);
+	printf("\t%s -p <server_port> -i <interface> ", prog_name);
+	printf("[--ipbl <blacklist>] [--dnbl <blacklist]\n");
+	printf("Options:\n");
+	printf("\t[-h | --help]:\tPrint this usage message\n");
+	printf("\t-i <interface>: The name of the interface to capture traffic from.\n");
+	printf("\t-p <server_port>:\tThe port that will be advertised via MDNS ");
+	printf("(if enabled) and will accept connections from mobile devices.\n");
+	printf("\t[--ipbl <blacklist]:\tPath to a blacklist file containing IP ");
+	printf("addresses to load into the blacklist immediately.\n");
+	printf("\t[--dnbl <blacklist]:\tPath to a blacklist file containing ");
+	printf("domain names to load into the blacklist immediately.\n");
+}
+
+/**
+ * Parse command line arguments.
+ */
 int parse_args(struct IdsArgs *args, int argc, char **argv)
 {
 	char *getopt_args = "hp:i:";
@@ -155,6 +183,7 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
 	    {"ipbl", 1, 0, 0},
 		{"dnbl", 1, 0, 0},
 		{"fuzz", 1, 0, 0},
+		{"help", 0, &args->help_flag, 1},
 		{0, 0, 0, 0}
 	};
 	const static char *getopt_usage =
@@ -163,7 +192,6 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
     char *program = NULL;
     int option_char;
     int iface_num = 0;
-    int success = 1;
     int option_index = 0;
 
     memset(args, 0, sizeof(*args));
@@ -179,69 +207,43 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
             // Is a long option
         	if (0 == option_index)
         	{
-				if (!optarg) {
-					fprintf(stderr, "Did not receive an option for %s\n",
-							long_options[option_index].name);
-				} else {
-					fprintf(stderr, "Argument --ipbl (IP blacklist file): %s\n",
-							optarg);
-					args->ip_filename = optarg;
-				}
+        		if (optarg) args->ip_filename = optarg;
+        		else return NSIDS_CMDLN;
         	}
         	else if (1 == option_index)
         	{
-        		if (!optarg) {
-        			fprintf(stderr, "Did not receive an option for %s\n",
-        					long_options[option_index].name);
-        		} else {
-        			fprintf(stderr, "Argument --dnbl (domain blacklist file): %s\n",
-        					optarg);
-        			args->domain_filename = optarg;
-        		}
+        		if (optarg) args->domain_filename = optarg;
+        		else return NSIDS_CMDLN;
         	}
         	else if (2 == option_index)
         	{
-        		if (!optarg) {
-        			fprintf(stderr, "Did not receive an option for %s\n",
-        					long_options[option_index].name);
-        		} else {
-        			fprintf(stderr, "Argument --fuzz (fuzz packet file): %s\n",
-        					optarg);
-        			args->fuzz_filename = optarg;
-        		}
+        		if (optarg) args->fuzz_filename = optarg;
+        		else return NSIDS_CMDLN;
         	}
         	break;
         case 'h':
-            fprintf(stderr, getopt_usage, program);
-            return 1;
+        	// Help flag takes priority over all other flags so return as soon
+        	// as it is found
+            args->help_flag = 1;
+            return NSIDS_OK;
         case 'i':
-            // -i requires an argument
-            if (!optarg) {
-                fprintf(stderr, "-i requires an argument\n");
-                success = 0;
+        	// Must have an argument
+            if (optarg)
+            {
+            	// There should only be one interface
+            	if (args->iface) return NSIDS_CMDLN;
+            	args->iface = optarg;
             }
-
-            iface_num++;
-            args->iface = optarg;
-
-            fprintf(stderr, "Argument -i (interface): %s\n", optarg);
+            else return NSIDS_CMDLN;
             break;
         case 'p':
-            // -p requires an argument
-            if (!optarg) {
-                fprintf(stderr, "-p requires an argument\n");
-                success = 0;
-            }
-
-            // -p must be given a port number > 0
-            args->server_port = atoi(optarg);
-            if (args->server_port <= 0) {
-                fprintf(stderr, "-p was given an invalid argument: %s\n",
-                        optarg);
-                success = 0;
-            }
-
-            fprintf(stderr, "Argument -p (port number): %d\n", args->server_port);
+        	if (optarg) {
+        		// Should only receive this option once
+        		if (args->server_port) return NSIDS_CMDLN;
+        		args->server_port = atoi(optarg);
+        		if (args->server_port <= 0) return NSIDS_CMDLN;
+        	}
+        	else return NSIDS_CMDLN;
             break;
         case '?':
             // options which require an argument
@@ -254,47 +256,67 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
             else
                 fprintf(stderr, "Unknown option received: -0x%x\n", optopt);
 
-            success = 0;
+            return NSIDS_CMDLN;
             break;
         }
     }
 
-    if (iface_num <= 0 || iface_num > 1) {
-    	fprintf(stderr, "Received %d -i arguments. Require exactly 1.\n",
-    			iface_num);
-        success = 0;
-    }
-
     // Check every required option has been received
-    if (args->server_port <= 0) {
-        fprintf(stderr, "Required argument -p not received\n");
-        success = 0;
-    }
+    if (!args->help_flag && (args->server_port <= 0 || !args->iface))
+    	return NSIDS_CMDLN;
 
-    return success;
+    return NSIDS_OK;
 }
 
-static bool setup_stdin_pipe(uv_loop_t *loop)
+static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
+             uv_buf_t *buf)
+{
+    *buf = uv_buf_init((char *) malloc(suggested_size), (uint) suggested_size);
+}
+
+static void read_stdin(uv_stream_t *stream, ssize_t nread,
+               const uv_buf_t *buf)
+{
+    if (nread < 0) {
+        if (nread == UV_EOF) {
+        uv_read_stop((uv_stream_t *) &stdin_pipe);
+            uv_stop(loop);
+        }
+    } else {
+        // Keep reading
+        uv_read_start(stream, alloc_buffer, read_stdin);
+    }
+
+    if (buf->base)
+        free(buf->base);
+}
+
+static int setup_stdin_pipe(uv_loop_t *loop)
 {
 	assert(loop);
     int ipc = 0;
     uv_file stdin_fd = 0;
+    int uv_rc;
 
-    if (0 > uv_pipe_init(loop, &stdin_pipe, ipc))
+    if (0 > (uv_rc = uv_pipe_init(loop, &stdin_pipe, ipc)))
     {
-    	DPRINT("pipe could not be initialized\n");
-    	return false;
+    	fprintf(stderr, "Could not open stdin pipe: %s\n", uv_strerror(uv_rc));
+    	return NSIDS_UV;
     }
 
-    if (0 > uv_pipe_open(&stdin_pipe, stdin_fd))
+    if (0 > (uv_rc = uv_pipe_open(&stdin_pipe, stdin_fd)))
     {
-    	DPRINT("pipe could not be opened\n");
-    	return false;
+    	fprintf(stderr, "Could not open stdin pipe: %s\n", uv_strerror(uv_rc));
+    	return NSIDS_UV;
     }
 
-    printf("initialized stdin\n");
+    if (0 > (uv_rc = uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)))
+    {
+    	fprintf(stderr, "Could not open stdin pipe: %s\n", uv_strerror(uv_rc));
+    	return NSIDS_UV;
+    }
 
-    return true;
+    return NSIDS_OK;
 }
 
 /**
@@ -321,65 +343,50 @@ closed socket\n");
  * The signal handler must be a variable from the main loop or a global, otherwise it will lose
  * its memory allocation after this function has completed.
  */
-bool setup_sigterm_handling(uv_loop_t *loop, uv_signal_t *handle)
+int setup_sigterm_handling(uv_loop_t *loop, uv_signal_t *handle)
 {
 	assert(loop);
 	assert(handle);
 
-	if (0 > uv_signal_init(loop, handle))
+	int uv_rc;
+
+	if (0 > (uv_rc = uv_signal_init(loop, handle)))
 	{
-		fprintf(stderr, "Could not initialize signal handle\n");
-		return false;
+		fprintf(stderr, "Could not initialize SIGTERM handle: %s\n",
+				uv_strerror(uv_rc));
+		return NSIDS_UV;
 	}
-	if (0 > uv_signal_start(handle, signal_cb, SIGTERM))
+	if (0 > (uv_rc = uv_signal_start(handle, signal_cb, SIGTERM)))
 	{
-		fprintf(stderr, "Could not start signal handling\n");
-		return false;
+		fprintf(stderr, "Could not initialize SIGTERM handle: %s\n",
+				uv_strerror(uv_rc));
+		return NSIDS_UV;
 	}
-	return true;
+	return NSIDS_OK;
 }
 
-bool setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
+int setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
 {
 	assert(loop);
 	assert(handle);
-	if (0 > uv_signal_init(loop, handle))
+	int uv_rc;
+
+	if (0 > (uv_rc = uv_signal_init(loop, handle)))
 	{
-		fprintf(stderr, "Could not initialize signal handle\n");
-		return false;
+		fprintf(stderr, "Could not initialize SIGINT handle: %s\n",
+				uv_strerror(uv_rc));
+		return NSIDS_UV;
 	}
-	if (0 > uv_signal_start(handle, signal_cb, SIGINT))
+	if (0 > (uv_rc = uv_signal_start(handle, signal_cb, SIGINT)))
 	{
-		fprintf(stderr, "Could not start signal handling\n");
-		return false;
+		fprintf(stderr, "Could not initialize SIGINT handle: %s\n",
+				uv_strerror(uv_rc));
+		return NSIDS_UV;
 	}
-	return true;
+	return NSIDS_OK;
 }
 
-static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
-             uv_buf_t *buf)
-{
-    *buf = uv_buf_init((char *) malloc(suggested_size), (uint) suggested_size);
-}
-
-static void read_stdin(uv_stream_t *stream, ssize_t nread,
-               const uv_buf_t *buf)
-{
-    if (nread < 0) {
-        if (nread == UV_EOF) {
-        uv_read_stop((uv_stream_t *) &stdin_pipe);
-            uv_stop(loop);
-        }
-    } else {
-        // Keep reading
-        uv_read_start(stream, alloc_buffer, read_stdin);
-    }
-
-    if (buf->base)
-        free(buf->base);
-}
-
-static bool setup_sigpipe(void)
+static int setup_sigpipe(void)
 {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -388,9 +395,9 @@ static bool setup_sigpipe(void)
     if (sigaction(SIGPIPE, &sa, 0) == -1)
     {
         perror("sigaction");
-        return false;
+        return NSIDS_SIG;
     } else {
-        return true;
+        return NSIDS_OK;
     }
 }
 
@@ -401,16 +408,24 @@ int main(int argc, char **argv)
     int retval = -1;
     const char *filter = "(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0\
  and tcp[tcpflags] & tcp-ack == 0)";
-    char err[PCAP_ERRBUF_SIZE];
 
 #ifndef NO_MDNS
     memset(&mdns, 0, sizeof(mdns));
 #endif
     memset(&args, 0, sizeof(args));
 
-    if (!parse_args(&args, argc, argv)) {
-        DPRINT("parse_args() failed\n");
+    // Invalid arguments
+    if (parse_args(&args, argc, argv)) {
+        fprintf(stderr, "Failed to parse command line arguments\n");
+        print_usage(argv[0]);
         exit(EXIT_FAILURE);
+    }
+
+    // Request for print usage received
+    if (args.help_flag)
+    {
+    	print_usage(argv[0]);
+    	exit(EXIT_SUCCESS);
     }
 
 	// pcap_io_task_setup, configure and add the pcap task to the event
@@ -426,75 +441,74 @@ int main(int argc, char **argv)
     fuzz_test_pcap(args.fuzz_filename);
 #endif // FUZZ_TEST
 
-    if (!setup_ip_blacklist(&ip_bl)) {
-        DPRINT("setup_ip_blacklist() failed\n");
-        exit(EXIT_FAILURE);
-    }
-    if (args.ip_filename && 0 > (n_ip_entries = import_feodo_blacklist(args.ip_filename, ip_bl)))
-    {
-    	fprintf(stderr, "Could not import Feodo blacklist from %s\n", args.ip_filename);
-    	exit(EXIT_FAILURE);
-    }
-    fprintf(stdout, "Imported %d IP blacklist entries\n", n_ip_entries);
 
-    if (!setup_domain_blacklist(&dn_bl)) {
-    	DPRINT("setup_domain_blacklist() failed\n");
-    	exit(EXIT_FAILURE);
-    }
-    if (args.domain_filename && 0 > (n_dn_entries = import_urlhaus_blacklist_file(args.domain_filename, dn_bl)))
-    {
-    	fprintf(stderr, "Could not import domain blacklist from %s\n", args.domain_filename);
-    	exit(EXIT_FAILURE);
-    }
-    fprintf(stdout, "Imported %d domain blacklist entries\n", n_dn_entries);
+    // Setup blacklists and load entries from files
+    if (NSIDS_OK != setup_ip_blacklist(&ip_bl)) goto done;
 
-    if ((retval = configure_pcap(&pcap, filter, args.iface, err) != 0)
+    if (args.ip_filename)
+    	if (0 > (n_ip_entries = import_feodo_blacklist(args.ip_filename, ip_bl)))
+    	{
+			fprintf(stderr, "Could not import Feodo blacklist from %s\n", args.ip_filename);
+			goto done;
+    	}
+    	else
+    		fprintf(stdout, "Imported %d IP blacklist entries\n", n_ip_entries);
+
+    if (NSIDS_OK != setup_domain_blacklist(&dn_bl)) goto done;
+
+    if (args.domain_filename)
+    	if (0 > (n_dn_entries = import_urlhaus_blacklist_file(args.domain_filename, dn_bl)))
+    	{
+			fprintf(stderr, "Could not import domain blacklist from %s\n", args.domain_filename);
+			goto done;
+    	}
+    	else
+    		fprintf(stdout, "Imported %d domain blacklist entries\n", n_dn_entries);
+
+    // Setup packet capture handle
+    if (NSIDS_OK != configure_pcap(&pcap, filter, args.iface)
     		&& !IGNORE_PCAP_ERRORS) goto done;
 
-    memset(&pcap_handle, 0, sizeof(pcap_handle));
+    // Begin event loop setup
     if (NULL == (loop = uv_default_loop()))
     {
     	DPRINT("loop could not be allocated\n");
     	goto done;
     }
 
-    if (pcap != NULL && !setup_pcap_handle(loop, &pcap_handle, pcap)) goto done;
+    if (pcap && setup_pcap_handle(loop, &pcap_handle, pcap)) goto done;
 
-    if (!setup_stdin_pipe(loop)) goto done;
-    if (!setup_sigterm_handling(loop, &sigterm_handle)) goto done;
-    if (!setup_sigint_handling(loop, &sigint_handle)) goto done;
-    if (!setup_sigpipe()) goto done;
-    printf("setup sigterm\n");
-
-    if (0 > uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)) goto done;
+    if (setup_stdin_pipe(loop)) goto done;
+    if (setup_sigterm_handling(loop, &sigterm_handle)) goto done;
+    if (setup_sigint_handling(loop, &sigint_handle)) goto done;
+    if (setup_sigpipe()) goto done;
 
 #ifndef NO_MDNS
-    if (!ids_mdns_setup_mdns(&mdns, args.server_port)) goto done;
-    if (!mdns_check_setup(loop, &mdns_handle, mdns.simple_poll)
-    		|| !mdns_check_start(&mdns_handle)) goto done;
+    if (ids_mdns_setup_mdns(&mdns, args.server_port)) goto done;
+    if (mdns_setup_event_handle(loop, &mdns_handle, mdns.simple_poll)
+    		|| mdns_check_start(&mdns_handle)) goto done;
 #endif
 #ifndef NO_UPDATES
-    if (0 != setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
+    if (setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
     {
     	printf("Could not setup updates.\n");
     	goto done;
     }
 
-    if (0 != setup_timer(&update_timer, loop, &ids_update_ctx))
+    if (setup_update_timer(&update_timer, loop, &ids_update_ctx))
     {
     	printf("Could not setup update timer.\n");
     	goto done;
     }
 #endif
 
-    printf("setting up event server...\n");
-    if (0 != setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
-    printf("setup event server...\n");
+    if (setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
 
 #ifndef FUZZ_TEST
+    printf("Beginning capture\n");
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
 #endif
-    printf("\n\nCapture finished.\n\n");
+    printf("\n\nEnding capture\n");
 
     retval = 0;
 

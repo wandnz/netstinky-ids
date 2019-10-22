@@ -6,7 +6,7 @@
  *  Created on: Jul 22, 2019
  *      Author: mfletche
  */
-
+#include <assert.h>
 #include <string.h>
 
 #include <openssl/err.h>
@@ -34,7 +34,6 @@ setup_context()
 {
 	SSL_CTX *ctx = NULL;
 	const SSL_METHOD *method = SSLv23_method();
-	print_if_NULL(method);
 	if (!method) return NULL;
 
 	SSL_library_init();
@@ -43,10 +42,7 @@ setup_context()
 	OpenSSL_add_all_algorithms();
 	ERR_load_crypto_strings();
 
-	//method = TLS_server_method();
-
 	ctx = SSL_CTX_new(method);
-	print_if_NULL(ctx);
 	if (!ctx) return NULL;
 
 	SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
@@ -64,32 +60,35 @@ int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 		domain_blacklist **domain, ip_blacklist **ip)
 {
-	int rc;
+	assert(update_ctx);
+	assert(loop);
+	assert(domain);
+	assert(ip);
 
-	print_if_NULL(update_ctx);
-	print_if_NULL(loop);
-	print_if_NULL(domain);
-	print_if_NULL(ip);
-	if (!update_ctx || !loop || !domain || !ip) return -1;
+	int rc;
 
 	// Setup SSL context
 	update_ctx->ctx = setup_context();
-	print_if_NULL(update_ctx->ctx);
-	if (NULL == update_ctx->ctx) return -1;
+	if (NULL == update_ctx->ctx) return NSIDS_SSL;
 
 	// Setup actual TLS stream
 	rc = tls_stream_init(&update_ctx->stream, loop, update_ctx->ctx);
-	if (0 != rc) return -1;
+	if (0 != rc) goto error;
 
 	// Save blacklist pointers
 	update_ctx->domain = domain;
 	update_ctx->ip = ip;
-
 	update_ctx->proto.state = NS_PROTO_VERSION_WAITING;
-
 	update_ctx->stream.data = update_ctx;
 
-	return 0;
+	return NSIDS_OK;
+
+error:
+	if (update_ctx->ctx) SSL_CTX_free(update_ctx->ctx);
+
+	// Determine where the error occurred
+	if (TLS_STR_NEED_CLOSE) return NSIDS_UV;
+	return NSIDS_SSL;
 }
 
 static void
@@ -315,20 +314,33 @@ update_timer_cb(uv_timer_t *timer)
 }
 
 int
-setup_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx)
+setup_update_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx)
 {
+	assert(timer);
+	assert(loop);
+	assert(ctx);
+
 	int uv_rc;
 
 	uv_rc = uv_timer_init(loop, timer);
-	print_error(check_uv_error(uv_rc));
-	if (uv_rc < 0) return -1;
+	if (uv_rc < 0)
+	{
+		fprintf(stderr, "Failed to setup update timer handle: %s\n",
+				uv_strerror(uv_rc));
+		return NSIDS_UV;
+	}
 
 	timer->data = ctx;
 	uv_rc = uv_timer_start(timer, update_timer_cb, 0, update_interval_ms);
-	print_error(check_uv_error(uv_rc));
-	if (uv_rc < 0) return -1;
+	if (uv_rc < 0)
+	{
+		fprintf(stderr, "Failed to setup update timer handle: %s\n",
+				uv_strerror(uv_rc));
+		teardown_timer(timer);
+		return NSIDS_UV;
+	}
 
-	return 0;
+	return NSIDS_OK;
 }
 
 int
@@ -336,11 +348,8 @@ teardown_timer(uv_timer_t *timer)
 {
 	int rc;
 
-	rc = uv_timer_stop(timer);
-	print_error(check_uv_error(rc));
-	if (rc < 0) return -1;
-
+	uv_timer_stop(timer);
 	uv_close((uv_handle_t *)timer, NULL);
 
-	return 0;
+	return NSIDS_OK;
 }
