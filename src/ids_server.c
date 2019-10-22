@@ -261,37 +261,6 @@ void ids_server_write_cb(uv_write_t *req, int status)
 	}
 }
 
-static void ids_server_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
-{
-	uv_write_t *req;
-	uv_buf_t wrbuf;
-	int err;
-
-	printf("server read\n");
-	if (nread < 0)
-	{
-		if (UV_EOF != (err = nread)) goto msg;
-	}
-	else if (nread > 0)
-	{
-		if (NULL == (req = malloc(sizeof(*req)))) goto error;
-		wrbuf = uv_buf_init(buf->base, nread);
-		if (0 > (err = uv_write(req, client, &wrbuf, 1, ids_server_write_cb))) goto msg;
-	}
-
-	goto finally;
-
-msg:
-	fprintf(stderr, "read error: %s\n", uv_strerror(err));
-error:
-	uv_close((uv_handle_t *)client, NULL);
-	free(client);
-
-// Free the buffer in all cases
-finally:
-	if (buf->base) free(buf->base);
-}
-
 static void on_new_connection(uv_stream_t *server, int status)
 {
 	int err;
@@ -308,7 +277,6 @@ static void on_new_connection(uv_stream_t *server, int status)
 	client->data = server->data;
 
 	if (0 != (err = uv_accept(server, (uv_stream_t *)client))) goto msg;
-	if (0 != (err = uv_read_start((uv_stream_t *)client, alloc_buffer, ids_server_read_cb))) goto msg;
 
 	write_ids_event_list((uv_stream_t *)client);
 	// Write the current list to the new connection
