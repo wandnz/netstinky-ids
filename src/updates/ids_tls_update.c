@@ -67,13 +67,15 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 
 	int rc;
 
+	memset(update_ctx, 0, sizeof(*update_ctx));
+
 	// Setup SSL context
 	update_ctx->ctx = setup_context();
 	if (NULL == update_ctx->ctx) return NSIDS_SSL;
 
 	// Setup actual TLS stream
-	rc = tls_stream_init(&update_ctx->stream, loop, update_ctx->ctx);
-	if (0 != rc) goto error;
+	//rc = tls_stream_init(&update_ctx->stream, loop, update_ctx->ctx);
+	//if (0 != rc) goto error;
 
 	// Save blacklist pointers
 	update_ctx->domain = domain;
@@ -87,7 +89,6 @@ error:
 	if (update_ctx->ctx) SSL_CTX_free(update_ctx->ctx);
 
 	// Determine where the error occurred
-	if (TLS_STR_NEED_CLOSE) return NSIDS_UV;
 	return NSIDS_SSL;
 }
 
@@ -113,11 +114,14 @@ teardown_update_context(ids_update_ctx_t *update_ctx)
 	if (update_ctx->ctx)
 		SSL_CTX_free(update_ctx->ctx);
 
-	// If stream cannot be closed by conventional means, wipe it now
-	rc = tls_stream_close(&update_ctx->stream,
-			teardown_update_context_close_cb);
-	if (rc != 0)
-		memset(&update_ctx->stream, 0,sizeof(update_ctx->stream));
+	// Check if stream is currently initialized and active
+	if (update_ctx->stream.tcp.type == UV_TCP)
+	{
+		rc = tls_stream_close(&update_ctx->stream,
+				teardown_update_context_close_cb);
+		if (rc != 0)
+			memset(&update_ctx->stream, 0,sizeof(update_ctx->stream));
+	}
 
 	return 0;
 }
@@ -271,46 +275,56 @@ update_timer_on_handshake(tls_stream_t *stream, int status)
 static void
 update_timer_cb(uv_timer_t *timer)
 {
+	assert(timer);
+
 	int rc;
 	ids_update_ctx_t *ctx = NULL;
 	struct sockaddr_in addr;
 
 	// Connect to the IOC server
-	print_if_NULL(timer);
-	if (!timer) return;
 	ctx = timer->data;
 
 	// Re-init protocol
 	ctx->proto.state = NS_PROTO_VERSION_WAITING;
 
-	// Close the uv_handle and return if the previous update is still running.
-	// uv_is_active will return 0 if the tcp handle has been zeroed, so this
-	// works even if the handle hasn't been properly initialized.
-	if (uv_is_active((uv_handle_t *)&ctx->stream.tcp))
+	// When not initialized, the handle type will be UNKNOWN. Check if the previous TCP
+	// handle is still open.
+	if (ctx->stream.tcp.type == UV_TCP && uv_is_active((uv_handle_t *)&ctx->stream.tcp))
 	{
 		rc = tls_stream_close(&ctx->stream, update_timer_on_close);
 		if (rc)
+		{
 			// Callback is not going to happen, so free and continue
 			tls_stream_fini(&ctx->stream);
+			memset(&ctx->stream, 0, sizeof(ctx->stream));
+		}
 		else
-			// Must wait for callback
+			// Can't clean up until after the callback
 			return;
 	}
 	rc = tls_stream_init(&ctx->stream, timer->loop, ctx->ctx);
 	if (rc)
 	{
 		print_error("Could not initialize TLS stream");
-		return;
+		goto error;
 	}
 	ctx->stream.data = ctx;
 
 	rc = uv_ip4_addr(server_ip, server_port, &addr);
-	print_error(check_uv_error(rc));
-	if (0 != rc) return;
+	if (0 != rc) goto error;
 
 	rc = tls_stream_connect(&ctx->stream, (const struct sockaddr *)&addr,
 			update_timer_on_handshake, update_timer_on_read);
-	if (0 != rc) return;
+	if (0 != rc) goto error;
+	return;
+error:
+	// Clear stream
+	rc = tls_stream_close(&ctx->stream, update_timer_on_close);
+	if (rc)
+	{
+		tls_stream_fini(&ctx->stream);
+		memset(&ctx->stream, 0, sizeof(ctx->stream));
+	}
 }
 
 int

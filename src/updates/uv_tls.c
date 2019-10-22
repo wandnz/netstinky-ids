@@ -986,6 +986,7 @@ tls_stream_close_close_cb(uv_handle_t *handle)
 
 	// Notify user that stream is closed
 	if (stream->on_close) stream->on_close(stream);
+	memset(stream, 0, sizeof(*stream));
 }
 
 /**
@@ -1018,9 +1019,7 @@ tls_stream_close(tls_stream_t *stream, tls_str_close_cb cb)
 	stream->on_close = cb;
 
 	// tcp
-	uv_rc = uv_read_stop((uv_stream_t *)&stream->tcp);
-	if (uv_rc)
-		return TLS_STR_FAIL;
+	uv_read_stop((uv_stream_t *)&stream->tcp);
 	req = malloc(sizeof(*req));
 	if (req)
 	{
