@@ -382,6 +382,7 @@ static void read_stdin(uv_stream_t *stream, ssize_t nread,
 static bool setup_sigpipe(void)
 {
     struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sa_handler = SIG_IGN;
     sa.sa_flags = 0;
     if (sigaction(SIGPIPE, &sa, 0) == -1)
