@@ -5,19 +5,20 @@
  *      Author: mfletche
  */
 
+#include "../error/ids_error.h"
 #include "ids_blacklist.h"
 
 int setup_ip_blacklist(ip_blacklist **bl)
 {
-    if (!bl) goto error;
+	assert(bl);
 
     *bl = new_ip_blacklist();
     if (!*bl) goto error;
 
-    return (1);
+    return NSIDS_OK;
 error:
     free_ip_blacklist(bl);
-    return (0);
+    return NSIDS_MEM;
 }
 
 /**
@@ -27,14 +28,13 @@ error:
  */
 int setup_domain_blacklist(domain_blacklist **bl)
 {
+	assert(bl);
 
-	if (!bl) goto error;
     *bl = new_domain_blacklist();
     if (!*bl) goto error;
 
-	DPRINT("domain blacklist setup complete...\n");
-	return 1;
+	return NSIDS_OK;
 
 error:
-	return 0;
+	return NSIDS_MEM;
 }

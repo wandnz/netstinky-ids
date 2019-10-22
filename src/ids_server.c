@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "ids_server.h"
+#include "error/ids_error.h"
 
 #define MAX_CONNS 128
 
@@ -292,12 +293,13 @@ error:
 int
 setup_event_server(uv_loop_t *loop, uv_tcp_t *handle, int port, struct ids_event_list *list)
 {
-	int ret;
-	struct sockaddr_in server_addr;
-
 	assert(loop);
 	assert(handle);
 	assert(port);
+	assert(list);
+
+	int ret;
+	struct sockaddr_in server_addr;
 
 	if (0 != uv_tcp_init(loop, handle)) goto error;
 	// Put a pointer to the ids_event_list in the data field of the tcp handle
@@ -309,6 +311,46 @@ setup_event_server(uv_loop_t *loop, uv_tcp_t *handle, int port, struct ids_event
 	return 0;
 
 error:
+
 	fprintf(stderr, "Could not setup uv_tcp_t handle for server\n");
 	return -1;
+}
+
+static void
+event_server_close_cb(uv_tcp_t *handle)
+{
+	memset(handle, 0, sizeof(*handle));
+}
+
+static void
+event_server_shutdown_cb(uv_shutdown_t *req, int status)
+{
+	// Ignore status and close handle
+	uv_close((uv_handle_t *)req->handle, (uv_close_cb)event_server_close_cb);
+	free(req);
+}
+
+
+int
+teardown_event_server(uv_tcp_t *handle)
+{
+	assert(handle);
+
+	uv_shutdown_t *req = malloc(sizeof(*req));
+	int uv_rc;
+
+	// Ignore return codes because we'll carry on if a failure occurs
+	uv_read_stop((uv_stream_t *)handle);
+	if (req)
+	{
+		// If this works, the close operation must wait for the callback
+		uv_rc = uv_shutdown(req, (uv_stream_t *)handle,
+				event_server_shutdown_cb);
+	}
+
+	// If shutdown failed, just close
+	if (!req || 0 > uv_rc)
+		uv_close((uv_handle_t *)handle, (uv_close_cb)event_server_close_cb);
+
+	return NSIDS_OK;
 }

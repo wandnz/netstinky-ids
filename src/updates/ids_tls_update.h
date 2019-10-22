@@ -90,6 +90,6 @@ teardown_update_context(ids_update_ctx_t *update_ctx);
  * @param ctx: The update context.
  */
 int
-setup_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx);
+setup_update_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx);
 
 #endif /* SRC_BLACKLIST_UPDATES_IDS_TLS_UPDATE_H_ */

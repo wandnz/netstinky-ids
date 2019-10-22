@@ -56,16 +56,21 @@ new_write_cb_data(tls_stream_t *stream, buf_array_t *plaintext,
 static void
 tls_stream_write_cb(uv_write_t *req, int status);
 
+static void
+tls_stream_close_close_cb(uv_handle_t *handle);
+
 int
 tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
 {
 	int uv_rc;
 	int bio_rc;
 
+	assert(stream);
+	assert(loop);
+	assert(ctx);
+
 	// default error code if going to the fail label
 	int err_ret = TLS_STR_FAIL;
-
-	if (!stream || !loop || !ctx) return TLS_STR_FAIL;
 
 	memset(stream, 0, sizeof(*stream));
 
@@ -80,7 +85,11 @@ tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
 	uv_rc = uv_tcp_init(loop, &stream->tcp);
 	if (uv_rc < 0)
 	{
+		// Begin to close the stream, but warn user not to free it
+		fprintf(stderr, "Could not establish a TCP stream: %s\n", uv_strerror(uv_rc));
 		err_ret = TLS_STR_NEED_CLOSE;
+		stream->tcp.data = stream;
+		tls_stream_close(stream, tls_stream_close_close_cb);
 		goto fail;
 	}
 
@@ -472,6 +481,7 @@ tls_stream_connect_cb(uv_connect_t *req, int status)
 	if (!req) return;
 
 	stream = req->data;
+	free(req);
 
 	if (!status)
 	{

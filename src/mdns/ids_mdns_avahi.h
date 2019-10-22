@@ -30,7 +30,7 @@ typedef struct AvahiMdnsContext
 	AvahiEntryGroup *group;
 } AvahiMdnsContext;
 
-bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port);
+int ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port);
 
 /**
  * Perform one non-blocking iteration of the Avahi event loop.

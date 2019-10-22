@@ -22,6 +22,7 @@
 #include <avahi-common/error.h>
 #include <avahi-common/malloc.h>
 
+#include "error/ids_error.h"
 
 void create_services(AvahiMdnsContext *mdns);
 
@@ -167,24 +168,27 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
 	}
 }
 
-bool ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port)
+int ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port)
 {
+	assert(mdns);
+	assert(port > 0);
+
 	int error;
 
 	mdns->name = avahi_strdup("NetStinky");
 	mdns->port = port;
 	mdns->simple_poll = avahi_simple_poll_new();
-	if (!mdns->simple_poll) return false;
+	if (!mdns->simple_poll) return NSIDS_MEM;
 
 	mdns->client = avahi_client_new(avahi_simple_poll_get(mdns->simple_poll),
 			0, client_callback, mdns, &error);
 	if (!mdns->client)
 	{
-		fprintf(stderr, "ids_mdns_setup_mdns: %s\n", avahi_strerror(error));
+		fprintf(stderr, "Failed to setup MDNS: %s\n", avahi_strerror(error));
 		goto error;
 	}
 
-	return true;
+	return NSIDS_OK;
 
 error:
 	if (mdns->client)

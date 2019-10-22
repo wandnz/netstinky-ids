@@ -20,6 +20,7 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
+#include "error/ids_error.h"
 #include "utils/common.h"
 #include "dns.h"
 #include "ids_pcap.h"
@@ -233,25 +234,29 @@ ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_b
 
 int set_filter(pcap_t *pcap, const char *filter, char *err)
 {
-    int rc = -1;
-    struct bpf_program fp;
+	assert(pcap);
+	assert(filter);
+	assert(err);
 
-    if (pcap == NULL || filter == NULL) return 0;
+    int rc = NSIDS_PCAP;
+    struct bpf_program fp;
 
     memset(&fp, 0, sizeof(fp));
 
-    if ((rc = pcap_compile(pcap, &fp, filter, 0, PCAP_NETMASK_UNKNOWN)) != 0) {
-        fprintf(stderr, "Error in filter expression: %s\n", err);
-        goto done;
-    }
-    if ((rc = pcap_setfilter(pcap, &fp)) != 0) {
-        fprintf(stderr, "Can't set filter expression: %s\n", err);
+    if (0 != pcap_compile(pcap, &fp, filter, 0, PCAP_NETMASK_UNKNOWN)) {
+        fprintf(stderr, "Could not compile pcap filter: %s\n", pcap_geterr(pcap));
         goto done;
     }
 
-    pcap_freecode(&fp);
-    rc = 0;
+    if (0 != pcap_setfilter(pcap, &fp)) {
+        fprintf(stderr, "Could not set pcap filter: %s\n", pcap_geterr(pcap));
+        goto done;
+    }
+
+    rc = NSIDS_OK;
+
 done:
+	pcap_freecode(&fp);
     return rc;
 }
 
@@ -289,69 +294,96 @@ static void pcap_data_cb(uv_poll_t *handle, int status, int events)
     }
 }
 
-bool setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap)
+int setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap)
 {
 	assert(loop);
 	assert(pcap_handle);
 	assert(pcap);
 
 	int fd;
+	int uv_rc;
 
-	if (PCAP_ERROR == (fd = pcap_get_selectable_fd(pcap))) return false;
+	if (PCAP_ERROR == (fd = pcap_get_selectable_fd(pcap))) return NSIDS_PCAP;
 
-    if (0 > uv_poll_init(loop, pcap_handle, fd))
+    if (0 > (uv_rc = uv_poll_init(loop, pcap_handle, fd)))
     {
-    	printf("polling could not be initialized\n");
-    	return false;
+    	fprintf(stderr, "Failed to setup pcap event loop handle: %s\n",
+    			uv_strerror(uv_rc));
+    	return NSIDS_UV;
     }
 
-    if (0 > uv_poll_start(pcap_handle, UV_READABLE, pcap_data_cb))
+    if (0 > (uv_rc = uv_poll_start(pcap_handle, UV_READABLE, pcap_data_cb)))
     {
-    	printf("could not start polling\n");
-    	return false;
+    	fprintf(stderr, "Failed to setup pcap event loop handle: %s\n",
+    			uv_strerror(uv_rc));
+    	return NSIDS_UV;
     }
 
     pcap_handle->data = pcap;
 
-    return true;
+    return NSIDS_OK;
 }
 
-int configure_pcap(pcap_t **pcap, const char *filter, const char *dev, char *err)
+int configure_pcap(pcap_t **pcap, const char *filter, const char *dev)
 {
-    int retval = -1;
+	// None of the arguments should be NULL
+	assert(pcap);
+	assert(filter);
+	assert(dev);
+
+	char errbuf[PCAP_ERRBUF_SIZE];
     int pcap_fd;
-    if ((*pcap = pcap_create(dev, err)) == NULL) {
-        fprintf(stderr, "Can't open %s: %s\n", dev, err);
-        retval = -2;
+    int pcap_rc;
+    if ((*pcap = pcap_create(dev, errbuf)) == NULL) {
+        fprintf(stderr, "Can't open %s: %s\n", dev, errbuf);
         goto error;
     }
     if (pcap_set_promisc(*pcap, 1) != 0) {
         fprintf(stderr, "pcap_set_promisc failed\n");
-        retval = -4;
         goto error;
     }
-    if (pcap_activate(*pcap) != 0) {
-        fprintf(stderr, "pcap_activate failed\n");
-        retval = -5;
-        goto error;
+    if (0 != (pcap_rc = pcap_activate(*pcap))) {
+
+    	if (pcap_rc > 0)
+    	{
+    		// Just a warning
+    		if (PCAP_WARNING_PROMISC_NOTSUP == pcap_rc)
+    			fprintf(stderr, "Pcap handle activated with a warning: %s\n",
+    					pcap_geterr(*pcap));
+    		else
+    			fprintf(stderr, "Pcap handle activated with a warning: %s\n",
+    					pcap_statustostr(pcap_rc));
+    	}
+    	else
+    	{
+    		// An error occurred
+    		if (PCAP_ERROR_NO_SUCH_DEVICE == pcap_rc ||
+    				PCAP_ERROR_PERM_DENIED == pcap_rc)
+    		{
+    			fprintf(stderr, "Could not activate pcap handle: %s\n",
+    					pcap_geterr(*pcap));
+    		}
+    		else
+    			fprintf(stderr, "Could not activate pcap handle: %s\n",
+    					pcap_statustostr(pcap_rc));
+
+    		goto error;
+    	}
     }
-    if (set_filter(*pcap, filter, err) != 0) {
+    if (set_filter(*pcap, filter, errbuf) != 0) {
         fprintf(stderr, "Who even cares?\n");
-        retval = -3;
         goto error;
     }
 
     pcap_fd = pcap_get_selectable_fd(*pcap);
     if (pcap_fd == -1) {
         fprintf(stderr, "pcap_get_sel_fd failed\n");
-        retval = -6;
         goto error;
     }
 
-    retval = 0;
-    return retval;
+    return NSIDS_OK;
 error:
 	if (*pcap) pcap_close(*pcap);
 	*pcap = NULL;
-	return retval;
+	return NSIDS_PCAP;
 }
