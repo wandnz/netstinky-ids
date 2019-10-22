@@ -110,8 +110,11 @@ tls_stream_fini(tls_stream_t *stream)
 {
 	int ret = TLS_STR_OK;
 
-	// Do not free BIOs separately, they are cleaned up by SSL_free
+	// One of the BIOs is freed implicitly by SSL_free
 	SSL_free(stream->ssl);
+	BIO_free(stream->internal);
+
+	memset(stream, 0, sizeof(*stream));
 
 	return ret;
 }
