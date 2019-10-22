@@ -16,6 +16,8 @@
 #include <avahi-client/publish.h>
 #include <avahi-common/simple-watch.h>
 
+#define MDNS_SVC_NAME "_netstinky._tcp"
+
 /**
  * Encapsulates the variables required for the Avahi client library. Can be
  * provided as userdata to Avahi callback functions, instead of declaring these
