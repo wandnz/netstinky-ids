@@ -1016,25 +1016,32 @@ tls_stream_close(tls_stream_t *stream, tls_str_close_cb cb)
 {
 	int uv_rc, shutdown_rc;
 	uv_shutdown_t *req = NULL;
+	const uv_stream_t *tcp_stream;
 
 	if (!stream) return TLS_STR_FAIL;
 
 	stream->on_close = cb;
 
 	// tcp
-	uv_read_stop((uv_stream_t *)&stream->tcp);
+	tcp_stream = (uv_stream_t *) &stream->tcp;
+	uv_read_stop(tcp_stream);
 	req = malloc(sizeof(*req));
 	if (req)
 	{
 		req->data = stream;
-		shutdown_rc = uv_shutdown(req, (uv_stream_t *)&stream->tcp,
+		shutdown_rc = uv_shutdown(req, tcp_stream,
 				tls_stream_close_shutdown_cb);
 		if (shutdown_rc < 0) free(req);
 	}
 	// Immediately close if request couldn't be allocated or shutdown was
 	// unsuccessful
 	if (!req || shutdown_rc < 0)
-		uv_close((uv_handle_t *)&stream->tcp, tls_stream_close_close_cb);
+	{
+		if (!uv_is_closing((uv_handle_t *) tcp_stream))
+		{
+			uv_close((uv_handle_t *) tcp_stream, tls_stream_close_close_cb);
+		}
+	}
 
 	return TLS_STR_OK;
 }

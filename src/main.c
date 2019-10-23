@@ -90,8 +90,19 @@ static void close_cb(uv_handle_t *handle)
 	 * the global variable 'server_handle'), free it as it is dynamically
 	 * allocated.
 	 */
-	if (UV_TCP == handle->type && handle != (uv_handle_t *)&server_handle)
+	if (handle == (uv_handle_t *) &server_handle)
+	{
+		return;
+	}
+	else if (handle == (uv_handle_t *) &(ids_update_ctx.stream))
+	{
+		// The ids_update_ctx.stream global is not malloc-ed
+		return;
+	}
+	else if (UV_TCP == handle->type)
+	{
 		free(handle);
+	}
 }
 
 void
@@ -131,8 +142,11 @@ void walk_and_close_handle_cb(uv_handle_t *handle, void *arg)
 					// Successfully started shutdown process of stream
 					return;
 		}
-
-		uv_close(handle, close_cb);
+		else
+		{
+			// Handle isn't a stream. No need to shutdown before close.
+			uv_close(handle, close_cb);
+		}
 	}
 }
 
