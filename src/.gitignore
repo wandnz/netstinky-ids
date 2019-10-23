@@ -53,3 +53,5 @@ libtool
 **/.deps
 **/.dirstamp
 
+# Binary
+nsids
