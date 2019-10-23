@@ -5,13 +5,6 @@
  *      Author: mfletche
  */
 
-/*
- * libuv_tls.h
- *
- *  Created on: Jul 18, 2019
- *      Author: mfletche
- */
-
 #include <assert.h>
 #include <string.h>
 #include <openssl/bio.h>
@@ -59,6 +52,9 @@ tls_stream_write_cb(uv_write_t *req, int status);
 static void
 tls_stream_close_close_cb(uv_handle_t *handle);
 
+static void
+tls_stream_close_err_cb(tls_stream_t *stream);
+
 int
 tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
 {
@@ -89,7 +85,7 @@ tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
 		fprintf(stderr, "Could not establish a TCP stream: %s\n", uv_strerror(uv_rc));
 		err_ret = TLS_STR_NEED_CLOSE;
 		stream->tcp.data = stream;
-		tls_stream_close(stream, tls_stream_close_close_cb);
+		tls_stream_close(stream, tls_stream_close_err_cb);
 		goto fail;
 	}
 
@@ -778,44 +774,6 @@ error:
 	return TLS_STR_FAIL;
 }
 
-/*static int
-tls_stream_write_buffer(tls_stream_t *stream, const uv_buf_t *buf,
-		uv_write_cb cb)
-{
-	int total_written = 0;
-	int written = 0;
-	int rc;
-	int ret = TLS_STR_FAIL;
-	uv_write_t *req = NULL;
-	uv_buf_t *buf_array = NULL;
-	unsigned int array_len = 0;
-
-
-	if (!stream || !buf) return TLS_STR_FAIL;
-
-	rc = tls_stream_encrypt_buffer(stream, buf, &buf_array, &array_len);
-	if (TLS_STR_OK != rc) return rc;
-
-	req = malloc(sizeof(*req));
-	if (!req)
-	{
-		ret = TLS_STR_MEM;
-		goto error;
-	}
-	rc = uv_write(stream->tcp, buf_array, array_len, cb);
-	if (rc < 0) goto error;
-
-	// The array doesn't need to be kept
-	free(buf_array);
-
-	return TLS_STR_OK;
-
-error:
-	if (buf_array) free(buf_array);
-	if (req) free(req);
-	return ret;
-}*/
-
 /**
  * Encrypt an array of buffers and add it to the ENCRYPTED array of buffers.
  * Will realloc ENCRYPTED and update NENCRYPTED as necessary.
@@ -992,6 +950,21 @@ tls_stream_close_close_cb(uv_handle_t *handle)
 	memset(stream, 0, sizeof(*stream));
 }
 
+/*
+ * Function to run when there was an error setting up the TLS stream
+ * Implements type tls_str_close_cb from uv_tls.h
+ */
+static void
+tls_stream_close_err_cb(tls_stream_t *stream)
+{
+	if (!stream) return;
+
+	// Notify the user that the stream is closed
+	if (stream->on_close) stream->on_close(stream);
+	memset(stream, 0, sizeof(*stream));
+}
+
+
 /**
  * Callback that is run when a stream has been closed using
  * tls_stream_close(). This is an intermediate stage before the tcp handle has
@@ -1014,7 +987,7 @@ tls_stream_close_shutdown_cb(uv_shutdown_t *req, int status)
 int
 tls_stream_close(tls_stream_t *stream, tls_str_close_cb cb)
 {
-	int uv_rc, shutdown_rc;
+	int shutdown_rc;
 	uv_shutdown_t *req = NULL;
 	const uv_stream_t *tcp_stream;
 
@@ -1024,12 +997,12 @@ tls_stream_close(tls_stream_t *stream, tls_str_close_cb cb)
 
 	// tcp
 	tcp_stream = (uv_stream_t *) &stream->tcp;
-	uv_read_stop(tcp_stream);
+	uv_read_stop((uv_stream_t *) tcp_stream);
 	req = malloc(sizeof(*req));
 	if (req)
 	{
 		req->data = stream;
-		shutdown_rc = uv_shutdown(req, tcp_stream,
+		shutdown_rc = uv_shutdown(req, (uv_stream_t *) tcp_stream,
 				tls_stream_close_shutdown_cb);
 		if (shutdown_rc < 0) free(req);
 	}
