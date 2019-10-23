@@ -110,8 +110,6 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 	assert(pcap_data);
 	if (pcap_data)
 	{
-        char src_str[18];
-        char dst_str[18];
 		if (!pcap_hdr)
 		{
 			DPRINT("ids_pcap_read_packet(): pcap header was NULL\n");

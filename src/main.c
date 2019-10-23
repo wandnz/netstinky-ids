@@ -200,19 +200,13 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
 		{"help", 0, &args->help_flag, 1},
 		{0, 0, 0, 0}
 	};
-	const static char *getopt_usage =
-	        "\nRun as: %s -p port -i dev1 [-i devn]\n";
 
-    char *program = NULL;
     int option_char;
-    int iface_num = 0;
     int option_index = 0;
 
     memset(args, 0, sizeof(*args));
 
     if (argc < 1) return 0;
-
-    program = argv[0];
 
     while(-1 != (option_char = getopt_long(argc, argv, getopt_args,
                  long_options, &option_index))) {
@@ -460,6 +454,7 @@ int main(int argc, char **argv)
     if (NSIDS_OK != setup_ip_blacklist(&ip_bl)) goto done;
 
     if (args.ip_filename)
+	{
     	if (0 > (n_ip_entries = import_feodo_blacklist(args.ip_filename, ip_bl)))
     	{
 			fprintf(stderr, "Could not import Feodo blacklist from %s\n", args.ip_filename);
@@ -467,10 +462,12 @@ int main(int argc, char **argv)
     	}
     	else
     		fprintf(stdout, "Imported %d IP blacklist entries\n", n_ip_entries);
+	}
 
     if (NSIDS_OK != setup_domain_blacklist(&dn_bl)) goto done;
 
     if (args.domain_filename)
+	{
     	if (0 > (n_dn_entries = import_urlhaus_blacklist_file(args.domain_filename, dn_bl)))
     	{
 			fprintf(stderr, "Could not import domain blacklist from %s\n", args.domain_filename);
@@ -478,6 +475,7 @@ int main(int argc, char **argv)
     	}
     	else
     		fprintf(stdout, "Imported %d domain blacklist entries\n", n_dn_entries);
+	}
 
     // Setup packet capture handle
     if (NSIDS_OK != configure_pcap(&pcap, filter, args.iface)

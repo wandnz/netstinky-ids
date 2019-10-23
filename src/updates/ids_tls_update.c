@@ -65,17 +65,11 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	assert(domain);
 	assert(ip);
 
-	int rc;
-
 	memset(update_ctx, 0, sizeof(*update_ctx));
 
 	// Setup SSL context
 	update_ctx->ctx = setup_context();
 	if (NULL == update_ctx->ctx) return NSIDS_SSL;
-
-	// Setup actual TLS stream
-	//rc = tls_stream_init(&update_ctx->stream, loop, update_ctx->ctx);
-	//if (0 != rc) goto error;
 
 	// Save blacklist pointers
 	update_ctx->domain = domain;
@@ -84,12 +78,6 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	update_ctx->stream.data = update_ctx;
 
 	return NSIDS_OK;
-
-error:
-	if (update_ctx->ctx) SSL_CTX_free(update_ctx->ctx);
-
-	// Determine where the error occurred
-	return NSIDS_SSL;
 }
 
 static void
@@ -328,6 +316,15 @@ error:
 }
 
 int
+teardown_timer(uv_timer_t *timer)
+{
+	uv_timer_stop(timer);
+	uv_close((uv_handle_t *)timer, NULL);
+
+	return NSIDS_OK;
+}
+
+int
 setup_update_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx)
 {
 	assert(timer);
@@ -353,17 +350,6 @@ setup_update_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx)
 		teardown_timer(timer);
 		return NSIDS_UV;
 	}
-
-	return NSIDS_OK;
-}
-
-int
-teardown_timer(uv_timer_t *timer)
-{
-	int rc;
-
-	uv_timer_stop(timer);
-	uv_close((uv_handle_t *)timer, NULL);
 
 	return NSIDS_OK;
 }

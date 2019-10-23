@@ -11,6 +11,7 @@
 
 #include <errno.h>
 
+#include "../utils/file_processing.h"
 #include "domain_blacklist.h"
 #include "urlhaus_domain_blacklist.h"
 #include "ids_storedvalues.h"

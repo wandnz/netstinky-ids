@@ -19,6 +19,7 @@
  *  Created on: 18/04/2019
  *      Author: mfletche
  */
+#include <stdio.h>
 
 #include "ids_mdns_avahi.h"
 
@@ -34,7 +35,8 @@ int mdns_setup_event_handle(uv_loop_t *loop, uv_check_t *check, AvahiSimplePoll 
 
 	if (0 > (r = uv_check_init(loop, check)))
 	{
-		fprintf("Failed to initialize the MDNS event handle: %s\n", uv_strerror(r));
+		fprintf(stderr, "Failed to initialize the MDNS event handle: %s\n",
+			uv_strerror(r));
 		return NSIDS_UV;
 	}
 

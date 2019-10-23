@@ -5,7 +5,7 @@
  *      Author: mfletche
  */
 
-#define _XOPEN_SOURCE
+#define _XOPEN_SOURCE 500
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
