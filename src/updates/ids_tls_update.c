@@ -16,8 +16,6 @@
 
 // 15 minute interval
 const static uint64_t update_interval_ms = 15 * 60 * 1000;
-const static char *server_ip = "192.168.122.104";
-const static int server_port = 15000;
 
 static void
 update_timer_cb(uv_timer_t *timer);
@@ -58,6 +56,7 @@ setup_context()
 
 int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
+		struct sockaddr_in update_addr,
 		domain_blacklist **domain, ip_blacklist **ip)
 {
 	assert(update_ctx);
@@ -70,6 +69,8 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	// Setup SSL context
 	update_ctx->ctx = setup_context();
 	if (NULL == update_ctx->ctx) return NSIDS_SSL;
+
+	update_ctx->server_addr = update_addr;
 
 	// Save blacklist pointers
 	update_ctx->domain = domain;
@@ -267,7 +268,6 @@ update_timer_cb(uv_timer_t *timer)
 
 	int rc;
 	ids_update_ctx_t *ctx = NULL;
-	struct sockaddr_in addr;
 
 	// Connect to the IOC server
 	ctx = timer->data;
@@ -298,10 +298,7 @@ update_timer_cb(uv_timer_t *timer)
 	}
 	ctx->stream.data = ctx;
 
-	rc = uv_ip4_addr(server_ip, server_port, &addr);
-	if (0 != rc) goto error;
-
-	rc = tls_stream_connect(&ctx->stream, (const struct sockaddr *)&addr,
+	rc = tls_stream_connect(&ctx->stream, (struct sockaddr *)&ctx->server_addr,
 			update_timer_on_handshake, update_timer_on_read);
 	if (0 != rc) goto error;
 	return;

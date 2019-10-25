@@ -55,6 +55,11 @@ struct IdsArgs
 	char *iface;
 	int server_port;
 	int help_flag;
+
+#ifndef NO_UPDATES
+	char *update_server_ip;
+	uint16_t update_server_port;
+#endif
 };
 
 // Variables that MUST be global so exit callback can free them
@@ -185,6 +190,8 @@ print_usage(char *prog_name)
 	printf("addresses to load into the blacklist immediately.\n");
 	printf("\t[--dnbl <blacklist]:\tPath to a blacklist file containing ");
 	printf("domain names to load into the blacklist immediately.\n");
+	printf("\t[--update-ip]:\tIp address of the update server.\n");
+	printf("\t[--update-port]:\tPort to connect to on the update server.\n");
 }
 
 /**
@@ -198,11 +205,15 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
 		{"dnbl", 1, 0, 0},
 		{"fuzz", 1, 0, 0},
 		{"help", 0, &args->help_flag, 1},
+		{"update-ip", 1, 0, 0},
+		{"update-port", 1, 0, 0},
 		{0, 0, 0, 0}
 	};
 
     int option_char;
     int option_index = 0;
+    unsigned long parsed_ul;
+    char *arg_end = NULL;
 
     memset(args, 0, sizeof(*args));
 
@@ -228,6 +239,35 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
         		if (optarg) args->fuzz_filename = optarg;
         		else return NSIDS_CMDLN;
         	}
+
+        	/**
+        	 * Options re: the update server.
+        	 */
+#ifndef NO_UPDATES
+        	else if (4 == option_index)
+        	{
+        		if (optarg) args->update_server_ip = optarg;
+        		else return NSIDS_CMDLN;
+        	}
+        	else if (5 == option_index)
+        	{
+        		if (optarg)
+        		{
+        			// Parse port as an int
+        			errno = 0;
+        			parsed_ul = strtoul(optarg, &arg_end, 10);
+
+        			// Check successful parse and within range
+        			if (!parsed_ul || ERANGE == errno || parsed_ul > USHRT_MAX)
+        			{
+        				fprintf(stderr, "Invalid port number: %s\n", optarg);
+        				return NSIDS_CMDLN;
+        			}
+        			args->update_server_port = parsed_ul;
+        		}
+        		else return NSIDS_CMDLN;
+        	}
+#endif
         	break;
         case 'h':
         	// Help flag takes priority over all other flags so return as soon
@@ -501,16 +541,22 @@ int main(int argc, char **argv)
     		|| mdns_check_start(&mdns_handle)) goto done;
 #endif
 #ifndef NO_UPDATES
-    if (setup_update_context(&ids_update_ctx, loop, &dn_bl, &ip_bl))
+    struct sockaddr_in update_server;
+    if (args.update_server_ip
+    		&& 0 == uv_ip4_addr(args.update_server_ip,
+    				args.update_server_port, &update_server))
     {
-    	printf("Could not setup updates.\n");
-    	goto done;
-    }
+		if (setup_update_context(&ids_update_ctx, loop, update_server, &dn_bl, &ip_bl))
+		{
+			printf("Could not setup updates.\n");
+			goto done;
+		}
 
-    if (setup_update_timer(&update_timer, loop, &ids_update_ctx))
-    {
-    	printf("Could not setup update timer.\n");
-    	goto done;
+		if (setup_update_timer(&update_timer, loop, &ids_update_ctx))
+		{
+			printf("Could not setup update timer.\n");
+			goto done;
+		}
     }
 #endif
 
@@ -537,4 +583,3 @@ done:
     free_globals();
     return retval;
 }
-

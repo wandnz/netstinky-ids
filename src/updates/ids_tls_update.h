@@ -44,6 +44,7 @@ typedef struct
 
 typedef struct
 {
+	struct sockaddr_in server_addr;
 	SSL_CTX *ctx;	// May only be needed once
 	tls_stream_t stream;
 	ns_cli_proto_t proto;
@@ -66,12 +67,14 @@ ns_cl_proto_on_handshake(ns_cli_state_t *state, tls_stream_t *stream);
  * Initialize an ids_update_ctx_t.
  * @param update_ctx: Uninitialized ids_update_ctx_t. May not be NULL.
  * @param loop: Libuv event loop. May not be NULL.
+ * @param update_addr: Internet address of the update server.
  * @param domain: Domain blacklist which will be updated.
  * @param ip: IP blacklist which will be updated.
  * @return: 0 if successful
  */
 int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
+		struct sockaddr_in update_addr,
 		domain_blacklist **domain, ip_blacklist **ip);
 
 /**
