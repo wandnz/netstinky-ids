@@ -17,7 +17,7 @@ static char *fmt_timestamp = "Timestamp: %11lu\n";
 static char *fmt_event_count = "Occurrences: %d\n";
 static char *fmt_iface = "Interface: %s\n";
 static char *fmt_src_ip = "Src-IP: %s\n";
-static char *fmt_src_mac = "Src-MAC: %02X:%02X:%02X:%02X:%02X:%02X\n\n";
+static char *fmt_src_mac = "Src-MAC: %02X-%02X-%02X-%02X-%02X-%02X\n\n";
 
 /**
  * A datatype to store the location of buffers used by uv_write. This should be
