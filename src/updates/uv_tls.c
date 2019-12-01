@@ -55,6 +55,14 @@ tls_stream_close_close_cb(uv_handle_t *handle);
 static void
 tls_stream_close_err_cb(tls_stream_t *stream);
 
+#ifdef DEBUG
+static void
+keylog_callback(const SSL *ssl, const char *line)
+{
+	fprintf(stderr, "%s\n", line);
+}
+#endif
+
 int
 tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
 {
@@ -77,6 +85,9 @@ tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
 	if (1 != bio_rc) goto fail;
 
 	SSL_set_bio(stream->ssl, stream->network, stream->network);
+#ifdef DEBUG
+	SSL_CTX_set_keylog_callback(ctx, keylog_callback);
+#endif
 
 	uv_rc = uv_tcp_init(loop, &stream->tcp);
 	if (uv_rc < 0)

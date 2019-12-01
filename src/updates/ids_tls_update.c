@@ -14,8 +14,8 @@
 
 #include "ids_tls_update.h"
 
-// 15 minute interval
-const static uint64_t update_interval_ms = 15 * 60 * 1000;
+// 5 minute interval
+const static uint64_t update_interval_ms = 2 * 60 * 1000;
 
 static void
 update_timer_cb(uv_timer_t *timer);
