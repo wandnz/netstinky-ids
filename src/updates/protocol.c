@@ -38,7 +38,7 @@ int
 ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 		tls_stream_t *stream, const uv_buf_t *buf)
 {
-	int rc;
+	int rc, parse_rc;
 
 	action->type = NS_ACTION_NOP;
 	action->send_buffer.base = NULL;
@@ -63,19 +63,19 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 	case NS_PROTO_OP_SENDING:
 		break;
 	case NS_PROTO_IOCS_WAITING:
-		// TODO: Process IOCs and send confirmation
-		if (0 != parse_ioc_update(buf, stream))
-			return -1;
+		// Process IOCs and send confirmation
+		if (0 == (parse_rc = parse_ioc_update(buf, stream)))
+		{
+			action->send_buffer.base = malloc(1500);
+			if (!action->send_buffer.base) return -1;
 
-		action->send_buffer.base = malloc(1500);
-		if (!action->send_buffer.base) return -1;
+			action->type = NS_ACTION_WRITE;
+			rc = snprintf(action->send_buffer.base, 1500, "UPDATE CONFIRMED\n\n");
+			assert(rc < 1500);
+			action->send_buffer.len = rc;
 
-		action->type = NS_ACTION_WRITE;
-		rc = snprintf(action->send_buffer.base, 1500, "UPDATE CONFIRMED\n\n");
-		assert(rc < 1500);
-		action->send_buffer.len = rc;
-
-		*state = NS_PROTO_CONF_SENDING;
+			*state = NS_PROTO_CONF_SENDING;
+		}
 		break;
 	case NS_PROTO_CONF_SENDING:
 		break;
@@ -91,6 +91,8 @@ int
 ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
 		tls_stream_t *stream, int status)
 {
+	ids_update_ctx_t *update_ctx = NULL;
+
 	action->type = NS_ACTION_NOP;
 	action->send_buffer.base = NULL;
 	action->send_buffer.len = 0;
@@ -103,6 +105,16 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
 		break;
 	case NS_PROTO_OP_SENDING:
 		*state = NS_PROTO_IOCS_WAITING;
+
+		// Prepare blacklist structures.
+		// TODO: Check that update is valid before freeing blacklists so we don't
+		// accidentally end up with empty blacklist.
+		update_ctx = stream->data;
+		free_ip_blacklist(update_ctx->ip);
+		*update_ctx->ip = new_ip_blacklist();
+
+		free_domain_blacklist(update_ctx->domain);
+		*update_ctx->domain = new_domain_blacklist();
 		break;
 	case NS_PROTO_IOCS_WAITING:
 		break;
@@ -249,33 +261,36 @@ process_line(char *line, domain_blacklist **dn, ip_blacklist **ip)
 	return 0;
 }
 
+/**
+ * Parse an update packet. The update may span multiple packets.
+ * @returns 0 if successful, and the packet was the last update packet expected,
+ * -ve if an error occurred, +ve if successful but more packets expected.
+ */
 static int
 parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
 {
-	ids_update_ctx_t *update_ctx = NULL;
 	char *line = NULL;
 	char *next_line = NULL;
 	int rc;
+	ids_update_ctx_t *update_ctx = NULL;
 
 	if (!buf || !stream)
 		return -1;
 
+	update_ctx = (ids_update_ctx_t *)stream->data;
 	next_line = buf->base;
-	update_ctx = stream->data;
-
-	// TODO: Check that update is valid before freeing blacklists so we don't
-	// accidentally end up with empry blacklist.
-	free_ip_blacklist(update_ctx->ip);
-	*update_ctx->ip = new_ip_blacklist();
-
-	free_domain_blacklist(update_ctx->domain);
-	*update_ctx->domain = new_domain_blacklist();
 
 	do
 	{
 		// Iterate through each line in the buffer
 		rc = uv_buf_read_line(buf, next_line, &line, &next_line);
 		if (rc < 0) break;
+
+		// Check for end of update (two new-lines in a row)
+		if ('\n' == *next_line) {
+			free(line);
+			return 0;
+		}
 
 		rc = process_line(line, update_ctx->domain, update_ctx->ip);
 		// TODO: See if there is anything I can do to handle incorrectly parsed
@@ -284,5 +299,5 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
 
 	} while (next_line);
 
-	return 0;
+	return 1;
 }

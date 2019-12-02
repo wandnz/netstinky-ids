@@ -992,7 +992,8 @@ tls_stream_close_shutdown_cb(uv_shutdown_t *req, int status)
 
 	free(req);
 
-	uv_close((uv_handle_t *)handle, tls_stream_close_close_cb);
+	if (!uv_is_closing((uv_handle_t *)handle))
+		uv_close((uv_handle_t *)handle, tls_stream_close_close_cb);
 }
 
 int
