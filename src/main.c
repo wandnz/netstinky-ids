@@ -160,7 +160,7 @@ static void free_globals(void) {
     if (pcap) pcap_close(pcap);
     if (event_queue) free_ids_event_list(&event_queue);
     if (ip_bl) free_ip_blacklist(&ip_bl);
-    if (dn_bl) free_domain_blacklist(&dn_bl);
+    if (dn_bl) domain_blacklist_clear(dn_bl);
 #ifndef NO_MDNS
     ids_mdns_free_mdns(&mdns);
 #endif

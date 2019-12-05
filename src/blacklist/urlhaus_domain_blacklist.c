@@ -71,7 +71,6 @@ handle_urlhaus_line(char *line, void *user_data)
 	value->botnet_id = 0;
 
 	rc = domain_blacklist_add(data->blacklist, line, value);
-	free(value);
 	if (!rc)
 	{
 		return;

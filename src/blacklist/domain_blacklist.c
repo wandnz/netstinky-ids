@@ -23,7 +23,7 @@
  * operation).
  */
 char *
-_domain_blacklist_reverse_labels(char * domain)
+_domain_blacklist_reverse_labels(const char * domain)
 {
 	assert(domain);
 	int reversed_idx = -1;
@@ -41,7 +41,7 @@ _domain_blacklist_reverse_labels(char * domain)
 	if (!reversed) return NULL;	// Memory allocation error
 
 	// Counts back from end as domain labels are prepended
-	reversed_idx = reversed_sz - 1;
+	reversed_idx = (int) reversed_sz - 1;
 	if (reversed_idx < 0) goto error;
 	reversed[reversed_idx] = '\0';
 
@@ -68,7 +68,7 @@ error:
 }
 
 int
-domain_blacklist_add(domain_blacklist *b, char *domain, ids_ioc_value_t *value)
+domain_blacklist_add(domain_blacklist *b, const char *domain, ids_ioc_value_t *value)
 {
 	assert(b);
 	assert(domain);
@@ -90,7 +90,7 @@ domain_blacklist_add(domain_blacklist *b, char *domain, ids_ioc_value_t *value)
 }
 
 ids_ioc_value_t *
-domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
+domain_blacklist_is_blacklisted(domain_blacklist *b, const char *domain)
 {
 	assert(b);
 	assert(domain);
@@ -115,7 +115,10 @@ domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain)
 
 	free(reversed);
 
-	return (ids_ioc_value_t *)result;
+	if (result)
+		return (ids_ioc_value_t *) *result;
+	else
+		return NULL;
 }
 
 void
@@ -131,9 +134,10 @@ domain_blacklist_clear(domain_blacklist *b)
 	while (!hattrie_iter_finished(iter))
 	{
 		stored = hattrie_iter_val(iter);
-		free_ids_ioc_value((ids_ioc_value_t *)stored);
+		free_ids_ioc_value((ids_ioc_value_t *) *stored);
 		hattrie_iter_next(iter);
 	}
+	hattrie_iter_free(iter);
 
 	hattrie_free(h);
 }

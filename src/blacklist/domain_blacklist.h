@@ -30,7 +30,7 @@ typedef hattrie_t domain_blacklist;
  * @return 1 if successful, 0 if unsuccessful.
  */
 int
-domain_blacklist_add(domain_blacklist *b, char *domain, ids_ioc_value_t *value);
+domain_blacklist_add(domain_blacklist *b, const char *domain, ids_ioc_value_t *value);
 
 /**
  * Lookup a domain in the blacklist. Will handle reversing the labels of the
@@ -41,7 +41,7 @@ domain_blacklist_add(domain_blacklist *b, char *domain, ids_ioc_value_t *value);
  * if the key is not in the blacklist.
  */
 ids_ioc_value_t *
-domain_blacklist_is_blacklisted(domain_blacklist *b, char *domain);
+domain_blacklist_is_blacklisted(domain_blacklist *b, const char *domain);
 
 /**
  * Empty all domains in the blacklist.

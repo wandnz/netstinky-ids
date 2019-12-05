@@ -476,6 +476,8 @@ tls_stream_on_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	}
 
 	decrypt_rc = tls_stream_decrypt_buffer(&decrypted, tls, nread, buf);
+	// We are finished with this buffer now
+	free(buf->base);
 	if (decrypt_rc == TLS_STR_OK && decrypted.len == 0) return;
 
 	tls->on_read(tls, decrypt_rc, &decrypted);

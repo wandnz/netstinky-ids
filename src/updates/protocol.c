@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "../blacklist/ids_storedvalues.h"
+#include "../blacklist/domain_blacklist.h"
 #include "ids_tls_update.h"
 #include "uv_buf_helper.h"
 
@@ -113,7 +114,7 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
 		free_ip_blacklist(update_ctx->ip);
 		*update_ctx->ip = new_ip_blacklist();
 
-		free_domain_blacklist(update_ctx->domain);
+		domain_blacklist_clear(*update_ctx->domain);
 		*update_ctx->domain = new_domain_blacklist();
 		break;
 	case NS_PROTO_IOCS_WAITING:
@@ -240,20 +241,24 @@ process_line(char *line, domain_blacklist **dn, ip_blacklist **ip)
 	if (0 == strncmp(dn_label, line, strlen(dn_label)))
 	{
 		rc = parse_dn_line(line, &domain, &domain_value);
-		if (rc < 0) return -1;
+		if (rc < 0)
+		{
+			free_ids_ioc_value(domain_value);
+			return -1;
+		}
 		rc = domain_blacklist_add(*dn, domain, domain_value);
-		if (rc < 0) return -1;
+		if (rc < 0)
+		{
+			free_ids_ioc_value(domain_value);
+			return -1;
+		}
 	}
 	else if (0 == strncmp(ip_label, line, strlen(ip_label)))
 	{
 		rc = parse_ip_line(line, &ioc);
 		if (rc < 0) return -1;
 		rc = ip_blacklist_add(*ip, &ioc);
-		if (rc < 0)
-		{
-			free_ids_ioc_value(domain_value);
-			return -1;
-		}
+		if (rc < 0) return -1;
 	}
 	else
 		return -1;
