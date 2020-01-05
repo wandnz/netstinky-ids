@@ -25,8 +25,15 @@ int ip_blacklist_cmp(void *a, void *b)
 	// Rank by IP addresses, and then by ports. Both must be equal to get
 	// a 0 result.
 	diff = a_val->ip_addr - b_val->ip_addr;
+
 	if (!diff)
-		diff = a_val->port - b_val->port;
+	{
+		// A port value of 0 matches anything
+		if (a_val->port == 0 || b_val->port == 0)
+			diff = 0;
+		else
+			diff = a_val->port - b_val->port;
+	}
 
 	return diff;
 }
