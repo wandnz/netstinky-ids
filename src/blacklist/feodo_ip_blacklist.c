@@ -6,6 +6,7 @@
  */
 
 #define _XOPEN_SOURCE 500
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -223,7 +224,31 @@ parse_feodo_line(feodo_row_t *parsed, char *line)
 error:
 	if (parsed->dst_ip) free(parsed->dst_ip);
 	return -1;
+}
 
+int
+parse_feodo_line_ip_only(feodo_row_t *parsed, char *line)
+{
+	assert(parsed);
+	assert(line);
+
+	// Truncate newline
+	size_t line_len, line_idx;
+	for (line_len = strlen(line); line_len > 0; line_len--)
+	{
+		line_idx = line_len - 1;
+		if (line[line_idx] != '\r'
+				&& line[line_idx] != '\n')
+			break;
+
+		line[line_idx] = '\0';
+	}
+
+	memset(parsed, 0, sizeof(*parsed));
+	if (!is_valid_ipv4_address(line)) return -1;
+	parsed->dst_ip = strdup(line);
+	if (!parsed->dst_ip) return -1;
+	return 0;
 }
 
 /**
@@ -280,7 +305,7 @@ handle_feodo_line(char *line, void *usr_data)
 	feodo_cb_data_t *cb_data = (feodo_cb_data_t *)usr_data;
 	feodo_row_t parsed;
 
-	rc = parse_feodo_line(&parsed, line);
+	rc = parse_feodo_line_ip_only(&parsed, line);
 	if (rc) return;
 
 	rc = insert_blacklist_item(cb_data->blacklist, parsed.dst_ip,

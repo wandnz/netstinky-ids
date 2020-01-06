@@ -47,7 +47,8 @@ ip_blacklist_add(ip_blacklist *b, ip_key_value_t *addr);
  * Return the key-value struct if it exists.
  * @param b: The blacklist.
  * @param ip_addr: The IP address to look up.
- * @param port: The port to look up.
+ * @param port: The port to look up. A value of 0 will ignore the port number
+ * and return a match if just the IP address matches a key in the blacklist.
  * @return: The address of the key-value struct within the blacklist or NULL if
  * the IP address/port is not in the data structure. Do not modify the
  * key-value struct.
