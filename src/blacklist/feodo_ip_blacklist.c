@@ -284,7 +284,7 @@ insert_blacklist_item(ip_blacklist *bl, char *ip_addr, uint16_t port, char *malw
 	int rc;
 	ip_key_value_t item;
 
-	if (!bl || !ip_addr || 0 == port) return -1;
+	if (!bl || !ip_addr) return -1;
 
 	rc = ip_addr_str_to_int(&item.ip_addr, ip_addr);
 	if (rc) return -1;
