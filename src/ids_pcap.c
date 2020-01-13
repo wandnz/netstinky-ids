@@ -138,18 +138,24 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 		}
 		ip_hdr = (struct ip *)(pcap_data + sizeof(*eth_hdr));
 
-		DPRINT("ids_pcap_read_packet(): destination IP: %s\n", inet_ntoa(ip_hdr->ip_dst));
-		DPRINT("ids_pcap_read_packet(): source IP: %s\n", inet_ntoa(ip_hdr->ip_src));
 		out->dest_ip = ip_hdr->ip_dst.s_addr;
 		out->src_ip = ip_hdr->ip_src.s_addr;
 
 		switch (ip_hdr->ip_p)
 		{
 			case IPPROTO_TCP:
-				DPRINT("ids_pcap_read_packet(): tcp packet\n");
 				tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*eth_hdr) + sizeof(*ip_hdr));
 				out->dest_port = tcp_hdr->th_dport;
 				out->src_port = tcp_hdr->th_sport;
+
+				DPRINT("ids_pcap_read_packet(): TCP %s:%d -> ",
+					inet_ntoa(ip_hdr->ip_src),
+					ntohs(tcp_hdr->th_sport)
+				);
+				DPRINT("%s:%d\n",
+					inet_ntoa(ip_hdr->ip_dst),
+					ntohs(tcp_hdr->th_dport)
+				);
 
 				/* Check header is correct */
 				assert((tcp_hdr->th_flags & TH_SYN) && !(tcp_hdr->th_flags & TH_ACK));
@@ -157,10 +163,19 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 				out->domain = NULL;
 				break;
 			case IPPROTO_UDP:
-				DPRINT("ids_pcap_read_packet(): udp packet\n");
 				udp_hdr = (struct udphdr *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr)));
 				out->dest_port = udp_hdr->uh_dport;
 				out->src_port = udp_hdr->uh_sport;
+
+				DPRINT("ids_pcap_read_packet(): UDP %s:%d -> ",
+					inet_ntoa(ip_hdr->ip_src),
+					ntohs(udp_hdr->uh_sport)
+				);
+				DPRINT("%s:%d\n",
+					inet_ntoa(ip_hdr->ip_dst),
+					ntohs(udp_hdr->uh_dport)
+				);
+
 				payload_pos = (uint8_t *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
 
 				uint8_t *payload_end = (uint8_t *) payload_pos + (pcap_hdr->len - (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
