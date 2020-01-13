@@ -205,6 +205,7 @@ update_timer_on_read(tls_stream_t *stream, int status, const uv_buf_t *buf)
 
 	if (TLS_STR_OK != status)
 	{
+		if (buf) free(buf->base);
 		rc = tls_stream_shutdown(stream, update_timer_on_shutdown);
 		return;
 	}
@@ -275,20 +276,32 @@ update_timer_cb(uv_timer_t *timer)
 	// Re-init protocol
 	ctx->proto.state = NS_PROTO_VERSION_WAITING;
 
+	printf("Update callback\n");
+
 	// When not initialized, the handle type will be UNKNOWN. Check if the previous TCP
 	// handle is still open.
-	if (ctx->stream.tcp.type == UV_TCP && uv_is_active((uv_handle_t *)&ctx->stream.tcp))
+	if (ctx->stream.tcp.type == UV_TCP)
 	{
-		rc = tls_stream_close(&ctx->stream, update_timer_on_close);
-		if (rc)
+		if (uv_is_active((uv_handle_t *)&ctx->stream.tcp))
 		{
-			// Callback is not going to happen, so free and continue
+			// Close properly, but might mean cannot update until next timeout.
+			rc = tls_stream_close(&ctx->stream, update_timer_on_close);
+			if (rc)
+			{
+				// Callback is not going to happen, so free and continue
+				tls_stream_fini(&ctx->stream);
+				memset(&ctx->stream, 0, sizeof(ctx->stream));
+			}
+			else
+				// Can't clean up until after the callback
+				return;
+		}
+		else
+		{
+			// Inactive handle still exists.
 			tls_stream_fini(&ctx->stream);
 			memset(&ctx->stream, 0, sizeof(ctx->stream));
 		}
-		else
-			// Can't clean up until after the callback
-			return;
 	}
 	rc = tls_stream_init(&ctx->stream, timer->loop, ctx->ctx);
 	if (rc)
