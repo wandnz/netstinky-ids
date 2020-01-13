@@ -262,6 +262,17 @@ void ids_server_write_cb(uv_write_t *req, int status)
 	}
 }
 
+static void
+on_client_close(uv_handle_t *handle)
+{
+	if (handle->type == UV_TCP)
+	{
+		uv_tcp_t *client = (uv_tcp_t *) handle;
+		// Assume client->data will be freed elsewhere
+		free(client);
+	}
+}
+
 static void on_new_connection(uv_stream_t *server, int status)
 {
 	int err;
@@ -287,7 +298,7 @@ static void on_new_connection(uv_stream_t *server, int status)
 msg:
 	fprintf(stderr, "connection error: %s\n", uv_strerror(err));
 error:
-	if (client) uv_close((uv_handle_t *)client, NULL);
+	if (client) uv_close((uv_handle_t *)client, (uv_close_cb) on_client_close);
 }
 
 int
