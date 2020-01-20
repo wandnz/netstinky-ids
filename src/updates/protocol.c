@@ -65,8 +65,10 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 		break;
 	case NS_PROTO_IOCS_WAITING:
 		// Process IOCs and send confirmation
-		if (0 == (parse_rc = parse_ioc_update(buf, stream)))
+		parse_rc = parse_ioc_update(buf, stream);
+		switch (parse_rc)
 		{
+		case 0:
 			action->send_buffer.base = malloc(1500);
 			if (!action->send_buffer.base) return -1;
 
@@ -76,6 +78,18 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 			action->send_buffer.len = rc;
 
 			*state = NS_PROTO_CONF_SENDING;
+			break;
+		default:
+			action->send_buffer.base = malloc(1500);
+			if (!action->send_buffer.base) return -1;
+
+			action->type = NS_ACTION_WRITE;
+			rc = snprintf(action->send_buffer.base, 1500, "ERROR\n\n");
+			assert (rc < 1500);
+			action->send_buffer.len = rc;
+
+			*state = NS_PROTO_CONF_SENDING;
+			break;
 		}
 		break;
 	case NS_PROTO_CONF_SENDING:
@@ -290,8 +304,10 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
 		// Iterate through each line in the buffer
 		rc = uv_buf_read_line(buf, next_line, &line, &next_line);
 		if (rc < 0) break;
+		if (!next_line) break;
 
 		// Check for end of update (two new-lines in a row)
+		/* TODO: Segfault with fuzzed input */
 		if ('\n' == *next_line) {
 			free(line);
 			return 0;
