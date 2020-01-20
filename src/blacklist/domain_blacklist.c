@@ -83,6 +83,11 @@ domain_blacklist_add(domain_blacklist *b, const char *domain, ids_ioc_value_t *v
 
 	len = strlen(reversed);
 	result = hattrie_get(h, reversed, len);
+	if (result && *result)
+	{
+		// If the trie already has a value for this domain, free the old one
+		free_ids_ioc_value((ids_ioc_value_t *)*result);
+	}
 	*result = (uintptr_t)value;
 	free(reversed);
 
