@@ -6,7 +6,6 @@ nsids_SOURCES = \
 	blacklist/domain_blacklist.c \
 	blacklist/feodo_ip_blacklist.c \
 	blacklist/ids_blacklist.c \
-	blacklist/ids_blacklist_update.c \
 	blacklist/ip_blacklist.c \
 	blacklist/ids_storedvalues.c \
 	blacklist/urlhaus_domain_blacklist.c \
