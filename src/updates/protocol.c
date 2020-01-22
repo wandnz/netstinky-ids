@@ -13,6 +13,7 @@
 #include "../blacklist/domain_blacklist.h"
 #include "ids_tls_update.h"
 #include "uv_buf_helper.h"
+#include "domain_validation.h"
 
 // Labels for contents of each received line
 const static char *dn_label = "DN_IOC:";
@@ -223,7 +224,7 @@ parse_dn_line(char *line, char **out, ids_ioc_value_t **value)
 
 	// Second token is the domain name
 	token = strtok(NULL, delim);
-	if (!token) return -1;
+	if (!token || is_domain_valid(token, strlen(token)) != 0) return -1;
 	domain = token;
 
 	// Should be no further tokens

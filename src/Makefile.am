@@ -74,10 +74,12 @@ if ENABLE_UPDATES
 nsids_CFLAGS += $(UPDATES_CFLAGS)
 nsids_LDFLAGS += -lcrypto $(UPDATES_LIBS)
 nsids_SOURCES += \
+  updates/domain_validation.c \
   updates/ids_tls_update.c \
   updates/protocol.c \
   updates/uv_buf_helper.c \
   updates/uv_tls.c \
+  updates/domain_validation.h \
   updates/ids_tls_update.h \
   updates/uv_buf_helper.h \
   updates/uv_tls.h
