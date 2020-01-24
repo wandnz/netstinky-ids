@@ -50,6 +50,8 @@ typedef struct
 	ns_cli_proto_t proto;
 	domain_blacklist **domain;
 	ip_blacklist **ip;
+	domain_blacklist *new_domain;
+	ip_blacklist *new_ip;
 } ids_update_ctx_t;
 
 int

@@ -78,6 +78,10 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	update_ctx->proto.state = NS_PROTO_VERSION_WAITING;
 	update_ctx->stream.data = update_ctx;
 
+	// Prepare new blacklist pointers
+	update_ctx->new_domain = NULL;
+	update_ctx->new_ip = NULL;
+
 	return NSIDS_OK;
 }
 
@@ -94,9 +98,29 @@ teardown_update_context(ids_update_ctx_t *update_ctx)
 
 	if (!update_ctx) return -1;
 
+	
+	// If the current domain structure equals the new domain structure,
+	// do not free it!
+	if (update_ctx->domain != NULL &&
+			*update_ctx->domain == update_ctx->new_domain)
+		update_ctx->new_domain = NULL;
+
+	// If the current ip structure equals the new ip structure,
+	// do not free it!
+	if (update_ctx->ip != NULL &&
+			*update_ctx->ip == update_ctx->new_ip)
+		update_ctx->new_ip = NULL;
+
 	// Not managed by the update ctx, user responsible for freeing
 	update_ctx->domain = NULL;
 	update_ctx->ip = NULL;
+
+	// If the `new` structures are non-NULL, they haven't been set as the
+	// active blacklist structures and therefore need to be freed
+	if (update_ctx->new_domain)
+		domain_blacklist_clear(update_ctx->new_domain);
+	if (update_ctx->new_ip)
+		ip_blacklist_clear(update_ctx->new_ip);
 
 	update_ctx->proto.state = 0;
 

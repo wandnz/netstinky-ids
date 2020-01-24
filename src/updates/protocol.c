@@ -19,6 +19,53 @@
 const static char *dn_label = "DN_IOC:";
 const static char *ip_label = "IP_IOC:";
 
+static void
+swap_blacklists(ids_update_ctx_t * const context)
+{
+	// Global blacklist pointers
+	domain_blacklist **g_dn = context->domain;
+	ip_blacklist **g_ip = context->ip;
+
+	// Old blacklists
+	domain_blacklist *old_dn = *g_dn;
+	ip_blacklist *old_ip = *g_ip;
+	// New blacklist pointers
+	domain_blacklist *new_dn = context->new_domain;
+	ip_blacklist *new_ip = context->new_ip;
+
+	// NULL out the new pointers
+	context->new_ip = NULL;
+	context->new_domain = NULL;
+	// Swap out the active blacklists
+	*context->domain = new_dn;
+	*context->ip = new_ip;
+
+	// Free the old blacklists
+	domain_blacklist_clear(old_dn);
+	// free_domain_blacklist(dn);
+	free_ip_blacklist(&old_ip);
+}
+
+static void
+reinit_staging_blacklists(ids_update_ctx_t * const context)
+{
+	// For both blacklists:
+	// - if the `new` blacklist is null, skip to CREATE
+	// - if the `new` blacklist is non-null, but *is* the same as the active
+	//   blacklist, skip to CREATE. Otherwise, free the blacklist.
+	// - CREATE: create a new blacklist
+
+	if (context->new_domain)
+		if (*context->domain != context->new_domain)
+			free_domain_blacklist(&context->new_domain);
+	context->new_domain = new_domain_blacklist();
+
+	if (context->new_ip)
+		if(*context->ip != context->new_ip)
+			free_ip_blacklist(&context->new_ip);
+	context->new_ip = new_ip_blacklist();
+}
+
 static int
 parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream);
 
@@ -123,14 +170,8 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
 		*state = NS_PROTO_IOCS_WAITING;
 
 		// Prepare blacklist structures.
-		// TODO: Check that update is valid before freeing blacklists so we don't
-		// accidentally end up with empty blacklist.
 		update_ctx = stream->data;
-		free_ip_blacklist(update_ctx->ip);
-		*update_ctx->ip = new_ip_blacklist();
-
-		domain_blacklist_clear(*update_ctx->domain);
-		*update_ctx->domain = new_domain_blacklist();
+		reinit_staging_blacklists(update_ctx);
 		break;
 	case NS_PROTO_IOCS_WAITING:
 		break;
@@ -138,6 +179,8 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
 		// TODO: Begin close
 		action->type = NS_ACTION_CLOSE;
 		*state = NS_PROTO_CLOSE;
+		update_ctx = stream->data;
+		swap_blacklists(update_ctx);
 		break;
 	case NS_PROTO_CLOSE:
 		break;
@@ -314,9 +357,7 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
 			return 0;
 		}
 
-		rc = process_line(line, update_ctx->domain, update_ctx->ip);
-		// TODO: See if there is anything I can do to handle incorrectly parsed
-		// lines
+		rc = process_line(line, &update_ctx->new_domain, &update_ctx->new_ip);
 		free(line);
 
 	} while (next_line);
