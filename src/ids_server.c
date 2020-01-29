@@ -31,6 +31,7 @@ typedef struct evs_usr_data_s
 } evs_usr_data_t;
 
 void ids_server_write_cb(uv_write_t *req, int status);
+static void on_client_close(uv_handle_t *handle);
 
 /**
  * Bundle the write buffers into a single data structure. Copies all uv_buf_t
@@ -207,7 +208,9 @@ static void write_sock_shutdown(uv_shutdown_t *req, int status) {
         fprintf(stderr, "Failed to close write socket");
     }
     if (req != NULL) {
+		uv_stream_t *stream = req->handle;
         free(req);
+		if (stream) uv_close((uv_handle_t *) stream, (uv_close_cb) on_client_close);
     }
 }
 
