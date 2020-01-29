@@ -351,8 +351,7 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
 		if (!next_line) break;
 
 		// Check for end of update (two new-lines in a row)
-		/* TODO: Segfault with fuzzed input */
-		if ('\n' == *next_line) {
+		if (*line == '\0' && '\0' == *next_line) {
 			free(line);
 			return 0;
 		}
