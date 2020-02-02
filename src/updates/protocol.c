@@ -348,7 +348,11 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
 		// Iterate through each line in the buffer
 		rc = uv_buf_read_line(buf, next_line, &line, &next_line);
 		if (rc < 0) break;
-		if (!next_line) break;
+		if (!next_line)
+		{
+			if (line) free(line);
+			break;
+		}
 
 		// Check for end of update (two new-lines in a row)
 		if (*line == '\0' && '\0' == *next_line) {
