@@ -114,31 +114,18 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 	case NS_PROTO_IOCS_WAITING:
 		// Process IOCs and send confirmation
 		parse_rc = parse_ioc_update(buf, stream);
-		switch (parse_rc)
-		{
-		case 0:
-			action->send_buffer.base = malloc(1500);
-			if (!action->send_buffer.base) return -1;
+		action->send_buffer.base = malloc(1500);
+		if (!action->send_buffer.base) return -1;
 
-			action->type = NS_ACTION_WRITE;
+		action->type = NS_ACTION_WRITE;
+		if (parse_rc)
 			rc = snprintf(action->send_buffer.base, 1500, "UPDATE CONFIRMED\n\n");
-			assert(rc < 1500);
-			action->send_buffer.len = rc;
-
-			*state = NS_PROTO_CONF_SENDING;
-			break;
-		default:
-			action->send_buffer.base = malloc(1500);
-			if (!action->send_buffer.base) return -1;
-
-			action->type = NS_ACTION_WRITE;
+		else
 			rc = snprintf(action->send_buffer.base, 1500, "ERROR\n\n");
-			assert (rc < 1500);
-			action->send_buffer.len = rc;
+		assert(rc < 1500);
+		action->send_buffer.len = rc;
 
-			*state = NS_PROTO_CONF_SENDING;
-			break;
-		}
+		*state = NS_PROTO_CONF_SENDING;
 		break;
 	case NS_PROTO_CONF_SENDING:
 		break;
@@ -183,6 +170,7 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
 		swap_blacklists(update_ctx);
 		break;
 	case NS_PROTO_CLOSE:
+		printf("NS_PROTO_CLOSE in on_send\n");
 		break;
 	}
 
