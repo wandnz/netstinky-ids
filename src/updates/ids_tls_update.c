@@ -157,7 +157,7 @@ perform_protocol_action(tls_stream_t *stream, ns_action_t action)
 		if (TLS_STR_OK != rc) return -1;
 		break;
 	case NS_ACTION_CLOSE:
-		rc = tls_stream_shutdown(stream, NULL);
+		rc = tls_stream_shutdown(stream, update_timer_on_shutdown);
 		if (TLS_STR_OK != rc) return -1;
 		break;
 	}
