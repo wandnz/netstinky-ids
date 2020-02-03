@@ -5,6 +5,10 @@
  *      Author: mfletche
  */
 
+#if defined(__linux__)
+#define __FAVOR_BSD
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 

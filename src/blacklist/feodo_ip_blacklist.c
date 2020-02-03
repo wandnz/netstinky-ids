@@ -6,13 +6,21 @@
  */
 
 #define _XOPEN_SOURCE 500
-#include <assert.h>
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
+
+#include <stdlib.h>
+#include <string.h>
+
+#define _WITH_GETLINE
+#include <stdio.h>
+#include <assert.h>
+
+#include <errno.h>
+#include <time.h>
 
 #include "../utils/file_processing.h"
 #include "ip_blacklist.h"

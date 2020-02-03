@@ -28,7 +28,8 @@ nsids_SOURCES = \
 	main.c
 
 nsids_CFLAGS = $(AM_CFLAGS)
-nsids_LDFLAGS = -luv -lpcap
+nsids_LDADD = @OPENSSL_LIBS@
+nsids_LDFLAGS = -luv -lpcap @OPENSSL_LDFLAGS@
 
 nsids_SOURCES += \
 	common.h \

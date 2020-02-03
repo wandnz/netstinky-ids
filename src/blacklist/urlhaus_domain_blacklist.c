@@ -4,8 +4,11 @@
  *  Created on: 11/04/2019
  *      Author: mfletche
  */
-#include <assert.h>
+
+#define _WITH_GETLINE
 #include <stdio.h>
+
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 

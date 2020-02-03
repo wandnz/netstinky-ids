@@ -56,6 +56,10 @@ AC_SEARCH_LIBS([pcap_create], [pcap], [], [
   AC_MSG_ERROR([required library libpcap not found])
 ])
 
+AC_CHECK_FUNCS(memcpy)
+AC_CHECK_FUNCS(memmove)
+AC_CHECK_FUNCS(memset)
+
 # Define ./configure options
 AC_ARG_ENABLE([debug],
   [AS_HELP_STRING([--enable-debug], [build with debugging symbols])])
@@ -94,13 +98,22 @@ AS_IF([test "x$enable_mdns" != xno],
 # Act on enable-updates option
 AS_IF([test "x$enable_updates" != xno],
   [
-  PKG_CHECK_MODULES([UPDATES], [libssl libcrypto])
+  AX_CHECK_OPENSSL(
+    [AC_DEFINE([HAVE_OPENSSL], [1], [Define to 1 if you have OpenSSL])]
+    [CFLAGS="$CFLAGS $OPENSSL_INCLUDES"]
+    [have_openssl=yes]
+  )
   AM_CONDITIONAL(ENABLE_UPDATES, true)
   ], [
   AM_CONDITIONAL(ENABLE_UPDATES, false)
   AC_DEFINE(NO_UPDATES,[1])
   ]
 )
+
+if test "x$have_openssl" = xyes; then
+   LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
+   LIBS="$LIBS $OPENSSL_LIBS"
+fi
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
