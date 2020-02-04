@@ -1,46 +1,87 @@
-AC_INIT([nsids], [0.1], [amackint@waikato.ac.nz])
+# Process this file with autoconf to produce a configure script
 
+AC_PREREQ(2.69)
+AC_INIT([nsids], [0.1], [amackint@waikato.ac.nz])
+AC_CONFIG_SRCDIR([main.c])
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([1.11 -Wall -Werror foreign subdir-objects])
+AC_USE_SYSTEM_EXTENSIONS
 
 AC_PROG_LIBTOOL
+AC_PROG_CXX
 AC_PROG_CC
-AC_PROG_CC_STDC
+AC_PROG_CPP
 AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
 AC_PROG_MKDIR_P
 AC_LANG(C)
 LT_INIT
 
+# Checks for typedefs, structures, and compiler characteristics.
+AC_CHECK_HEADER_STDBOOL
+AC_C_INLINE
+AC_TYPE_INT16_T
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_INT8_T
+AC_C_RESTRICT
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINT8_T
+AC_CHECK_TYPES([ptrdiff_t])
+
+# Checks for library functions.
 AC_HEADER_ASSERT
 AC_HEADER_STDC
 AC_HEADER_STDBOOL
 AC_HEADER_TIME
+AC_FUNC_MALLOC
+AC_FUNC_MKTIME
+AC_FUNC_REALLOC
+AC_FUNC_STRNLEN
 
-AC_MSG_CHECKING(whether compiler understands -Wall)
-old_CFLAGS="$CFLAGS"
-CFLAGS="$CFLAGS -Wall"
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-  CFLAGS="$old_CFLAGS")
-
-AC_CHECK_HEADER(arpa/inet.h)
-AC_CHECK_HEADER(errno.h)
-AC_CHECK_HEADER(getopt.h)
-AC_CHECK_HEADER(limits.h)
-AC_CHECK_HEADER(math.h)
-AC_CHECK_HEADER(net/ethernet.h)
-AC_CHECK_HEADER(netinet/in.h)
-AC_CHECK_HEADER(netinet/ip.h)
-AC_CHECK_HEADER(netinet/udp.h)
-AC_CHECK_HEADER(poll.h)
-AC_CHECK_HEADER(signal.h)
-AC_CHECK_HEADER(stddef.h)
-AC_CHECK_HEADER(stdint.h)
-AC_CHECK_HEADER(stdio.h)
-AC_CHECK_HEADER(strings.h)
-AC_CHECK_HEADER(sys/socket.h)
-AC_CHECK_HEADER(unistd.h)
+# Checks for header files.
+AC_CHECK_HEADERS([sys/types.h])
+AC_CHECK_HEADERS([arpa/inet.h])
+AC_CHECK_HEADERS([errno.h])
+AC_CHECK_HEADERS([getopt.h])
+AC_CHECK_HEADERS([limits.h])
+AC_CHECK_HEADERS([math.h])
+AC_CHECK_HEADERS([net/ethernet.h])
+AC_CHECK_HEADERS([netinet/in.h], [], [],
+[#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+# endif
+])
+AC_CHECK_HEADERS([netinet/ip.h], [], [],
+[#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+# endif
+#if HAVE_NETINET_IN_H
+# include <netinet/in.h>
+# endif
+])
+AC_CHECK_HEADERS([netinet/udp.h])
+AC_CHECK_HEADERS([poll.h])
+AC_CHECK_HEADERS([signal.h])
+AC_CHECK_HEADERS([stddef.h])
+AC_CHECK_HEADERS([stdint.h])
+AC_CHECK_HEADERS([stdlib.h])
+AC_CHECK_HEADERS([stdio.h])
+AC_CHECK_HEADERS([string.h])
+AC_CHECK_HEADERS([strings.h])
+AC_CHECK_HEADERS([sys/param.h])
+AC_CHECK_HEADERS([sys/socket.h])
+AC_CHECK_HEADERS([sys/time.h])
+AC_CHECK_HEADERS([unistd.h])
+AC_CHECK_HEADERS([wchar.h])
+AC_CHECK_HEADERS([endian.h sys/endian.h], [
+  break
+])
 
 AC_CHECK_HEADER([uv.h], [], [
   AC_MSG_ERROR([required header uv.h not found])
@@ -56,9 +97,7 @@ AC_SEARCH_LIBS([pcap_create], [pcap], [], [
   AC_MSG_ERROR([required library libpcap not found])
 ])
 
-AC_CHECK_FUNCS(memcpy)
-AC_CHECK_FUNCS(memmove)
-AC_CHECK_FUNCS(memset)
+AC_CHECK_FUNCS([clock_gettime gettimeofday inet_ntoa memcpy memmove memset strcasecmp strdup strstr strtol strtoul])
 
 # Define ./configure options
 AC_ARG_ENABLE([debug],
