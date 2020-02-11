@@ -144,7 +144,6 @@ AS_IF([test "x$enable_updates" != xno],
   [
   AX_CHECK_OPENSSL(
     [AC_DEFINE([HAVE_OPENSSL], [1], [Define to 1 if you have OpenSSL])]
-    [CFLAGS="$CFLAGS $OPENSSL_INCLUDES"]
     [have_openssl=yes]
   )
   AM_CONDITIONAL(ENABLE_UPDATES, true)
