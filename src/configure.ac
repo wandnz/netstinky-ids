@@ -14,6 +14,7 @@ AC_LANG([C])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([main.c])
+AC_CONFIG_HEADERS([config.h])
 
 AC_PROG_CXX
 AC_PROG_CC
@@ -120,13 +121,7 @@ AC_ARG_ENABLE([updates],
 
 # Act on enable-debug option
 AS_IF([test "x$enable_debug" != xno],
-  [
-  AM_CONDITIONAL(ENABLE_DEBUG, true)
-  AC_DEFINE(DEBUG,[1])
-  ], [
-  AM_CONDITIONAL(ENABLE_DEBUG, false)
-  ]
-)
+  [AC_DEFINE(DEBUG, [1], [Define to enable DEBUG features])])
 
 # Act on enable-mdns option
 AS_IF([test "x$enable_mdns" != xno],
@@ -135,7 +130,7 @@ AS_IF([test "x$enable_mdns" != xno],
   AM_CONDITIONAL(ENABLE_MDNS, true)
   ], [
   AM_CONDITIONAL(ENABLE_MDNS, false)
-  AC_DEFINE(NO_MDNS,[1])
+  AC_DEFINE(NO_MDNS, [1], [Define to disable mDNS listener])
   ]
 )
 
@@ -149,7 +144,7 @@ AS_IF([test "x$enable_updates" != xno],
   AM_CONDITIONAL(ENABLE_UPDATES, true)
   ], [
   AM_CONDITIONAL(ENABLE_UPDATES, false)
-  AC_DEFINE(NO_UPDATES,[1])
+  AC_DEFINE(NO_UPDATES, [1], [Define to disable online updates])
   ]
 )
 

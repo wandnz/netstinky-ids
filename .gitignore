@@ -144,3 +144,6 @@ local.properties
 *.mk
 Debug/
 # End of https://www.gitignore.io/api/c,linux,eclipse
+
+# Exclude Autotools config.h
+src/config.h
