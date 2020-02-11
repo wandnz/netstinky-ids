@@ -1,13 +1,20 @@
+#                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script
 
 AC_PREREQ(2.69)
 AC_INIT([nsids], [0.1], [amackint@waikato.ac.nz])
-AC_CONFIG_SRCDIR([main.c])
-AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE([1.11 -Wall -Werror foreign subdir-objects])
 AC_USE_SYSTEM_EXTENSIONS
+AM_INIT_AUTOMAKE([1.11 -Wall -Werror foreign subdir-objects])
 
-AC_PROG_LIBTOOL
+AM_PROG_AR
+LT_PREREQ([2.4])
+LT_INIT([dlopen])
+
+AC_LANG([C])
+
+AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_SRCDIR([main.c])
+
 AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_CPP
@@ -15,8 +22,6 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_MKDIR_P
-AC_LANG(C)
-LT_INIT
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
@@ -150,8 +155,30 @@ AS_IF([test "x$enable_updates" != xno],
 )
 
 if test "x$have_openssl" = xyes; then
+   AC_MSG_CHECKING([for SSL_CTX_set_keylog_callback])
+   save_LDFLAGS="$LDFLAGS"
+   save_LIBS="$LIBS"
    LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
    LIBS="$LIBS $OPENSSL_LIBS"
+   AC_LINK_IFELSE([
+     AC_LANG_PROGRAM([
+       [#include <openssl/ssl.h>]],
+       [
+[const SSL_METHOD *method = SSLv23_method();]
+[SSL_CTX *ctx = SSL_CTX_new(method);]
+[SSL_CTX_set_keylog_callback(ctx, (SSL_CTX_keylog_cb_func) 0);]
+     ])
+   ],
+   [
+    AC_MSG_RESULT([yes])
+    AC_DEFINE_UNQUOTED([HAVE_SSL_CTX_SET_KEYLOG_CALLBACK], 1,
+        [Define to 1 if you have the SSL_CTX_set_keylog_callback function])
+   ],
+   [
+    AC_MSG_RESULT([no])
+   ])
+   LDFLAGS="$save_LDFLAGS"
+   LIBS="$save_LIBS"
 fi
 
 AC_CONFIG_FILES([Makefile])
