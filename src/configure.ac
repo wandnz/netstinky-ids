@@ -16,7 +16,6 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([main.c])
 AC_CONFIG_HEADERS([config.h])
 
-AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
@@ -85,9 +84,7 @@ AC_CHECK_HEADERS([sys/socket.h])
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_HEADERS([unistd.h])
 AC_CHECK_HEADERS([wchar.h])
-AC_CHECK_HEADERS([endian.h sys/endian.h], [
-  break
-])
+AC_CHECK_HEADERS([endian.h sys/endian.h], [break])
 
 AC_CHECK_HEADER([uv.h], [], [
   AC_MSG_ERROR([required header uv.h not found])
@@ -107,48 +104,47 @@ AC_CHECK_FUNCS([clock_gettime gettimeofday inet_ntoa memcpy memmove memset strca
 
 # Define ./configure options
 AC_ARG_ENABLE([debug],
-  [AS_HELP_STRING([--enable-debug], [build with debugging symbols])])
+  [AS_HELP_STRING([--enable-debug],
+    [build with debugging symbols])],
+  [debug="$enableval"], [debug=no])
 
 AC_ARG_ENABLE([mdns],
-  [AS_HELP_STRING([--enable-mdns], [enable mDNS advertisement with avahi])],
-  [],
-  [enable_mdns=yes])
+  [AS_HELP_STRING([--enable-mdns],
+    [enable mDNS advertisement with avahi])],
+  [mdns="$enableval"], [mdns=yes])
 
 AC_ARG_ENABLE([updates],
-  [AS_HELP_STRING([--enable-updates], [enable online updates over tls])],
-  [],
-  [enable_updates=yes])
+  [AS_HELP_STRING([--enable-updates],
+    [enable online updates over tls])],
+  [updates="$enableval"], [updates=yes])
 
 # Act on enable-debug option
-AS_IF([test "x$enable_debug" != xno],
+AS_IF([test "x$debug" != xno],
   [AC_DEFINE(DEBUG, [1], [Define to enable DEBUG features])])
 
 # Act on enable-mdns option
-AS_IF([test "x$enable_mdns" != xno],
+AS_IF([test "x$mdns" != xno],
   [
-  PKG_CHECK_MODULES([AVAHI], [avahi-client])
-  AM_CONDITIONAL(ENABLE_MDNS, true)
+    PKG_CHECK_MODULES([AVAHI], [avahi-client])
+    AM_CONDITIONAL(ENABLE_MDNS, true)
   ], [
-  AM_CONDITIONAL(ENABLE_MDNS, false)
-  AC_DEFINE(NO_MDNS, [1], [Define to disable mDNS listener])
-  ]
-)
+    AM_CONDITIONAL(ENABLE_MDNS, false)
+    AC_DEFINE(NO_MDNS, [1], [Define to disable mDNS listener])
+  ])
 
 # Act on enable-updates option
-AS_IF([test "x$enable_updates" != xno],
+AS_IF([test "x$updates" != xno],
   [
-  AX_CHECK_OPENSSL(
-    [AC_DEFINE([HAVE_OPENSSL], [1], [Define to 1 if you have OpenSSL])]
-    [have_openssl=yes]
-  )
-  AM_CONDITIONAL(ENABLE_UPDATES, true)
+    AX_CHECK_OPENSSL(
+      [AC_DEFINE([HAVE_OPENSSL], [1], [Define to 1 if you have OpenSSL])]
+      [have_openssl=yes])
+    AM_CONDITIONAL(ENABLE_UPDATES, true)
   ], [
-  AM_CONDITIONAL(ENABLE_UPDATES, false)
-  AC_DEFINE(NO_UPDATES, [1], [Define to disable online updates])
-  ]
-)
+    AM_CONDITIONAL(ENABLE_UPDATES, false)
+    AC_DEFINE(NO_UPDATES, [1], [Define to disable online updates])
+  ])
 
-if test "x$have_openssl" = xyes; then
+if test "x$debug" != xno && test "x$have_openssl" = xyes; then
    AC_MSG_CHECKING([for SSL_CTX_set_keylog_callback])
    save_LDFLAGS="$LDFLAGS"
    save_LIBS="$LIBS"
