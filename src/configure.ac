@@ -38,6 +38,14 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 AC_CHECK_TYPES([ptrdiff_t])
+AC_C_BIGENDIAN([
+  AC_DEFINE([ENDIANNESS], [BIG_ENDIAN], [Define to either BIG_ENDIAN or LITTLE_ENDIAN])
+], [
+  AC_DEFINE([ENDIANNESS], [LITTLE_ENDIAN], [Define to either BIG_ENDIAN or LITTLE_ENDIAN])
+], [
+  AC_DEFINE([ENDIANNESS], [BIG_ENDIAN], [Define to either BIG_ENDIAN or LITTLE_ENDIAN])
+  AC_MSG_WARN(["Universal" endianness detected, defaulting to BIG_ENDIAN])
+])
 
 # Checks for library functions.
 AC_HEADER_ASSERT
@@ -99,6 +107,13 @@ AC_CHECK_HEADER([pcap/pcap.h], [], [
 AC_SEARCH_LIBS([pcap_create], [pcap], [], [
   AC_MSG_ERROR([required library libpcap not found])
 ])
+
+# Check for byte-ordering macro definitions on Apple systems
+AC_CHECK_DECLS([
+  OSSwapHostToBigInt32,
+  OSSwapBigToHostInt32,
+  OSSwapHostToBigInt64,
+  OSSwapBigToHostInt64], [], [], [[#include <libkern/OSByteOrder.h>]])
 
 AC_CHECK_FUNCS([clock_gettime gettimeofday inet_ntoa memcpy memmove memset strcasecmp strdup strstr strtol strtoul])
 
