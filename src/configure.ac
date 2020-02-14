@@ -115,7 +115,17 @@ AC_CHECK_DECLS([
   OSSwapHostToBigInt64,
   OSSwapBigToHostInt64], [], [], [[#include <libkern/OSByteOrder.h>]])
 
-AC_CHECK_FUNCS([clock_gettime gettimeofday inet_ntoa memcpy memmove memset strcasecmp strdup strstr strtol strtoul])
+AC_CHECK_FUNCS([clock_gettime])
+AC_CHECK_FUNCS([gettimeofday])
+AC_CHECK_FUNCS([inet_ntoa])
+AC_CHECK_FUNCS([memcpy])
+AC_CHECK_FUNCS([memmove])
+AC_CHECK_FUNCS([memset])
+AC_CHECK_FUNCS([strcasecmp])
+AC_CHECK_FUNCS([strdup])
+AC_CHECK_FUNCS([strstr])
+AC_CHECK_FUNCS([strtol])
+AC_CHECK_FUNCS([strtoul])
 
 # Define ./configure options
 AC_ARG_ENABLE([debug],
