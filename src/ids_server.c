@@ -279,7 +279,7 @@ on_client_close(uv_handle_t *handle)
 static void on_new_connection(uv_stream_t *server, int status)
 {
 	int err;
-	uv_tcp_t *client;
+	uv_tcp_t *client = NULL;
 	uv_loop_t *loop;
 
 	printf("new connection\n");
