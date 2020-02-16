@@ -8,6 +8,7 @@
 #ifndef SRC_UTILS_FILE_PROCESSING_H_
 #define SRC_UTILS_FILE_PROCESSING_H_
 
+#define _WITH_GETLINE
 #include <stdio.h>
 #include <stdlib.h>
 
