@@ -5,19 +5,16 @@ The NetStinky IDS is intended to be installed in a CPE device and provide
 real-time monitoring of network traffic for Indicators of Compromise (IoCs).
 
 # Building with Autotools
-This project uses GNU autotools in order to provide a configurable build. In order to generate the Makefile, you will need to have the following tools installed:
+This project uses GNU Autotools in order to provide a configurable build. In order to generate the Makefile, you will need to have the following tools installed:
 - autoconf
 - automake
 - libtool
 - pkg-config
 
-To generate the `./configure` script on a Unix-like OS, run the following commands inside the `src/` directory:
+To generate the `./configure` script on a Unix-like OS, run the following command inside the `src/` directory:
 
 ```bash
-$ libtoolize
-$ aclocal
-$ autoconf
-$ automake --add-missing
+$ autoreconf -i
 ```
 
 You will only have to do this once, after which you should then be able to do a typical
@@ -25,7 +22,7 @@ You will only have to do this once, after which you should then be able to do a 
 ./configure
 make
 ```
-Which will generate the `nsids` binary whenever you need to recompile.
+Which will generate the `nsids` binary.
 
 ## Minimal build
 For a minimal build, you will need to ensure that you have the `libpcap` and `libuv` development
@@ -61,4 +58,3 @@ cd test/
 make
 ./runner
 ```
-
