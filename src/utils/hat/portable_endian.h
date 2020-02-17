@@ -40,8 +40,6 @@
 #  define __BIG_ENDIAN    BIG_ENDIAN
 #  define __LITTLE_ENDIAN LITTLE_ENDIAN
 #  define __PDP_ENDIAN    PDP_ENDIAN
-#else
-#  error platform not supported
 #endif
 
 #ifndef htobe32
