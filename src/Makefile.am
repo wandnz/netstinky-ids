@@ -1,7 +1,13 @@
 ACLOCAL_AMFLAGS = -I m4
 
 bin_PROGRAMS = nsids
-noinst_LTLIBRARIES = libmdns.la libupdates.la
+noinst_LTLIBRARIES =
+if ENABLE_MDNS
+noinst_LTLIBRARIES += libmdns.la
+endif
+if ENABLE_UPDATES
+noinst_LTLIBRARIES += libupdates.la
+endif
 
 # mDNS support
 libmdns_la_SOURCES = \

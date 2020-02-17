@@ -101,11 +101,13 @@ static void close_cb(uv_handle_t *handle)
 	{
 		return;
 	}
+#ifndef NO_UPDATES
 	else if (handle == (uv_handle_t *) &(ids_update_ctx.stream))
 	{
 		// The ids_update_ctx.stream global is not malloc-ed
 		return;
 	}
+#endif
 	else if (UV_TCP == handle->type)
 	{
 		free(handle);
