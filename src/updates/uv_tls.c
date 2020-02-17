@@ -344,6 +344,10 @@ tls_stream_check_handshake(tls_stream_t *stream)
 			stream->handshake_complete = 1;
 		}
 	}
+	else
+	{
+		handshake_rc = TLS_STR_OK;
+	}
 
 	return handshake_rc;
 }
@@ -417,6 +421,9 @@ tls_stream_decrypt_buffer(uv_buf_t *decrypted, tls_stream_t *stream, ssize_t nre
 		if (!SSL_is_init_finished(stream->ssl))
 		{
 			// If error occurs in handshake, on_handshake_cb will be called
+
+			// Ignore return value, as we only care about the side-effects of
+			// running the on_handshake callbacks
 			tls_stream_check_handshake(stream);
 		}
 
