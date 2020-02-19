@@ -355,21 +355,12 @@ int configure_pcap(pcap_t **pcap, const char *filter, const char *dev)
         fprintf(stderr, "Can't open %s: %s\n", dev, errbuf);
         goto error;
     }
-    if (pcap_set_promisc(*pcap, 1) != 0) {
-        fprintf(stderr, "pcap_set_promisc failed\n");
-        goto error;
-    }
     if (0 != (pcap_rc = pcap_activate(*pcap))) {
 
     	if (pcap_rc > 0)
     	{
-    		// Just a warning
-    		if (PCAP_WARNING_PROMISC_NOTSUP == pcap_rc)
-    			fprintf(stderr, "Pcap handle activated with a warning: %s\n",
-    					pcap_geterr(*pcap));
-    		else
-    			fprintf(stderr, "Pcap handle activated with a warning: %s\n",
-    					pcap_statustostr(pcap_rc));
+    		fprintf(stderr, "Pcap handle activated with a warning: %s\n",
+    			pcap_statustostr(pcap_rc));
     	}
     	else
     	{
@@ -388,7 +379,6 @@ int configure_pcap(pcap_t **pcap, const char *filter, const char *dev)
     	}
     }
     if (set_filter(*pcap, filter, errbuf) != 0) {
-        fprintf(stderr, "Who even cares?\n");
         goto error;
     }
 
