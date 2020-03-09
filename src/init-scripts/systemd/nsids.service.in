@@ -1,0 +1,11 @@
+[Unit]
+Description=NetStinky IDS service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=@BINDIR@/nsids -i wlan0 -p 8089 --update-ip 130.217.250.81 --update-port 15000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
