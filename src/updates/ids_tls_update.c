@@ -56,7 +56,7 @@ setup_context()
 
 int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
-		struct sockaddr_in update_addr,
+		const char *update_host, const uint16_t update_port,
 		domain_blacklist **domain, ip_blacklist **ip)
 {
 	assert(update_ctx);
@@ -70,7 +70,8 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	update_ctx->ctx = setup_context();
 	if (NULL == update_ctx->ctx) return NSIDS_SSL;
 
-	update_ctx->server_addr = update_addr;
+	update_ctx->server_host = update_host;
+	update_ctx->server_port = update_port;
 
 	// Save blacklist pointers
 	update_ctx->domain = domain;
@@ -286,6 +287,81 @@ update_timer_on_handshake(tls_stream_t *stream, int status)
 	return;
 }
 
+static int
+hostname_tls_connect(tls_stream_t *stream, int status, struct sockaddr *sa)
+{
+	int rc;
+	if (status != 0) goto error;
+	rc = tls_stream_connect(stream, sa,
+			update_timer_on_handshake, update_timer_on_read);
+	if (0 != rc) goto error;
+	return 0;
+error:
+	rc = tls_stream_close(stream, update_timer_on_close);
+	if (rc)
+	{
+		tls_stream_fini(stream);
+		memset(stream, 0, sizeof(*stream));
+	}
+	return -1;
+}
+
+static void
+on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res)
+{
+	ids_update_ctx_t *ctx = req->data;
+	struct sockaddr *sockaddr;
+	struct addrinfo *rp;
+	int rc;
+	if (status != 0)
+	{
+		fprintf(stderr, "getaddrinfo: %s\n", uv_strerror(status));
+	}
+
+	/**
+	 * TODO: Should attempt to connect to _each_ addrinfo in turn if the first
+	         connection does not succeed.
+	**/
+	for (rp = res; rp != NULL; rp = rp->ai_next)
+	{
+		struct sockaddr_in *sain;
+		sockaddr = rp->ai_addr;
+		/** TODO: Change this to support IPv6 **/
+		sain = (struct sockaddr_in *) sockaddr;
+		sain->sin_port = htons(ctx->server_port);
+		rc = hostname_tls_connect(&ctx->stream, status, sockaddr);
+		if (rc == 0) break; /** TODO: As per the previous todo note **/
+	}
+
+	uv_freeaddrinfo(res);
+}
+
+static int
+hostname_lookup(ids_update_ctx_t *ctx, uv_loop_t *loop)
+{
+	uv_getaddrinfo_t resolver;
+	struct addrinfo hints;
+	int status;
+	const char *hostname = ctx->server_host;
+
+	if (hostname == NULL)
+		return UV_EINVAL;
+
+	memset(&resolver, 0, sizeof(resolver));
+	resolver.data = ctx;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_CANONNAME;
+	hints.ai_protocol = 0;
+
+	status = uv_getaddrinfo(loop, &resolver, on_resolved,
+			hostname, NULL, &hints);
+	
+	return status;
+}
+
 static void
 update_timer_cb(uv_timer_t *timer)
 {
@@ -335,8 +411,10 @@ update_timer_cb(uv_timer_t *timer)
 	}
 	ctx->stream.data = ctx;
 
-	rc = tls_stream_connect(&ctx->stream, (struct sockaddr *)&ctx->server_addr,
-			update_timer_on_handshake, update_timer_on_read);
+	/**
+	 * TODO: Look-up the given hostname here, then perform the stream connection
+	**/
+	rc = hostname_lookup(ctx, timer->loop);
 	if (0 != rc) goto error;
 	return;
 error:

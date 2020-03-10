@@ -59,7 +59,7 @@ struct IdsArgs
 	int help_flag;
 
 #ifndef NO_UPDATES
-	char *update_server_ip;
+	char *update_server_host;
 	uint16_t update_server_port;
 #endif
 };
@@ -194,7 +194,7 @@ print_usage(char *prog_name)
 	printf("addresses to load into the blacklist immediately.\n");
 	printf("\t[--dnbl <blacklist]:\tPath to a blacklist file containing ");
 	printf("domain names to load into the blacklist immediately.\n");
-	printf("\t[--update-ip]:\tIp address of the update server.\n");
+	printf("\t[--update-host]:\tHostname or IP address of the update server.\n");
 	printf("\t[--update-port]:\tPort to connect to on the update server.\n");
 }
 
@@ -209,7 +209,7 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
 		{"dnbl", 1, 0, 0},
 		{"fuzz", 1, 0, 0},
 		{"help", 0, &args->help_flag, 1},
-		{"update-ip", 1, 0, 0},
+		{"update-host", 1, 0, 0},
 		{"update-port", 1, 0, 0},
 		{0, 0, 0, 0}
 	};
@@ -250,7 +250,7 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
 #ifndef NO_UPDATES
         	else if (4 == option_index)
         	{
-        		if (optarg) args->update_server_ip = optarg;
+        		if (optarg) args->update_server_host = optarg;
         		else return NSIDS_CMDLN;
         	}
         	else if (5 == option_index)
@@ -545,12 +545,12 @@ int main(int argc, char **argv)
     		|| mdns_check_start(&mdns_handle)) goto done;
 #endif
 #ifndef NO_UPDATES
-    struct sockaddr_in update_server;
-    if (args.update_server_ip
-    		&& 0 == uv_ip4_addr(args.update_server_ip,
-    				args.update_server_port, &update_server))
+    if (args.update_server_host)
     {
-		if (setup_update_context(&ids_update_ctx, loop, update_server, &dn_bl, &ip_bl))
+		if (setup_update_context(&ids_update_ctx, loop,
+				args.update_server_host,
+				(const uint16_t) args.update_server_port,
+				&dn_bl, &ip_bl))
 		{
 			printf("Could not setup updates.\n");
 			goto done;
