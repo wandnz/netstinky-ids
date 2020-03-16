@@ -61,6 +61,7 @@ struct IdsArgs
 #ifndef NO_UPDATES
 	char *update_server_host;
 	uint16_t update_server_port;
+	int ssl_no_verify;
 #endif
 };
 
@@ -186,8 +187,8 @@ print_usage(char *prog_name)
 	printf("\t%s -p <server_port> -i <interface> ", prog_name);
 	printf("[--ipbl <blacklist>] [--dnbl <blacklist]\n");
 	printf("Options:\n");
-	printf("\t[-h | --help]:\tPrint this usage message\n");
-	printf("\t-i <interface>: The name of the interface to capture traffic from.\n");
+	printf("\t\t[-h | --help]:\tPrint this usage message\n");
+	printf("\t\t-i <interface>: The name of the interface to capture traffic from.\n");
 	printf("\t-p <server_port>:\tThe port that will be advertised via MDNS ");
 	printf("(if enabled) and will accept connections from mobile devices.\n");
 	printf("\t[--ipbl <blacklist]:\tPath to a blacklist file containing IP ");
@@ -196,6 +197,7 @@ print_usage(char *prog_name)
 	printf("domain names to load into the blacklist immediately.\n");
 	printf("\t[--update-host]:\tHostname or IP address of the update server.\n");
 	printf("\t[--update-port]:\tPort to connect to on the update server.\n");
+	printf("\t[--ssl-no-verify]:\tSkip verification of TLS certificates");
 }
 
 /**
@@ -205,12 +207,13 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
 {
 	char *getopt_args = "hp:i:";
 	struct option long_options[] = {
-	    {"ipbl", 1, 0, 0},
-		{"dnbl", 1, 0, 0},
-		{"fuzz", 1, 0, 0},
-		{"help", 0, &args->help_flag, 1},
-		{"update-host", 1, 0, 0},
-		{"update-port", 1, 0, 0},
+	    {"ipbl", required_argument, 0, 0},
+		{"dnbl", required_argument, 0, 0},
+		{"fuzz", required_argument, 0, 0},
+		{"help", no_argument, &args->help_flag, 1},
+		{"update-host", required_argument, 0, 0},
+		{"update-port", required_argument, 0, 0},
+		{"ssl-no-verify", no_argument, &args->ssl_no_verify, 1},
 		{0, 0, 0, 0}
 	};
 
@@ -550,6 +553,7 @@ int main(int argc, char **argv)
 		if (setup_update_context(&ids_update_ctx, loop,
 				args.update_server_host,
 				(const uint16_t) args.update_server_port,
+				args.ssl_no_verify,
 				&dn_bl, &ip_bl))
 		{
 			printf("Could not setup updates.\n");

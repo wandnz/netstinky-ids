@@ -72,6 +72,7 @@ ns_cl_proto_on_handshake(ns_cli_state_t *state, tls_stream_t *stream);
  * @param loop: Libuv event loop. May not be NULL.
  * @param update_host: Hostname of the update server to connect to.
  * @param update_port: TCP port number of the update server to connect to.
+ * @param ssl_no_verify: Skip verifying TLS certificates
  * @param domain: Domain blacklist which will be updated.
  * @param ip: IP blacklist which will be updated.
  * @return: 0 if successful
@@ -79,6 +80,7 @@ ns_cl_proto_on_handshake(ns_cli_state_t *state, tls_stream_t *stream);
 int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 		const char *update_host, const uint16_t update_port,
+		int ssl_no_verify,
 		domain_blacklist **domain, ip_blacklist **ip);
 
 /**

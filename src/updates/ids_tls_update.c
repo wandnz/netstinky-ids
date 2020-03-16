@@ -29,7 +29,7 @@ update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
 		unsigned int nbufs);
 
 SSL_CTX *
-setup_context(const char *hostname)
+setup_context(const char *hostname, int ssl_no_verify)
 {
 	SSL_CTX *ctx = NULL;
 	const SSL_METHOD *method = SSLv23_method();
@@ -71,7 +71,10 @@ setup_context(const char *hostname)
 		return NULL;
 	}
 
-	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+	SSL_CTX_set_verify(
+			ctx,
+			ssl_no_verify == 0 ? SSL_VERIFY_PEER : SSL_VERIFY_NONE,
+			NULL);
 	rc = SSL_CTX_set_default_verify_paths(ctx);
 
 	ssl_err = ERR_get_error();
@@ -88,6 +91,7 @@ setup_context(const char *hostname)
 int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 		const char *update_host, const uint16_t update_port,
+		int ssl_no_verify,
 		domain_blacklist **domain, ip_blacklist **ip)
 {
 	assert(update_ctx);
@@ -98,7 +102,7 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	memset(update_ctx, 0, sizeof(*update_ctx));
 
 	// Setup SSL context
-	update_ctx->ctx = setup_context(update_host);
+	update_ctx->ctx = setup_context(update_host, ssl_no_verify);
 	if (NULL == update_ctx->ctx) return NSIDS_SSL;
 
 	update_ctx->server_host = update_host;
