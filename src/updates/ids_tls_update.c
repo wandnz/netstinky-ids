@@ -11,6 +11,7 @@
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 
 #include "ids_tls_update.h"
 
@@ -28,10 +29,13 @@ update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
 		unsigned int nbufs);
 
 SSL_CTX *
-setup_context()
+setup_context(const char *hostname)
 {
 	SSL_CTX *ctx = NULL;
 	const SSL_METHOD *method = SSLv23_method();
+	X509_VERIFY_PARAM *param = NULL;
+	int rc;
+	unsigned long ssl_err = 0;
 	if (!method) return NULL;
 
 	SSL_library_init();
@@ -51,6 +55,33 @@ setup_context()
 
 	SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
 
+	param = SSL_CTX_get0_param(ctx);
+	X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+	if (!X509_VERIFY_PARAM_set1_host(param, hostname, strnlen(hostname, 253)))
+	{
+		fprintf(stderr, "Failed to set the hostname as a verification parameter\n");
+		return NULL;
+	}
+	if (!X509_VERIFY_PARAM_set_flags(param,
+			X509_V_FLAG_POLICY_CHECK
+			| X509_V_FLAG_TRUSTED_FIRST
+			))
+	{
+		fprintf(stderr, "Failed to set the verify parameter flags\n");
+		return NULL;
+	}
+
+	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+	rc = SSL_CTX_set_default_verify_paths(ctx);
+
+	ssl_err = ERR_get_error();
+	if (rc != 1)
+	{
+		fprintf(stderr, "Failed to load default verify paths. ssl_err %lu\n",
+				ssl_err);
+		return NULL;
+	}
+
 	return ctx;
 }
 
@@ -67,7 +98,7 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
 	memset(update_ctx, 0, sizeof(*update_ctx));
 
 	// Setup SSL context
-	update_ctx->ctx = setup_context();
+	update_ctx->ctx = setup_context(update_host);
 	if (NULL == update_ctx->ctx) return NSIDS_SSL;
 
 	update_ctx->server_host = update_host;
