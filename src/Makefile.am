@@ -1,8 +1,5 @@
 ACLOCAL_AMFLAGS = -I m4
 
-AM_DISTCHECK_CONFIGURE_FLAGS = \
-  --with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir)
-
 bin_PROGRAMS = nsids
 noinst_LTLIBRARIES =
 if ENABLE_MDNS
@@ -98,14 +95,6 @@ endif
 if ENABLE_MDNS
 nsids_LDADD += libmdns.la
 endif
-
-if HAVE_SYSTEMD
-systemdsystemunit_DATA = \
-  init-scripts/systemd/nsids.service
-endif
-
-init-scripts/systemd/nsids.service: init-scripts/systemd/nsids.service.in
-	$(SED) -e 's,[@]BINDIR[@],$(bindir),g' < $< >$@
 
 bootstrap-clean:
 	$(RM) -f Makefile.in aclocal.m4 compile config.* \
