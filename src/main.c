@@ -79,7 +79,9 @@ struct ids_event_list *event_queue = NULL;
 #ifndef NO_MDNS
 static uv_check_t mdns_handle;
 #endif
+#ifdef DEBUG
 static uv_pipe_t stdin_pipe;
+#endif
 static uv_poll_t pcap_handle;
 static uv_signal_t sigterm_handle, sigint_handle;
 
@@ -329,6 +331,7 @@ static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
     *buf = uv_buf_init((char *) malloc(suggested_size), (uint) suggested_size);
 }
 
+#ifdef DEBUG
 static void read_stdin(uv_stream_t *stream, ssize_t nread,
                const uv_buf_t *buf)
 {
@@ -373,6 +376,7 @@ static int setup_stdin_pipe(uv_loop_t *loop)
 
     return NSIDS_OK;
 }
+#endif
 
 /**
  * Callback when SIGTERM is received by program. Stop the main event loop from running.
@@ -537,7 +541,9 @@ int main(int argc, char **argv)
 
     if (pcap && setup_pcap_handle(loop, &pcap_handle, pcap)) goto done;
 
+#ifdef DEBUG
     if (setup_stdin_pipe(loop)) goto done;
+#endif
     if (setup_sigterm_handling(loop, &sigterm_handle)) goto done;
     if (setup_sigint_handling(loop, &sigint_handle)) goto done;
     if (setup_sigpipe()) goto done;
