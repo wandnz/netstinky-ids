@@ -1,0 +1,8 @@
+
+config netstinky 'ids'
+    option interface 'lan'
+    option port '8089'
+    option update-host 'netstinky-api.wand.net.nz'
+    option update-port '15000'
+    option ssl-no-verify 'false'
+
