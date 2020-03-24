@@ -163,7 +163,6 @@ void walk_and_close_handle_cb(uv_handle_t *handle, void *arg)
 }
 
 static void free_globals(void) {
-	DPRINT("Freeing globals...\n");
     if (pcap) pcap_close(pcap);
     if (event_queue) free_ids_event_list(&event_queue);
     if (ip_bl) free_ip_blacklist(&ip_bl);
@@ -577,10 +576,8 @@ int main(int argc, char **argv)
     if (setup_event_server(loop, &server_handle, args.server_port, event_queue)) goto done;
 
 #ifndef FUZZ_TEST
-    printf("Beginning capture\n");
     if (0 > uv_run(loop, UV_RUN_DEFAULT)) goto done;
 #endif
-    printf("\n\nEnding capture\n");
 
     retval = 0;
 

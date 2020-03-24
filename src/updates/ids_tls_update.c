@@ -6,6 +6,8 @@
  *  Created on: Jul 22, 2019
  *      Author: mfletche
  */
+#include <config.h>
+
 #include <assert.h>
 #include <string.h>
 
@@ -274,7 +276,11 @@ update_timer_on_read(tls_stream_t *stream, int status, const uv_buf_t *buf)
 	ctx = stream->data;
 
 	if (!buf->base) return;
-	fwrite(buf->base, buf->len, 1, stdout);
+
+#ifdef DEBUG
+	printf("Rx'd buffer of len: %lu\n", buf->len);
+	// fwrite(buf->base, buf->len, 1, stdout);
+#endif
 	rc = ns_cl_proto_on_recv(&action, &ctx->proto.state, stream, buf);
 	free(buf->base);
 	if (0 != rc)
@@ -412,8 +418,6 @@ update_timer_cb(uv_timer_t *timer)
 
 	// Re-init protocol
 	ctx->proto.state = NS_PROTO_VERSION_WAITING;
-
-	printf("Update callback\n");
 
 	// When not initialized, the handle type will be UNKNOWN. Check if the previous TCP
 	// handle is still open.
