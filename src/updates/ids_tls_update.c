@@ -369,12 +369,13 @@ on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res)
 	}
 
 	uv_freeaddrinfo(res);
+	free(req);
 }
 
 static int
 hostname_lookup(ids_update_ctx_t *ctx, uv_loop_t *loop)
 {
-	uv_getaddrinfo_t resolver;
+	uv_getaddrinfo_t *resolver;
 	struct addrinfo hints;
 	int status;
 	const char *hostname = ctx->server_host;
@@ -382,8 +383,9 @@ hostname_lookup(ids_update_ctx_t *ctx, uv_loop_t *loop)
 	if (hostname == NULL)
 		return UV_EINVAL;
 
-	memset(&resolver, 0, sizeof(resolver));
-	resolver.data = ctx;
+	resolver = malloc(sizeof(*resolver));
+	memset(resolver, 0, sizeof(*resolver));
+	resolver->data = ctx;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -391,7 +393,7 @@ hostname_lookup(ids_update_ctx_t *ctx, uv_loop_t *loop)
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_protocol = 0;
 
-	status = uv_getaddrinfo(loop, &resolver, on_resolved,
+	status = uv_getaddrinfo(loop, resolver, on_resolved,
 			hostname, NULL, &hints);
 	
 	return status;
