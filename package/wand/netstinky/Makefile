@@ -2,34 +2,40 @@ include $(TOPDIR)/rules.mk
 
 # Name, version and release number
 # The name and version of your package are used to define the variable to point to the build directory of your package: $(PKG_BUILD_DIR)
-PKG_NAME:=netstinky
-PKG_VERSION:=0.1.0
+PKG_NAME:=nsids
+PKG_VERSION:=0.1
 PKG_RELEASE:=1
 
-# Source settings (i.e. where to find the source codes)
-# This is a custom variable, used below
-# SOURCE_DIR:="$(basename "$(dirname "../")")"
-SOURCE_DIR:=/home/amackint/src/IDS/src
+PKG_BUILD_DIR:=$(BUILD_DIR)/nsids-$(PKG_VERSION)
+PKG_SOURCE:=nsids-$(PKG_VERSION).tar.gz
+PKG_CAT:=zcat
 
-# PKG_BUILD_DIR=$(BUILD_DIR)/$(PKG_NAME)
-# Declare library dependencies
-PKG_BUILDDEP:=libpcap
+PKG_FIXUP:=autoreconf
+
+PKG_INSTALL:=1
 
 include $(INCLUDE_DIR)/package.mk
 
-TARGET_LDFLAGS += -lpcap
+CONFIGURE_ARGS += \
+       --enable-mdns=no \
+       --enable-updates
 
 # Package definition; instructs on how and where our package will appear in the overall configuration menu ('make menuconfig')
-define Package/netstinky
+define Package/nsids
   SECTION:=net
   CATEGORY:=Network
-  TITLE:=NetStinky IDS
-  DEPENDS:=+libpcap
+  DEPENDS:=+libpcap +libuv +libopenssl
+  TITLE:=NetStinky IDS for detecting IoCs on an active network
+  URL:=https://netstinky.wand.net.nz/
 endef
 
 # Package description; a more verbose description on what our package does
-define Package/netstinky/description
-  NetStinky CPE IDS router package
+define Package/nsids/description
+  NetStinky IDS for detecting IoCs on an active network
+endef
+
+define Package/netstinky/conffiles
+/etc/config/netstinky
 endef
 
 # Package preparation instructions; create the build directory and copy the source code. 
@@ -49,10 +55,14 @@ define Build/Compile
 endef
 
 # Package install instructions; create a directory inside the package to hold our executable, and then copy the executable we built previously into the folder
-define Package/netstinky/install
+define Package/nsids/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/netstinky $(1)/usr/bin
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/nsids $(1)/usr/bin
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_DATA) ./files/nsids.conf $(1)/etc/config/netstinky
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/nsids.init $(1)/etc/init.d/nsids
 endef
 
 # This command is always the last, it uses the definitions and variables we give above in order to get the job done
-$(eval $(call BuildPackage,netstinky))
+$(eval $(call BuildPackage,nsids))
