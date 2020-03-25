@@ -60,7 +60,6 @@ nsids_SOURCES = \
 	ids_event_list.h \
 	ids_pcap.h \
 	ids_server.h \
-	linked_list.h \
 	blacklist/domain_blacklist.c \
 	blacklist/feodo_ip_blacklist.c \
 	blacklist/ids_blacklist.c \
@@ -77,12 +76,13 @@ nsids_SOURCES = \
 	utils/hat/hat-trie.c \
 	utils/hat/misc.c \
 	utils/hat/murmurhash3.c \
+	utils/linked_list.c \
+	utils/linked_list.h \
 	utils/file_processing.c \
 	dns.c \
 	ids_event_list.c \
 	ids_pcap.c \
 	ids_server.c \
-	linked_list.c \
 	main.c
 
 nsids_CFLAGS = $(AM_CFLAGS)

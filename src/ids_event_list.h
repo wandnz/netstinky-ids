@@ -12,7 +12,7 @@
 #include <stdint.h>
 
 #include "common.h"
-#include "linked_list.h"
+#include "utils/linked_list.h"
 #include "blacklist/ids_storedvalues.h"
 
 struct ids_event
