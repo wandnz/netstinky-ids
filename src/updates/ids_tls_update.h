@@ -10,7 +10,7 @@
 
 #include <stdlib.h>
 
-#include "uv_tls.h"
+#include "../utils/uvtls/uv_tls.h"
 #include "../blacklist/domain_blacklist.h"
 #include "../blacklist/ip_blacklist.h"
 #include "../error/ids_error.h"

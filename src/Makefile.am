@@ -6,32 +6,39 @@ if ENABLE_MDNS
 noinst_LTLIBRARIES += libmdns.la
 endif
 if ENABLE_UPDATES
-noinst_LTLIBRARIES += libupdates.la
+noinst_LTLIBRARIES += libuvtls.la \
+	libupdates.la
 endif
 
 # mDNS support
 libmdns_la_SOURCES = \
-  mdns/ids_mdns_avahi.c \
-  mdns/mdns_libuv_integration.c \
-  mdns/ids_mdns_avahi.h \
-  mdns/mdns_libuv_integration.h
+	mdns/ids_mdns_avahi.c \
+	mdns/mdns_libuv_integration.c \
+	mdns/ids_mdns_avahi.h \
+	mdns/mdns_libuv_integration.h
 libmdns_la_CFLAGS = $(AVAHI_CFLAGS)
 libmdns_la_LIBADD = -luv $(AVAHI_LIBS)
 
+# libuv TLS handle type
+libuvtls_la_SOURCES = \
+	utils/uvtls/uv_tls.c \
+	utils/uvtls/uv_tls.h
+libuvtls_la_CFLAGS = @OPENSSL_INCLUDES@
+libuvtls_la_LDFLAGS = @OPENSSL_LDFLAGS@
+libuvtls_la_LIBADD = -luv @OPENSSL_LIBS@
+
 # Online update support (uv_tls via OpenSSL)
 libupdates_la_SOURCES = \
-  updates/domain_validation.c \
-  updates/ids_tls_update.c \
-  updates/protocol.c \
-  updates/uv_buf_helper.c \
-  updates/uv_tls.c \
-  updates/domain_validation.h \
-  updates/ids_tls_update.h \
-  updates/uv_buf_helper.h \
-  updates/uv_tls.h
+	updates/domain_validation.c \
+	updates/ids_tls_update.c \
+	updates/protocol.c \
+	updates/uv_buf_helper.c \
+	updates/domain_validation.h \
+	updates/ids_tls_update.h \
+	updates/uv_buf_helper.h
 libupdates_la_CFLAGS = @OPENSSL_INCLUDES@
 libupdates_la_LDFLAGS = @OPENSSL_LDFLAGS@
-libupdates_la_LIBADD = -luv @OPENSSL_LIBS@
+libupdates_la_LIBADD = -luv @OPENSSL_LIBS@ libuvtls.la
 
 nsids_SOURCES = \
 	common.h \
@@ -91,7 +98,8 @@ nsids_CFLAGS = $(AM_CFLAGS)
 nsids_LDADD = -luv -lpcap
 
 if ENABLE_UPDATES
-nsids_LDADD += libupdates.la
+nsids_LDADD += libuvtls.la \
+	libupdates.la
 endif
 
 if ENABLE_MDNS
@@ -100,7 +108,6 @@ endif
 
 bootstrap-clean:
 	$(RM) -f Makefile.in aclocal.m4 compile config.* \
-             configure depcomp install-sh libtool ltmain.sh \
+			 configure depcomp install-sh libtool ltmain.sh \
 			 missing mkinstalldirs stamp-h.in
 	$(RM) -rf autom4te.cache/
-
