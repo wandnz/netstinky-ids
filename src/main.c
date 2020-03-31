@@ -11,9 +11,11 @@
 #include <getopt.h>
 #include <pcap.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <uv.h>
 
 #include "error/ids_error.h"
+#include "privileges.h"
 #include "blacklist/ids_blacklist.h"
 #include "blacklist/feodo_ip_blacklist.h"
 
@@ -41,6 +43,8 @@
 
 #define MAX_EVENTS 5
 #define MAX_TS 5
+#define NEW_USER "nobody"
+#define NEW_GROUP "nogroup"
 
 // For debugging with valgrind, which cannot handle programs with extra
 // capabilities
@@ -530,6 +534,10 @@ int main(int argc, char **argv)
     // Setup packet capture handle
     if (NSIDS_OK != configure_pcap(&pcap, filter, args.iface)
     		&& !IGNORE_PCAP_ERRORS) goto done;
+
+	// Drop root privileges now that the pcap handle is open
+	if (0 != ch_user(NEW_USER, NEW_GROUP))
+		goto done;
 
     // Begin event loop setup
     if (NULL == (loop = uv_default_loop()))

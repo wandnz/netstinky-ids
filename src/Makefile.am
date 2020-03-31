@@ -60,6 +60,7 @@ nsids_SOURCES = \
 	ids_event_list.h \
 	ids_pcap.h \
 	ids_server.h \
+	privileges.h \
 	blacklist/domain_blacklist.c \
 	blacklist/feodo_ip_blacklist.c \
 	blacklist/ids_blacklist.c \
@@ -83,7 +84,8 @@ nsids_SOURCES = \
 	ids_event_list.c \
 	ids_pcap.c \
 	ids_server.c \
-	main.c
+	main.c \
+	privileges.c
 
 nsids_CFLAGS = $(AM_CFLAGS)
 nsids_LDADD = -luv -lpcap
