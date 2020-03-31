@@ -28,53 +28,53 @@
 
 int mdns_setup_event_handle(uv_loop_t *loop, uv_check_t *check, AvahiSimplePoll *poll)
 {
-	assert(loop);
-	assert(check);
-	assert(poll);
-	int r;
+    assert(loop);
+    assert(check);
+    assert(poll);
+    int r;
 
-	if (0 > (r = uv_check_init(loop, check)))
-	{
-		fprintf(stderr, "Failed to initialize the MDNS event handle: %s\n",
-			uv_strerror(r));
-		return NSIDS_UV;
-	}
+    if (0 > (r = uv_check_init(loop, check)))
+    {
+        fprintf(stderr, "Failed to initialize the MDNS event handle: %s\n",
+            uv_strerror(r));
+        return NSIDS_UV;
+    }
 
-	// Store address of poll in check handle.
-	check->data = poll;
-	return NSIDS_OK;
+    // Store address of poll in check handle.
+    check->data = poll;
+    return NSIDS_OK;
 }
 
 static void mdns_check_cb(uv_check_t *handle)
 {
-	assert(handle);
-	assert(handle->data);
+    assert(handle);
+    assert(handle->data);
 
-	// Do a single non-blocking Avahi event loop.
-	AvahiSimplePoll *poll = (AvahiSimplePoll *)handle->data;
-	ids_mdns_walk(poll);
+    // Do a single non-blocking Avahi event loop.
+    AvahiSimplePoll *poll = (AvahiSimplePoll *)handle->data;
+    ids_mdns_walk(poll);
 }
 
 int mdns_check_start(uv_check_t *check)
 {
-	assert(check);
+    assert(check);
 
-	int r;
+    int r;
 
-	if (0 > (r = uv_check_start(check, mdns_check_cb)))
-	{
-		fprintf(stderr, "Failed to start MDNS event handle: %s\n", uv_strerror(r));
-		return NSIDS_UV;
-	}
+    if (0 > (r = uv_check_start(check, mdns_check_cb)))
+    {
+        fprintf(stderr, "Failed to start MDNS event handle: %s\n", uv_strerror(r));
+        return NSIDS_UV;
+    }
 
-	return NSIDS_OK;
+    return NSIDS_OK;
 }
 
 bool mdns_check_stop(uv_check_t *check)
 {
-	int r;
-	assert(check);
+    int r;
+    assert(check);
 
-	r = uv_check_stop(check);
-	return (r == 0);
+    r = uv_check_stop(check);
+    return (r == 0);
 }

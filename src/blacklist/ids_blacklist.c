@@ -10,7 +10,7 @@
 
 int setup_ip_blacklist(ip_blacklist **bl)
 {
-	assert(bl);
+    assert(bl);
 
     *bl = new_ip_blacklist();
     if (!*bl) goto error;
@@ -28,13 +28,13 @@ error:
  */
 int setup_domain_blacklist(domain_blacklist **bl)
 {
-	assert(bl);
+    assert(bl);
 
     *bl = new_domain_blacklist();
     if (!*bl) goto error;
 
-	return NSIDS_OK;
+    return NSIDS_OK;
 
 error:
-	return NSIDS_MEM;
+    return NSIDS_MEM;
 }

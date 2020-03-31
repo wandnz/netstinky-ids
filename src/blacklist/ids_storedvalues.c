@@ -30,40 +30,40 @@ fini_ids_ioc_value(ids_ioc_value_t *value);
 ids_ioc_value_t *
 new_ids_ioc_value(int botnet_id)
 {
-	int rc;
-	ids_ioc_value_t *value = NULL;
-	value = malloc(sizeof(*value));
-	if (!value) return NULL;
+    int rc;
+    ids_ioc_value_t *value = NULL;
+    value = malloc(sizeof(*value));
+    if (!value) return NULL;
 
-	rc = init_ids_ioc_value(value, botnet_id);
-	if (rc)
-	{
-		free(value);
-		return NULL;
-	}
+    rc = init_ids_ioc_value(value, botnet_id);
+    if (rc)
+    {
+        free(value);
+        return NULL;
+    }
 
-	return value;
+    return value;
 }
 
 void
 free_ids_ioc_value(ids_ioc_value_t *value)
 {
-	fini_ids_ioc_value(value);
-	if (value) free(value);
+    fini_ids_ioc_value(value);
+    if (value) free(value);
 }
 
 static int
 init_ids_ioc_value(ids_ioc_value_t *value, int botnet_id)
 {
-	if (!value) return -1;
+    if (!value) return -1;
 
-	value->botnet_id = botnet_id;
-	return 0;
+    value->botnet_id = botnet_id;
+    return 0;
 }
 
 static void
 fini_ids_ioc_value(ids_ioc_value_t *value)
 {
-	if (!value) return;
-	memset(value, 0, sizeof(*value));
+    if (!value) return;
+    memset(value, 0, sizeof(*value));
 }

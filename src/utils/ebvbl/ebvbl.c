@@ -122,9 +122,9 @@ ebvbl_init(size_t elementSize, cmpElement cmp, unsigned int f, first_bits fb)
 void
 _ebvbl_clear_bv(EBVBL *e)
 {
-	assert(e);
-	size_t sz_bytes = ebvbl_get_bit_vector_size(e->_f) / 8;
-	memset(e->_bv, 0, sz_bytes);
+    assert(e);
+    size_t sz_bytes = ebvbl_get_bit_vector_size(e->_f) / 8;
+    memset(e->_bv, 0, sz_bytes);
 }
 
 void *
@@ -266,30 +266,30 @@ ebvbl_contains(EBVBL *e, void *element)
 const void *
 ebvbl_lookup(EBVBL *e, void *element)
 {
-	// Check bit vector
-	unsigned int p = e->_fb(element, e->_f);
-	uint8_t bit = _get_bit_at_index(e, p);
+    // Check bit vector
+    unsigned int p = e->_fb(element, e->_f);
+    uint8_t bit = _get_bit_at_index(e, p);
 
-	// Only do lookup if bit vector indicates there might be a match
-	if (bit)
-		return sa_lookup_element(e->_sa, element);
+    // Only do lookup if bit vector indicates there might be a match
+    if (bit)
+        return sa_lookup_element(e->_sa, element);
 
-	return NULL;
+    return NULL;
 }
 
 void
 ebvbl_clear(EBVBL *e, freeElement free_item)
 {
-	assert(e);
-	_ebvbl_clear_bv(e);
+    assert(e);
+    _ebvbl_clear_bv(e);
 
-	// Save values stored in sorted array
-	size_t element_sz = sa_get_element_size(e->_sa);
-	cmpElement cmp = sa_compare(e->_sa);
+    // Save values stored in sorted array
+    size_t element_sz = sa_get_element_size(e->_sa);
+    cmpElement cmp = sa_compare(e->_sa);
 
-	// Free and re-initialize SortedArray
-	sa_free(e->_sa, free_item);
-	e->_sa = sa_initialize(element_sz, cmp);
+    // Free and re-initialize SortedArray
+    sa_free(e->_sa, free_item);
+    e->_sa = sa_initialize(element_sz, cmp);
 }
 
 EBVBL *

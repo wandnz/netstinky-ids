@@ -17,51 +17,51 @@
 
 typedef enum
 {
-	NS_PROTO_VERSION_WAITING,
-	NS_PROTO_OP_SENDING,
-	NS_PROTO_IOCS_WAITING,
-	NS_PROTO_CONF_SENDING,
-	NS_PROTO_CLOSE
+    NS_PROTO_VERSION_WAITING,
+    NS_PROTO_OP_SENDING,
+    NS_PROTO_IOCS_WAITING,
+    NS_PROTO_CONF_SENDING,
+    NS_PROTO_CLOSE
 } ns_cli_state_t;
 
 typedef enum
 {
-	NS_ACTION_NOP,
-	NS_ACTION_WRITE,
-	NS_ACTION_CLOSE
+    NS_ACTION_NOP,
+    NS_ACTION_WRITE,
+    NS_ACTION_CLOSE
 } ns_action_type_t;
 
 typedef struct
 {
-	ns_action_type_t type;
-	uv_buf_t send_buffer;
+    ns_action_type_t type;
+    uv_buf_t send_buffer;
 } ns_action_t;
 
 typedef struct
 {
-	ns_cli_state_t state;
+    ns_cli_state_t state;
 } ns_cli_proto_t;
 
 typedef struct
 {
-	const char *server_host;
-	uint16_t server_port;
-	SSL_CTX *ctx;	// May only be needed once
-	tls_stream_t stream;
-	ns_cli_proto_t proto;
-	domain_blacklist **domain;
-	ip_blacklist **ip;
-	domain_blacklist *new_domain;
-	ip_blacklist *new_ip;
+    const char *server_host;
+    uint16_t server_port;
+    SSL_CTX *ctx;	// May only be needed once
+    tls_stream_t stream;
+    ns_cli_proto_t proto;
+    domain_blacklist **domain;
+    ip_blacklist **ip;
+    domain_blacklist *new_domain;
+    ip_blacklist *new_ip;
 } ids_update_ctx_t;
 
 int
 ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
-		tls_stream_t *stream, const uv_buf_t *buf);
+        tls_stream_t *stream, const uv_buf_t *buf);
 
 int
 ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
-		tls_stream_t *stream, int status);
+        tls_stream_t *stream, int status);
 
 ns_action_t
 ns_cl_proto_on_handshake(ns_cli_state_t *state, tls_stream_t *stream);
@@ -79,9 +79,9 @@ ns_cl_proto_on_handshake(ns_cli_state_t *state, tls_stream_t *stream);
  */
 int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
-		const char *update_host, const uint16_t update_port,
-		int ssl_no_verify,
-		domain_blacklist **domain, ip_blacklist **ip);
+        const char *update_host, const uint16_t update_port,
+        int ssl_no_verify,
+        domain_blacklist **domain, ip_blacklist **ip);
 
 /**
  * Teardown an ids_update_ctx_t. This function starts the teardown process but

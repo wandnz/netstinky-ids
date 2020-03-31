@@ -19,8 +19,8 @@ typedef void (*free_linked_list_item)(LINKED_LIST_ITEM);
 
 struct linked_list
 {
-	LINKED_LIST_ITEM item;
-	struct linked_list *next;
+    LINKED_LIST_ITEM item;
+    struct linked_list *next;
 };
 
 void

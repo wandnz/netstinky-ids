@@ -212,19 +212,19 @@ sa_contains_element(SortedArray *sa, void *element)
 void *
 sa_lookup_element(SortedArray *sa, void *element)
 {
-	void *closest = NULL;
+    void *closest = NULL;
 
-	if (!sa || !element) return NULL;
+    if (!sa || !element) return NULL;
 
-	// Find closest match
-	unsigned int idx = sa_binary_search(sa, element);
-	closest = sa_get_element(sa, idx);
+    // Find closest match
+    unsigned int idx = sa_binary_search(sa, element);
+    closest = sa_get_element(sa, idx);
 
-	// Exact match?
-	if (0 == sa->_cmp(closest, element))
-		return closest;
+    // Exact match?
+    if (0 == sa->_cmp(closest, element))
+        return closest;
 
-	return NULL;
+    return NULL;
 }
 
 size_t
@@ -254,24 +254,24 @@ sa_compare(SortedArray *sa)
 void *
 sa_free(SortedArray *sa, freeElement e_free)
 {
-	assert(sa);
+    assert(sa);
 
-	int i;
+    int i;
 
-	if (sa)
-	{
-		// free elements first
-		if (e_free != NULL)
-		{
-			for (i = 0; i < sa->_n; i++)
-			{
-				e_free(sa_get_element(sa, i));
-			}
-		}
+    if (sa)
+    {
+        // free elements first
+        if (e_free != NULL)
+        {
+            for (i = 0; i < sa->_n; i++)
+            {
+                e_free(sa_get_element(sa, i));
+            }
+        }
 
-		if (sa->_arr) free(sa->_arr);
-		free(sa);
-	}
+        if (sa->_arr) free(sa->_arr);
+        free(sa);
+    }
     
     return NULL;
 }

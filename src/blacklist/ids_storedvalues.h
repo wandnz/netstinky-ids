@@ -17,7 +17,7 @@
 
 typedef struct
 {
-	int botnet_id;
+    int botnet_id;
 } ids_ioc_value_t;
 
 /**

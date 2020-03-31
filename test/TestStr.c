@@ -51,7 +51,7 @@ void testSplitString_withEmptyString_returnsNeg1(CuTest *tc)
 
 void testSplitString_withStringNoValue_assignsCorrectPointers(CuTest *tc)
 {
-	const char *string = "Hello:";
+    const char *string = "Hello:";
     const char *expected_header = "Hello";
     const char *expected_value = "";
     char *header = NULL;
@@ -59,13 +59,13 @@ void testSplitString_withStringNoValue_assignsCorrectPointers(CuTest *tc)
 
     split_string(':', string, 6, &header, &value);
 
-	CuAssertStrEquals(tc, header, expected_header);
-	CuAssertStrEquals(tc, value, expected_value);
+    CuAssertStrEquals(tc, header, expected_header);
+    CuAssertStrEquals(tc, value, expected_value);
 }
 
 void testSplitString_withStringNoHeader_returns0(CuTest *tc)
 {
-	const char *string = ":Hello";
+    const char *string = ":Hello";
     char *header = NULL;
     char *value = NULL;
 
@@ -76,7 +76,7 @@ void testSplitString_withStringNoHeader_returns0(CuTest *tc)
 
 void testSplitString_withStringNoHeader_assignsCorrectPointers(CuTest *tc)
 {
-	const char *string = ":Hello";
+    const char *string = ":Hello";
     const char *expected_header = "";
     const char *expected_value = "Hello";
     char *header = NULL;
@@ -84,8 +84,8 @@ void testSplitString_withStringNoHeader_assignsCorrectPointers(CuTest *tc)
 
     split_string(':', string, 6, &header, &value);
 
-	CuAssertStrEquals(tc, header, expected_header);
-	CuAssertStrEquals(tc, value, expected_value);
+    CuAssertStrEquals(tc, header, expected_header);
+    CuAssertStrEquals(tc, value, expected_value);
 }
 
 void testSplitString_withValidString_assignsCorrectPointers(CuTest *tc)

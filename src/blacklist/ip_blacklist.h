@@ -17,9 +17,9 @@ typedef struct ebvbl ip_blacklist;
 
 typedef struct
 {
-	uint32_t ip_addr;
-	uint16_t port;
-	ids_ioc_value_t value;
+    uint32_t ip_addr;
+    uint16_t port;
+    ids_ioc_value_t value;
 } ip_key_value_t;
 
 /**

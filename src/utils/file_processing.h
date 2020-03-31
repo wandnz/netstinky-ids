@@ -25,7 +25,7 @@
  * @param user_data A pointer to data provided by the user. May be NULL.
  */
 typedef void (*getline_handle_line_cb)(char *line, size_t line_len,
-		void *user_data);
+        void *user_data);
 
 /**
  * Run a callback function on each line that is extracted from a file.

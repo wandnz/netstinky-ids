@@ -19,7 +19,7 @@ typedef struct tls_stream_s tls_stream_t;
  */
 typedef void (*tls_str_handshake_cb)(tls_stream_t *, int status);
 typedef void (*tls_str_read_cb)(tls_stream_t *, int status,
-		const uv_buf_t *buf);
+        const uv_buf_t *buf);
 
 /**
  * Called when a write operation has completed. Status will be 0 if the
@@ -27,7 +27,7 @@ typedef void (*tls_str_read_cb)(tls_stream_t *, int status,
  * to the user. The user must free the base field of each buffer.
  */
 typedef void (*tls_str_write_cb)(tls_stream_t *, int status, uv_buf_t *buf,
-		unsigned int nbufs);
+        unsigned int nbufs);
 typedef void (*tls_str_shutdown_cb)(tls_stream_t *, int status);
 typedef void (*tls_str_close_cb) (tls_stream_t *);
 
@@ -37,18 +37,18 @@ typedef void (*tls_str_close_cb) (tls_stream_t *);
  */
 struct tls_stream_s
 {
-	uv_tcp_t tcp;
-	SSL *ssl;
-	BIO *internal;
-	BIO *network;
-	uv_alloc_cb on_alloc;
-	tls_str_handshake_cb on_handshake;
-	tls_str_shutdown_cb on_shutdown;
-	tls_str_close_cb on_close;
-	tls_str_read_cb on_read;
-	uv_write_cb on_write;
-	void *data;	// user data
-	int handshake_complete;
+    uv_tcp_t tcp;
+    SSL *ssl;
+    BIO *internal;
+    BIO *network;
+    uv_alloc_cb on_alloc;
+    tls_str_handshake_cb on_handshake;
+    tls_str_shutdown_cb on_shutdown;
+    tls_str_close_cb on_close;
+    tls_str_read_cb on_read;
+    uv_write_cb on_write;
+    void *data;	// user data
+    int handshake_complete;
 };
 
 /**
@@ -61,8 +61,8 @@ struct tls_stream_s
  */
 typedef struct buf_array_s
 {
-	unsigned int nbufs;
-	uv_buf_t *bufs;
+    unsigned int nbufs;
+    uv_buf_t *bufs;
 } buf_array_t;
 
 /**
@@ -72,19 +72,19 @@ typedef struct buf_array_s
  */
 typedef struct write_cb_data_s
 {
-	tls_stream_t *stream;
-	buf_array_t plaintext;
-	buf_array_t encrypted;
-	tls_str_write_cb cb;
+    tls_stream_t *stream;
+    buf_array_t plaintext;
+    buf_array_t encrypted;
+    tls_str_write_cb cb;
 } write_cb_data_t;
 
 enum
 {
-	TLS_STR_OK = 0,
-	TLS_STR_FAIL = -1,
-	TLS_STR_MEM = -2,
-	TLS_STR_HANDSHAKE_INCOMPLETE = -3,
-	TLS_STR_NEED_CLOSE = -4
+    TLS_STR_OK = 0,
+    TLS_STR_FAIL = -1,
+    TLS_STR_MEM = -2,
+    TLS_STR_HANDSHAKE_INCOMPLETE = -3,
+    TLS_STR_NEED_CLOSE = -4
 };
 
 /**
@@ -114,7 +114,7 @@ tls_stream_fini(tls_stream_t *stream);
  */
 int
 tls_stream_bind(tls_stream_t *stream, const struct sockaddr *addr,
-		unsigned int flags);
+        unsigned int flags);
 
 /**
  * Connect to a server.
@@ -125,7 +125,7 @@ tls_stream_bind(tls_stream_t *stream, const struct sockaddr *addr,
  */
 int
 tls_stream_connect(tls_stream_t *stream, const struct sockaddr *addr,
-		tls_str_handshake_cb handshake_cb, tls_str_read_cb read_cb);
+        tls_str_handshake_cb handshake_cb, tls_str_read_cb read_cb);
 
 int
 tls_stream_shutdown(tls_stream_t *stream, tls_str_shutdown_cb cb);
@@ -142,7 +142,7 @@ tls_stream_listen(tls_stream_t *stream, int backlog, uv_connection_cb cb);
  */
 int
 tls_stream_accept(tls_stream_t *server, tls_stream_t *client,
-		tls_str_handshake_cb hshake_cb, tls_str_read_cb read_cb);
+        tls_str_handshake_cb hshake_cb, tls_str_read_cb read_cb);
 
 int
 tls_stream_read_start(tls_stream_t *stream, uv_read_cb cb);
@@ -162,7 +162,7 @@ tls_stream_read_stop(tls_stream_t *stream);
  */
 int
 tls_stream_write(tls_stream_t *stream, const uv_buf_t bufs[],
-		unsigned int nbufs, tls_str_write_cb cb);
+        unsigned int nbufs, tls_str_write_cb cb);
 
 /**
  * Closes a stream. Will shutdown first if necessary.

@@ -23,7 +23,7 @@
  * as the size of the structure referenced by PTR.
  */
 #define MALLOC_ZERO(ptr) do { ptr = malloc(sizeof(*ptr)); \
-	if (ptr) memset(ptr, 0, sizeof(*ptr)); } while (0)
+    if (ptr) memset(ptr, 0, sizeof(*ptr)); } while (0)
 
 #define ZERO(ptr) do { memset(ptr, 0, sizeof(*(ptr))); } while (0);
 
@@ -39,8 +39,8 @@
  */
 struct ptr_range
 {
-	void *start;
-	void *end;
+    void *start;
+    void *end;
 };
 
 #endif /* UTILS_COMMON_H_ */

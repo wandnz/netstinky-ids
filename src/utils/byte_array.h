@@ -20,11 +20,11 @@
 
 uint8_t *
 byte_array_read_uint16(uint16_t *out, const uint8_t *pos,
-		const uint8_t *buffer_end);
+        const uint8_t *buffer_end);
 
 uint8_t *
 byte_array_read_uint32(uint32_t *out, const uint8_t *pos,
-		const uint8_t *buffer_end);
+        const uint8_t *buffer_end);
 
 /*
  * All byte_array_write_xxx functions have the same usage:
@@ -39,10 +39,10 @@ byte_array_read_uint32(uint32_t *out, const uint8_t *pos,
 
 uint8_t *
 byte_array_write_uint16(uint16_t value, uint8_t *pos,
-		const uint8_t *buffer_end);
+        const uint8_t *buffer_end);
 
 uint8_t *
 byte_array_write_uint32(uint32_t value, uint8_t *pos,
-		const uint8_t *buffer_end);
+        const uint8_t *buffer_end);
 
 #endif /* BYTE_ARRAY_H_ */

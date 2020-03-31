@@ -10,6 +10,6 @@
 const char *
 check_uv_error(int uv_error)
 {
-	if (0 == uv_error) return NULL;
-	return uv_strerror(uv_error);
+    if (0 == uv_error) return NULL;
+    return uv_strerror(uv_error);
 }

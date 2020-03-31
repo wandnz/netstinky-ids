@@ -19,8 +19,8 @@
  */
 struct packet_s
 {
-	size_t size;
-	uint8_t *packet;
+    size_t size;
+    uint8_t *packet;
 };
 
 struct packet_s

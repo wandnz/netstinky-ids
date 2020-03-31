@@ -31,6 +31,6 @@
  */
 int
 uv_buf_read_line(const uv_buf_t *buf, char *start, char **line,
-		char **next_start);
+        char **next_start);
 
 #endif /* UV_BUF_HELPER_H_ */
