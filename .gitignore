@@ -147,3 +147,7 @@ Debug/
 
 # Exclude Autotools config.h
 src/config.h
+
+# Exclude generated Doxygen files
+doc/html/
+doc/latex/
