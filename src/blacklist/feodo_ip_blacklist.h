@@ -10,6 +10,9 @@
  *
  *
  */
+/** @file
+ *
+ */
 #ifndef SRC_BLACKLIST_FEODO_IP_BLACKLIST_H_
 #define SRC_BLACKLIST_FEODO_IP_BLACKLIST_H_
 

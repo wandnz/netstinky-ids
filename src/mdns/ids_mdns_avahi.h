@@ -10,6 +10,9 @@
  *
  *
  */
+/** @file
+ *
+ */
 #ifndef SRC_IDS_MDNS_H_
 #define SRC_IDS_MDNS_H_
 

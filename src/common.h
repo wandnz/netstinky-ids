@@ -10,6 +10,9 @@
  *
  *
  */
+/** @file
+ *
+ */
 #ifndef SRC_COMMON_H_
 #define SRC_COMMON_H_
 

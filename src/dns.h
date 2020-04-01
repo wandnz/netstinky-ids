@@ -10,6 +10,9 @@
  *
  *
  */
+/** @file
+ *
+ */
 #ifndef DNS_H_
 #define DNS_H_
 

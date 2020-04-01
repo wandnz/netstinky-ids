@@ -10,8 +10,8 @@
  *
  *
  */
-/**
- * Extremely common and very general functions and definitions.
+/** @file
+ * @brief Extremely common and very general functions and definitions.
  */
 
 #include <config.h>

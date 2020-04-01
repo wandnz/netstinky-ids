@@ -10,6 +10,9 @@
  *
  *
  */
+/** @file
+ *
+ */
 #ifndef ERROR_IDS_ERROR_H_
 #define ERROR_IDS_ERROR_H_
 

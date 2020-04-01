@@ -10,8 +10,8 @@
  *
  *
  */
-/** @file
- * @brief Set up MDNS using the Avahi library
+/*
+ * Set up MDNS using the Avahi library
  *
  * Publishes the connection details of the IDS server which transmits IDS
  * events.

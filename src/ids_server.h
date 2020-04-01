@@ -10,6 +10,9 @@
  *
  *
  */
+/** @file
+ *
+ */
 #ifndef SRC_IDS_SERVER_H_
 #define SRC_IDS_SERVER_H_
 

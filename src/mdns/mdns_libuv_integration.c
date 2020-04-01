@@ -10,9 +10,9 @@
  *
  *
  */
-/** @file
+/*
  *
- * @brief Sets up a handle that will allow the Avahi MDNS library functions to
+ * Sets up a handle that will allow the Avahi MDNS library functions to
  * be called from within a libuv event loop.
  *
  * The Avahi library does not allow direct access to the file descriptors that

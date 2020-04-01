@@ -10,6 +10,9 @@
  *
  *
  */
+/** @file
+ *
+ */
 #ifndef DOMAIN_BLACKLIST_H_
 #define DOMAIN_BLACKLIST_H_
 
