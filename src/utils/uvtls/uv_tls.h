@@ -1,8 +1,20 @@
 /*
- * libuv_tls.h
  *
- *  Created on: Jul 18, 2019
- *      Author: mfletche
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ *
+ * @brief OpenSSL support for libuv tcp_handle_t handles
+ *
+ * @author Marianne Fletcher
  */
 
 #ifndef UV_TLS_H_

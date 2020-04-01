@@ -1,11 +1,21 @@
+
 /*
- * portable_endian.h
  *
- *  Created on: Jul 18, 2019
- *      Author: amackint
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
  *
- * Adapted from Public Domain code `portable_endian.h'
- * written by Mathias Panzenböck to use Autotools
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ * @brief Adapted from Public Domain code `portable_endian.h' written by
+ * Mathias Panzenböck to use Autotools
+ *
+ * @author Andrew Mackintosh
  */
 #ifndef PORTABLE_ENDIAN_H__
 #define PORTABLE_ENDIAN_H__

@@ -1,8 +1,16 @@
 /*
- * linked_list.h
  *
- *  Created on: 26/10/2018
- *      Author: mfletche
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
  *
  * An empty list is represented by a NULL pointer to a linked_list.
  *

@@ -1,7 +1,22 @@
-/**
- * Contains functions which operate on a byte array. This includes
- * functions which convert from a byte array into integers and
+/*
+ *
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ * @brief Functions which operate on a byte array.
+ *
+ * This includes functions which convert from a byte array into integers and
  * strings.
+ *
+ * @author Marianne Fletcher
  */
 
 #ifndef BYTE_ARRAY_H_

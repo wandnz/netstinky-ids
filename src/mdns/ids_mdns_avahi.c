@@ -1,13 +1,21 @@
 /*
- * Set up MDNS using the Avahi library.
+ *
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ * @brief Set up MDNS using the Avahi library
  *
  * Publishes the connection details of the IDS server which transmits IDS
  * events.
  *
- * ids_mdns.c
- *
- *  Created on: 11/04/2019
- *      Author: mfletche
  */
 #include "ids_mdns_avahi.h"
 

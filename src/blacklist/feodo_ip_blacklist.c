@@ -1,10 +1,15 @@
 /*
- * feodo_ip_blacklist.c
  *
- *  Created on: Aug 16, 2019
- *      Author: mfletche
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
  */
-
 #define _XOPEN_SOURCE 500
 
 #include <sys/types.h>

@@ -1,10 +1,23 @@
+/*
+ *
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
 /**
  * Extremely common and very general functions and definitions.
  */
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
-#define DEBUG 1
 
 /*
  * Prints a message if DEBUG is defined. This is not very secure as

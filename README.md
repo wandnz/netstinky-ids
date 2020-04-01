@@ -58,3 +58,12 @@ cd test/
 make
 ./runner
 ```
+
+# Copyright
+Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+All rights reserved.
+
+This code has been developed by the University of Waikato WAND
+research group. For further information please see https://netstinky.wand.net.nz/.
+
+This project is made available under the BSD 2-Clause license. For more information, see the `LICENSE` file.

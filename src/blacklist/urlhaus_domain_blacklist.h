@@ -1,5 +1,17 @@
 /*
- * Process a file downloaded from https://urlhaus.abuse.ch/api/ with a single URL on each line.
+ *
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ * @brief Process a file downloaded from https://urlhaus.abuse.ch/api/ with a single URL on each line.
  *
  * Comments are denoted by '#'.
  *
@@ -8,13 +20,7 @@
  *
  * These functions extract the domain name portion ONLY. For example, 'proforma-invoices.com' would
  * be extracted from the above URL.
- *
- * urlhaus_domain_blacklist.h
- *
- *  Created on: 11/04/2019
- *      Author: mfletche
  */
-
 #ifndef SRC_URLHAUS_DOMAIN_BLACKLIST_H_
 #define SRC_URLHAUS_DOMAIN_BLACKLIST_H_
 

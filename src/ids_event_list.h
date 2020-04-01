@@ -1,6 +1,20 @@
-/**
- * A queue of recent events which have been detected by the IDS. The queue
- * maintains a maximum number of events which is set at initialization
+/*
+ *
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ * @brief A queue of recent events which have been detected by the IDS.
+ *
+ * The queue maintains a maximum number of events which is set at
+ * initialization
  *
  * The events contain information about where they originated, on what
  * interface they were detected, indicator of compromise and time.

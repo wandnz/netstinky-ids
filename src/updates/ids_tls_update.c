@@ -1,10 +1,14 @@
 /*
- * Each connection requires a TLS context.
  *
- * ids_tls_update.c
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
  *
- *  Created on: Jul 22, 2019
- *      Author: mfletche
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
  */
 #include <config.h>
 

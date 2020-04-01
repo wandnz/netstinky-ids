@@ -1,10 +1,22 @@
 /*
- * A C implementation of The Enhanced Bit Vector Based Blacklisting Algorithm
+ *
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ * @brief A C implementation of The Enhanced Bit Vector Based Blacklisting Algorithm
  * (EBVBL), based on 'Bit vector algorithms enabling high-speed and
  * memory-efficient firewall blacklisting' by Thames, Abler and Keeling (2009).
- * 
+ *
  * The EBVBL is designed for IPv4 address blacklisting.
- * 
+ *
  * The worst-case performance when searching a sorted array occurs when the item
  * that is being searched for is not in the array. The EBVBL uses a sorted array
  * and an additional bit vector to reduce the chance that the worst-case leads

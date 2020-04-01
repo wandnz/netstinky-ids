@@ -1,8 +1,19 @@
 /*
- * uv_mdns_check.c
  *
- * Sets up a handle that will allow the Avahi MDNS library functions to be
- * called from within a libuv event loop.
+ * Copyright (c) 2020 The University of Waikato, Hamilton, New Zealand.
+ *
+ * This file is part of netstinky-ids.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-2-Clause
+ *
+ *
+ */
+/** @file
+ *
+ * @brief Sets up a handle that will allow the Avahi MDNS library functions to
+ * be called from within a libuv event loop.
  *
  * The Avahi library does not allow direct access to the file descriptors that
  * it uses, so using a uv_poll_t handle will not work, but it does have a
@@ -16,8 +27,6 @@
  * intended for something different, updates to libuv will need to be monitored
  * for changes that break this.
  *
- *  Created on: 18/04/2019
- *      Author: mfletche
  */
 #include <stdio.h>
 
