@@ -34,7 +34,7 @@ typedef hattrie_t domain_blacklist;
  *
  * @param b The blacklist structure.
  * @param domain The domain to add to the blacklist.
- * @param value: The value to associate with the domain.
+ * @param value The value to associate with the domain.
  * @return 1 if successful, 0 if unsuccessful.
  */
 int
@@ -58,9 +58,11 @@ domain_blacklist_is_blacklisted(domain_blacklist *b, const char *domain);
 void
 domain_blacklist_clear(domain_blacklist *b);
 
-/*
+/**
  * Free memory associated with the domain blacklist and set the pointer at
  * B to NULL.
+ *
+ * @param b A double-pointer to a domain_blacklist to be freed
  */
 void
 free_domain_blacklist(domain_blacklist **b);

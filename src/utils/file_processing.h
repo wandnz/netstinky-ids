@@ -39,7 +39,7 @@ typedef void (*getline_handle_line_cb)(char *line, size_t line_len,
  * Run a callback function on each line that is extracted from a file.
  * @param fp The file to extract lines from.
  * @param cb The callback which will run on each line.
- * @param user_data User data which will be passed directly to the callback.
+ * @param usr_data User data which will be passed directly to the callback.
  * @returns The number of lines processed or an error code (-ve).
  */
 int

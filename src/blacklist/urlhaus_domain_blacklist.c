@@ -33,19 +33,20 @@ struct urlhaus_cb_data_s
 typedef struct urlhaus_cb_data_s urlhaus_cb_data_t;
 
 /**
- * Return 1 if the line is a comment. Assumes that the '#' character is the first character in the
- * line (this has been true so far).
+ * Return 1 if the line is a comment. Assumes that the '#' character is the
+ * first character in the line (this has been true so far).
  *
  * @param line: A line from a urlhaus domain blacklist.
  */
-int urlhaus_is_comment(char *line)
+static int
+urlhaus_is_comment(char *line)
 {
     assert(line);
     if (line[0] == '#') return 1;
     return 0;
 }
 
-void
+static void
 handle_urlhaus_line(char *line, void *user_data)
 {
     int rc;
@@ -57,7 +58,8 @@ handle_urlhaus_line(char *line, void *user_data)
     if (urlhaus_is_comment(line)) return;
 
     char *domain_name_pos = line + strlen("http://");
-    if ('/' == *domain_name_pos) domain_name_pos++;	// Append extra in case prefix was 'https://'
+    // Append extra in case prefix was 'https://'
+    if ('/' == *domain_name_pos) domain_name_pos++;
 
     // Find first '/' character
     for (char *dn_iter = domain_name_pos; *dn_iter != '\0'; dn_iter++)
@@ -91,7 +93,7 @@ handle_urlhaus_line(char *line, void *user_data)
  * Bridge between getline and handle_urlhaus_line since if a line contains a NULL
  * character we don't want to bother reading past it.
  */
-void
+static void
 getline_urlhaus_cb(char *line, size_t line_sz, void *user_data)
 {
     handle_urlhaus_line(line, user_data);

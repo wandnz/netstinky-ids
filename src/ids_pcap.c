@@ -36,7 +36,7 @@
 
 /**
  * TODO: Refactor references to global state into a struct pointed to by
- * \s user_dat instead.
+ * user_dat instead.
  */
 extern ip_blacklist *ip_bl;
 extern domain_blacklist *dn_bl;
@@ -284,9 +284,9 @@ done:
 
 /**
  * Called when an event occurs on the pcap file descriptor.
- * @param handle: The handle of the libuv poll handle.
- * @param status: status < 0 indicates that an error occurred, 0 means success.
- * @param events: A bitmask of events.
+ * @param handle The handle of the libuv poll handle.
+ * @param status 0 on success, otherwise < 0 indicates that an error occurred
+ * @param events A bitmask of events.
  */
 static void pcap_data_cb(uv_poll_t *handle, int status, int events)
 {
@@ -302,8 +302,8 @@ static void pcap_data_cb(uv_poll_t *handle, int status, int events)
 
     if (events & UV_READABLE) {
         // If we are here, the fd is ready to read
-        // cnt = 0 or -1 means read all packets (but -1 will work with older versions of pcap,
-        // where 0 does not)
+        // cnt = 0 or -1 means read all packets (but -1 will work with older
+        // versions of pcap, where 0 does not)
         pkt_num = pcap_dispatch(pcap, cnt, packet_handler, NULL);
 
         if (pkt_num == PCAP_ERROR) {

@@ -29,35 +29,62 @@
 #include "utils/linked_list.h"
 #include "blacklist/ids_storedvalues.h"
 
+/**
+ * @brief Information about an observed IoC event
+ *
+ * When an Indicator of Compromise is observed, this is called an "event". An
+ * event is to be reported to a client device and as such, the details of
+ * events are buffered in a linked-list (of which this struct is an element).
+ */
 struct ids_event
 {
+    /** a linked list of observation timestamps */
     struct ids_event_ts *times_seen;
+    /** the number of times this IoC has been observed */
     unsigned int num_times;
+    /** the interface name of the interface where the event was observed */
     char *iface;
+    /** the IPv4 address of the generating device */
     uint32_t src_ip;
+    /** the MAC address of the generating device */
     mac_addr mac;
-    char *ioc;	/* may be a stringify-ed IP address or domain */
+    /** may be a stringify-ed IP address or domain */
+    char *ioc;
 
-    /* A copy of the value associated with the IOC. This is a copy since the
+    /** A copy of the value associated with the IOC. This is a copy since the
      * blacklist may change and the IOC/value pair may be removed but the event
      * should still be associated with the same botnet ID. */
     ids_ioc_value_t ioc_value;
 
+    /** The next value of the list **/
     struct ids_event *next;
+    /** the previous value of the list **/
     struct ids_event *previous;
 };
 
+/**
+ * A linked-list containing #ids_event structures
+ */
 struct ids_event_list
 {
+    /** The head of the linked-list, or NULL for an empty list */
     struct ids_event *head;
+    /** The maximum number of events to store in the list */
     unsigned int max_events;
+    /** The maximum number of timestamps to store for repeated events */
     unsigned int max_timestamps;
+    /** \deprecated Unused */
     unsigned int num_events;
 };
 
+/**
+ * A linked-list of timestamps
+ */
 struct ids_event_ts
 {
+    /** The timestamp of this event */
     struct timespec tm_stamp;
+    /** The next timestamp in the list, or NULL if no more timestamps */
     struct ids_event_ts *next;
 };
 
@@ -69,6 +96,12 @@ struct ids_event_ts
 void
 free_ids_event(struct ids_event **e);
 
+/**
+ * @brief Free an #ids_event_list structure, including any #ids_event children
+ *
+ * All members of the list are freed alongside the list structure itself. The
+ * pointer pointed to by \p list is also set to NULL.
+ */
 void
 free_ids_event_list(struct ids_event_list **list);
 
@@ -106,6 +139,15 @@ ids_event_list_add_event(struct ids_event_list *list, struct ids_event *e);
 struct ids_event *
 ids_event_list_contains(struct ids_event_list *list, struct ids_event *e);
 
+/**
+ * @brief Trim the oldest events in \p list until only
+ * \ref ids_event_list.max_events remain.
+ *
+ * Will traverse \ref ids_event_list.max_events events into the list before
+ * freeing the remaining events from the tail of the list.
+ *
+ * @param list The ids_event_list to traverse
+ */
 void
 ids_event_list_enforce_max_events(struct ids_event_list *list);
 
@@ -117,6 +159,7 @@ ids_event_list_enforce_max_events(struct ids_event_list *list);
  * @param src_ip The IP of the device which generated this event.
  * @param ioc A string containing the indicator of compromise (a domain name or
  * a string-ified IP address). May not be NULL.
+ * @param mac the MAC address of the device that generated this event
  * @param ioc_value The value stored in the blacklist for the particular IOC.
  * @return A pointer to a valid ids_event structure, or NULL if the ids_event
  * could not be created.

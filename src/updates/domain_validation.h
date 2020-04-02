@@ -16,11 +16,18 @@
 #ifndef SRC_BLACKLIST_UPDATES_DOMAIN_VALIDATION_H_
 #define SRC_BLACKLIST_UPDATES_DOMAIN_VALIDATION_H_
 
-#define MAX_DOMAIN_LEN 253
-#define MAX_LABEL_LEN 63
-#define MIN_LABEL_LEN 1
-#define DELIMITER_CHAR "."
+#define MAX_DOMAIN_LEN 253  ///< Maximum string length of a valid domain name
+#define MAX_LABEL_LEN 63    ///< Maximum string length of a valid "label"
+#define MIN_LABEL_LEN 1     ///< The minumum required number of labels
+#define DELIMITER_CHAR "."  ///< The label separator to use
 
+/**
+ * @brief Optimized range-check for uints
+ *
+ * @param c The value to check
+ * @param start The lower bound of the range
+ * @param diff The difference from the lower bound to the upper bound
+ */
 #define IN_RANGE(c, start, diff) ((unsigned)(c - start) <= diff)
 
 /*
@@ -29,14 +36,14 @@
  * can be done with a single comparison.
  */
 
-#define NUM_START 0x30
-#define NUM_DIFF 0x39 - 0x30
+#define NUM_START 0x30          ///< ASCII numeric range lower bound
+#define NUM_DIFF 0x39 - 0x30    ///< ASCII numeric range difference
 
-#define UPPER_START 0x41
-#define UPPER_DIFF 0x5A - 0x41
+#define UPPER_START 0x41        ///< ASCII upper-case range lower bound
+#define UPPER_DIFF 0x5A - 0x41  ///< ASCII upper-case range difference
 
-#define LOWER_START 0x61
-#define LOWER_DIFF 0x7A - 0x61
+#define LOWER_START 0x61        ///< ASCII lower-case range lower bound
+#define LOWER_DIFF 0x7A - 0x61  ///< ASCII lower-case range difference
 
 /**
  * Check if the given string is a well-formed domain name

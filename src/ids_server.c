@@ -15,6 +15,7 @@
 #include "ids_server.h"
 #include "error/ids_error.h"
 
+/** The maximum number of concurrent connections to the server */
 #define MAX_CONNS 128
 
 static char *fmt_ioc = "IOC: %s\n";
@@ -31,7 +32,9 @@ static char *fmt_src_mac = "Src-MAC: %02X-%02X-%02X-%02X-%02X-%02X\n\n";
  */
 typedef struct evs_usr_data_s
 {
+    /** Pointer to the array of buffers */
     uv_buf_t *bufs;
+    /** The number of buffers in #bufs */
     unsigned int nbufs;
 } evs_usr_data_t;
 
@@ -41,6 +44,9 @@ static void on_client_close(uv_handle_t *handle);
 /**
  * Bundle the write buffers into a single data structure. Copies all uv_buf_t
  * in case they were allocated on the stack.
+ *
+ * @param bufs A set of buffers provided by libuv
+ * @param nbufs The number of buffers pointed to by \p bufs
  */
 static evs_usr_data_t *
 new_usr_data(uv_buf_t *bufs, unsigned int nbufs)

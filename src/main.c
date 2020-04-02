@@ -60,13 +60,14 @@
 #include "test/fuzz_test_pcap.h"
 #endif // FUZZ_TEST
 
-#define MAX_EVENTS 5
-#define MAX_TS 5
-#define NEW_USER "nobody"
-#define NEW_GROUP "nogroup"
+#define MAX_EVENTS 5        ///< The maximum number of events to buffer
+#define MAX_TS 5            ///< The maximum number of timestamps to buffer
+#define NEW_USER "nobody"   ///< The user to switch to after initialization
+#define NEW_GROUP "nogroup" ///< The group to switch to after initialization
 
-// For debugging with valgrind, which cannot handle programs with extra
-// capabilities
+/** For debugging with valgrind, which cannot handle programs with extra
+ * capabilities
+ */
 #define IGNORE_PCAP_ERRORS (true)
 
 /* Structure to hold command line argument values. None of these will need to
@@ -74,16 +75,25 @@
  */
 struct IdsArgs
 {
+    /** Filename for a file containing domain IoC records */
     char *domain_filename;
+    /** Filename for a file containing IP IoC records*/
     char *ip_filename;
+    /** Filename for fuzz testing input */
     char *fuzz_filename;
+    /** The name of the interface to capture from */
     char *iface;
+    /** The port to use for the IoC event server */
     int server_port;
+    /** If the help flag was specified on the cmdline */
     int help_flag;
 
 #ifndef NO_UPDATES
+    /** The host to connect to for IoC updates */
     char *update_server_host;
+    /** The port on the host to connect to for IoC updates */
     uint16_t update_server_port;
+    /** If set to non-zero, do not verify the certificate of the remote host */
     int ssl_no_verify;
 #endif
 };
@@ -92,11 +102,11 @@ struct IdsArgs
 static uv_loop_t *loop = NULL;
 static pcap_t *pcap = NULL;
 #ifndef NO_MDNS
-AvahiMdnsContext mdns;
+static AvahiMdnsContext mdns;
 #endif
-ip_blacklist *ip_bl = NULL;
-domain_blacklist *dn_bl = NULL;
-struct ids_event_list *event_queue = NULL;
+ip_blacklist *ip_bl = NULL;                 ///< The IP IoC blacklist
+domain_blacklist *dn_bl = NULL;             ///< The domain IoC blacklist
+struct ids_event_list *event_queue = NULL;  ///< The buffer of IoC events
 
 // libuv handles
 #ifndef NO_MDNS
@@ -140,6 +150,11 @@ static void close_cb(uv_handle_t *handle)
     }
 }
 
+/**
+ * @brief Handle a shutdown request for libuv stream handle
+ * @param req The shutdown request
+ * @param status The status of the shutdown operation
+ */
 void
 stream_shutdown_cb(uv_shutdown_t *req, int status)
 {
@@ -153,6 +168,16 @@ stream_shutdown_cb(uv_shutdown_t *req, int status)
     free(req);
 }
 
+/**
+ * @brief Close the given handle
+ *
+ * This function is a callback for uv_walk on the event loop such that all
+ * remaining active handles on the event loop are closed before shutting down
+ *
+ * @param handle The current handle to close
+ * @param arg A void pointer to an optional argument (given to the uv_walk
+ * function call) that may be NULL
+ */
 void walk_and_close_handle_cb(uv_handle_t *handle, void *arg)
 {
     int err = 0;
@@ -199,7 +224,7 @@ static void free_globals(void) {
 }
 
 /**
- * Print command line help text.
+ * @brief Print command line help text.
  * @param prog_name Name of program from command line. Must not be NULL.
  */
 void
@@ -419,10 +444,12 @@ closed socket\n");
 
 /**
  * Sets the stop flag for the loop when the process receives SIGTERM.
- * @param loop: An event loop.
+ * @param loop An event loop
+ * @param handle An uninitialized uv_signal_t type handle
  *
- * The signal handler must be a variable from the main loop or a global, otherwise it will lose
- * its memory allocation after this function has completed.
+ * The signal handler must be a variable from the main loop or a global,
+ * otherwise it will lose its memory allocation after this function has
+ * completed.
  */
 int setup_sigterm_handling(uv_loop_t *loop, uv_signal_t *handle)
 {
@@ -446,7 +473,16 @@ int setup_sigterm_handling(uv_loop_t *loop, uv_signal_t *handle)
     return NSIDS_OK;
 }
 
-int setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
+/** Sets the stop flag for the loop when the process receives SIGINT.
+ * @param loop An event loop
+ * @param handle An uninitialized uv_signal_t type handle
+ *
+ * The signal handler must be a variable from the main loop or a global,
+ * otherwise it will lose its memory allocation after this function has
+ * completed.
+ */
+int
+setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
 {
     assert(loop);
     assert(handle);
@@ -467,7 +503,17 @@ int setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
     return NSIDS_OK;
 }
 
-static int setup_sigpipe(void)
+/**
+ * @brief Override the default signal handler for SIGPIPE
+ *
+ * Prevent a SIGPIPE signal from crashing the program when writing to a closed
+ * socket. While this is an invalid configuration, it is not dire enough to
+ * cause the program to exit.
+ *
+ * @return NSIDS_SIG on success, otherwise NSIDS_SIG on error
+ */
+static int
+setup_sigpipe(void)
 {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -482,7 +528,11 @@ static int setup_sigpipe(void)
     }
 }
 
-int main(int argc, char **argv)
+/**
+ * @brief Entrypoint
+ */
+int
+main(int argc, char **argv)
 {
     int n_ip_entries = 0, n_dn_entries = 0;
     struct IdsArgs args;

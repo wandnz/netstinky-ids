@@ -24,8 +24,10 @@
 #ifndef SRC_BLACKLIST_IDS_STOREDVALUES_H_
 #define SRC_BLACKLIST_IDS_STOREDVALUES_H_
 
+/** The value stored alongside the key in a blacklist */
 typedef struct
 {
+    /** The datbase ID number of the botnet that this IoC is associated with */
     int botnet_id;
 } ids_ioc_value_t;
 

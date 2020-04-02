@@ -26,11 +26,10 @@
 /**
  * Sets up libuv variables for the IDS event server.
  *
- * @param loop: The main event loop of the IDS
- * @param handle: The address of an uninitialized uv_tcp_t structure
- * @param server_addr: The interface and port of the server
- * @param list: The address of the ids_event_list which will be transmitted to
- * connections.
+ * @param loop The main event loop of the IDS
+ * @param handle The address of an uninitialized uv_tcp_t structure
+ * @param port the TCP port for the server to listen on
+ * @param list a pointer to the #ids_event_list to send to clients
  * @return 0 if successful, -1 on error
  */
 int

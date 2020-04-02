@@ -66,14 +66,14 @@ struct tls_stream_s
 /**
  * Libuv will discard references to the buffers submitted to uv_write. This
  * data structure will be used for keeping references to the written buffers
- * until the write_cb is called.
- * @field nbufs: The number of buffers in the buf array.
- * @field bufs: A dynamically allocated array of buffers associated with the
- * write request.
+ * until the write_cb is called
  */
 typedef struct buf_array_s
 {
+    /** The number of buffers in the buf array */
     unsigned int nbufs;
+    /** A dynamically allocated array of buffers associated with the write
+    request */
     uv_buf_t *bufs;
 } buf_array_t;
 

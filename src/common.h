@@ -16,7 +16,9 @@
 #ifndef SRC_COMMON_H_
 #define SRC_COMMON_H_
 
-// Uses a struct so that the bytes can be copied within a single statement.
+/**
+ * Uses a struct so that the bytes can be copied within a single statement.
+ */
 typedef struct mac_addr
 {
     uint8_t m_addr[6];

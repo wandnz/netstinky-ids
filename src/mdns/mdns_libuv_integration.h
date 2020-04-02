@@ -24,25 +24,31 @@
 #include <uv.h>
 
 /**
- * Setup the libuv handles that will be responsible for running MDNS functions.
+ * @brief Setup the libuv handles that will be responsible for running MDNS
+ * functions.
  * @param loop The main libuv event loop.
  * @param check An uninitialized uv_check_t handle.
+ * @param poll An avahi event loop
  * @returns True if successful.
  */
-int mdns_setup_event_handle(uv_loop_t *loop, uv_check_t *check, AvahiSimplePoll *poll);
+int
+mdns_setup_event_handle(uv_loop_t *loop, uv_check_t *check,
+                        AvahiSimplePoll *poll);
 
 /**
- * Start calling the MDNS functions within the event loop.
+ * @brief Start calling the MDNS functions within the event loop.
  * @param check An initialized uv_check_t structure.
  * @returns True if successful.
  */
-int mdns_check_start(uv_check_t *check);
+int
+mdns_check_start(uv_check_t *check);
 
 /**
- * Stop running the MDNS functions within the event loop.
+ * @brief Stop running the MDNS functions within the event loop.
  * @param check An initialized uv_check_t structure.
  * @returns True if successful.
  */
-bool mdns_check_stop(uv_check_t *check);
+bool
+mdns_check_stop(uv_check_t *check);
 
 #endif /* SRC_MDNS_MDNS_LIBUV_INTEGRATION_H_ */

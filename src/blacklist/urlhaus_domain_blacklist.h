@@ -11,19 +11,28 @@
  *
  */
 /** @file
- * @brief Process a file downloaded from https://urlhaus.abuse.ch/api/ with a single URL on each line.
  *
- * Comments are denoted by '#'.
- *
- * The URLs include the 'http://' prefix and include the complete file location instead of just the
- * domain name. e.g. 'http://proforma-invoices.com/proforma/IFYRAW_Protected887.exe'
- *
- * These functions extract the domain name portion ONLY. For example, 'proforma-invoices.com' would
- * be extracted from the above URL.
  */
 #ifndef SRC_URLHAUS_DOMAIN_BLACKLIST_H_
 #define SRC_URLHAUS_DOMAIN_BLACKLIST_H_
-
+/**
+ *
+ * @brief Import a file from urlhaus
+ *
+ * Process a file downloaded from
+ * <a href="https://urlhaus.abuse.ch/api/">urlhaus</a> with a single URL on
+ * each line.
+ *
+ * Comments are denoted by '#'.
+ *
+ * The URLs include the 'http://' prefix and include the complete file location
+ * instead of just the domain name. e.g.
+ * 'http://proforma-invoices.com/proforma/IFYRAW_Protected887.exe'
+ *
+ * These functions extract the domain name portion ONLY. For example,
+ * 'proforma-invoices.com' would be extracted from the above URL.
+ *
+ */
 int
 import_urlhaus_blacklist_file(char *path, domain_blacklist *bl);
 
