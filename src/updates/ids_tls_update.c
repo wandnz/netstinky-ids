@@ -59,18 +59,24 @@ SSL_CTX *
 setup_context(const char *hostname, int ssl_no_verify)
 {
     SSL_CTX *ctx = NULL;
-    const SSL_METHOD *method = TLS_method();
+    const SSL_METHOD *method;
     X509_VERIFY_PARAM *param = NULL;
     long ssl_opts;
     int rc;
     unsigned long ssl_err = 0;
-    if (!method) return NULL;
 
     SSL_load_error_strings();
     SSL_library_init();
     OpenSSL_add_all_algorithms();
     ERR_load_BIO_strings();
     ERR_load_crypto_strings();
+
+#ifdef HAVE_TLS_METHOD
+    method = TLS_method();
+#else
+    method = SSLv23_method();
+#endif
+    if (!method) return NULL;
 
     ctx = SSL_CTX_new(method);
     if (!ctx) return NULL;
@@ -85,7 +91,8 @@ setup_context(const char *hostname, int ssl_no_verify)
         & ~SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG
         & ~SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS;
 
-#if (OPENSSL_VERSION_NUMBER >= 0x1000100FL) /* 1.1.0 */
+/* OpenSSL v1.1.0+ */
+#ifdef HAVE_SSL_CTX_SET_MINMAX_PROTO_VERSION
     SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
     SSL_CTX_set_max_proto_version(ctx, 0); // Use highest available version
 #endif

@@ -198,5 +198,58 @@ if test "x$debug" != xno && test "x$have_openssl" = xyes; then
    LIBS="$save_LIBS"
 fi
 
+if test "x$have_openssl" = xyes; then
+   AC_MSG_CHECKING([for TLS_method])
+   save_LDFLAGS="$LDFLAGS"
+   save_LIBS="$LIBS"
+   LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
+   LIBS="$LIBS $OPENSSL_LIBS"
+   AC_LINK_IFELSE([
+     AC_LANG_PROGRAM([
+       [#include <openssl/ssl.h>]],
+       [
+[const SSL_METHOD *method = TLS_method();]
+     ])
+   ],
+   [
+    AC_MSG_RESULT([yes])
+    AC_DEFINE_UNQUOTED([HAVE_TLS_METHOD], 1,
+        [Define to 1 if you have the TLS_method function])
+   ],
+   [
+    AC_MSG_RESULT([no])
+   ])
+   LDFLAGS="$save_LDFLAGS"
+   LIBS="$save_LIBS"
+fi
+
+if test "x$have_openssl" = xyes; then
+   AC_MSG_CHECKING([for SSL_CTX_set_*_proto_version])
+   save_LDFLAGS="$LDFLAGS"
+   save_LIBS="$LIBS"
+   LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
+   LIBS="$LIBS $OPENSSL_LIBS"
+   AC_LINK_IFELSE([
+     AC_LANG_PROGRAM([
+       [#include <openssl/ssl.h>]],
+       [
+[const SSL_METHOD *method = TLS_method();]
+[SSL_CTX *ctx = SSL_CTX_new(method);]
+[SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);]
+[SSL_CTX_set_max_proto_version(ctx, 0);]
+     ])
+   ],
+   [
+    AC_MSG_RESULT([yes])
+    AC_DEFINE_UNQUOTED([HAVE_SSL_CTX_SET_MINMAX_PROTO_VERSION], 1,
+        [Define to 1 if you have the SSL_CTX_set_[min|max]_version functions])
+   ],
+   [
+    AC_MSG_RESULT([no])
+   ])
+   LDFLAGS="$save_LDFLAGS"
+   LIBS="$save_LIBS"
+fi
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
