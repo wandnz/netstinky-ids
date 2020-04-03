@@ -23,7 +23,7 @@
  * Prints a message if DEBUG is defined. This is not very secure as
  * it allows the user to put in an arbitrary format string
  */
-#define DPRINT(...) do { if (DEBUG) fprintf(stdout, __VA_ARGS__); } while (0)
+#define DPRINT(...) do { fprintf(stdout, __VA_ARGS__); } while (0)
 
 /**
  * Malloc a structure when the size of the allocation is the same as the size
