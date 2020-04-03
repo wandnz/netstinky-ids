@@ -288,7 +288,6 @@ tls_stream_do_handshake(tls_stream_t *stream)
 {
     int ssl_rc, rc;
     int ssl_err;
-    BIO *bio_out = NULL;
 
     int ret;	// return code from this function
 
@@ -315,9 +314,11 @@ tls_stream_do_handshake(tls_stream_t *stream)
     }
     else
     {
-        bio_out = BIO_new_fp(stdout, BIO_NOCLOSE);
-        ERR_print_errors(bio_out);
-        BIO_free(bio_out);
+        unsigned long err;
+        while( (err = ERR_get_error()) != 0)
+        {
+            tls_stream_print_err(stderr, err);
+        }
         return TLS_STR_FAIL;
     }
 
@@ -1230,4 +1231,12 @@ free_write_cb_data(write_cb_data_t *data)
     if (!data) return;
 
     free(data);
+}
+
+void
+tls_stream_print_err(FILE *fp, unsigned long code)
+{
+    char buf[256];
+    ERR_error_string_n(code, buf, sizeof(buf));
+    fprintf(fp, "%s\n", buf);
 }

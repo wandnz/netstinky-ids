@@ -34,32 +34,67 @@ static void
 update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
         unsigned int nbufs);
 
+static int
+verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
+{
+    if (!preverify_ok)
+    {
+        char buf[256];
+        X509 *err_cert;
+        int err;
+
+        err_cert = X509_STORE_CTX_get_current_cert(ctx);
+        err = X509_STORE_CTX_get_error(ctx);
+
+        X509_NAME_oneline(X509_get_subject_name(err_cert), buf, 256);
+
+        fprintf(stderr, "%s for %s\n",
+                 X509_verify_cert_error_string(err), buf);
+    }
+
+    return preverify_ok;
+}
+
 SSL_CTX *
 setup_context(const char *hostname, int ssl_no_verify)
 {
     SSL_CTX *ctx = NULL;
-    const SSL_METHOD *method = SSLv23_method();
+    const SSL_METHOD *method = TLS_method();
     X509_VERIFY_PARAM *param = NULL;
+    long ssl_opts;
     int rc;
     unsigned long ssl_err = 0;
     if (!method) return NULL;
 
-    SSL_library_init();
     SSL_load_error_strings();
-    ERR_load_BIO_strings();
+    SSL_library_init();
     OpenSSL_add_all_algorithms();
+    ERR_load_BIO_strings();
     ERR_load_crypto_strings();
 
     ctx = SSL_CTX_new(method);
     if (!ctx) return NULL;
 
-    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
-    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv3);
+    ssl_opts = (SSL_OP_ALL
+        | SSL_OP_NO_TICKET
+        | SSL_OP_NO_COMPRESSION
+        | SSL_OP_NO_SSLv2
+        | SSL_OP_NO_SSLv3
+        | SSL_OP_NO_TLSv1
+        | SSL_OP_NO_TLSv1_1)
+        & ~SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG
+        & ~SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS;
+
+#if (OPENSSL_VERSION_NUMBER >= 0x1000100FL) /* 1.1.0 */
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+    SSL_CTX_set_max_proto_version(ctx, 0); // Use highest available version
+#endif
+
+    SSL_CTX_set_options(ctx, ssl_opts);
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY
             | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER
-            | SSL_MODE_ENABLE_PARTIAL_WRITE);
-
-    SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
+            | SSL_MODE_ENABLE_PARTIAL_WRITE
+            | SSL_MODE_RELEASE_BUFFERS);
 
     param = SSL_CTX_get0_param(ctx);
     X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
@@ -80,14 +115,14 @@ setup_context(const char *hostname, int ssl_no_verify)
     SSL_CTX_set_verify(
             ctx,
             ssl_no_verify == 0 ? SSL_VERIFY_PEER : SSL_VERIFY_NONE,
-            NULL);
+            verify_callback);
     rc = SSL_CTX_set_default_verify_paths(ctx);
 
     ssl_err = ERR_get_error();
     if (rc != 1)
     {
-        fprintf(stderr, "Failed to load default verify paths. ssl_err %lu\n",
-                ssl_err);
+        fprintf(stderr, "Failed to load default verify paths. ssl_err: ");
+        tls_stream_print_err(stderr, ssl_err);
         return NULL;
     }
 

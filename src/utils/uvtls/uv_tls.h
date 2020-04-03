@@ -185,4 +185,14 @@ tls_stream_write(tls_stream_t *stream, const uv_buf_t bufs[],
 int
 tls_stream_close(tls_stream_t *stream, tls_str_close_cb cb);
 
+
+/**
+ * @brief Print an error string from the underlying TLS library to a file
+ *
+ * @param fp A file pointer to the target file
+ * @param err The error code returned from the underlying TLS library
+ */
+void
+tls_stream_print_err(FILE *fp, unsigned long err);
+
 #endif /* UV_TLS_H_ */
