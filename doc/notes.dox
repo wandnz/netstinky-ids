@@ -1,0 +1,86 @@
+
+# Architecture
+
+The IDS consists of a set of tasks that are running in a
+[libuv](http://docs.libuv.org/en/v1.x/) event loop. Due to the callback focused
+nature of libuv, tracing the flow of execution can be difficult but it is
+easier to track when modelling the program as a set of tasks. The tasks are as
+follows:
+
+- libpcap packet capture handler
+- TCP listener for local connections from a client smartphone app
+- mDNS responder for service discovery in the local network
+- A timer that triggers a TCP client for database updates
+
+Both the mDNS responder and the TCP client updates can be disabled during
+compilation by using configure flags:
+`./configure --disable-mdns --disable-updates`
+
+## PCAP Task
+
+The PCAP task captures all packets on the interface given by the `-i` option on
+the command-line and applies the BPF filter:
+
+```bpf
+(udp dst port 53) or (tcp[tcpflags] & tcp-syn != 0 and tcp[tcpflags] & tcp-ack == 0)
+```
+
+This captures outgoing DNS queries and TCP packets with the SYN (but not ACK)
+flags set. The intention of this is to capture the first packet in a TCP flow
+such that you only perform a blacklist lookup once per flow.
+
+A "selectable" file descriptor is requested from the underlying PCAP library
+which allows for asynchronous reads. This file descriptor is used with libuv's
+[uv_poll_t](http://docs.libuv.org/en/v1.x/poll.html) handle type which allows
+performing a `poll` on an arbitrary file descriptor. This `uv_poll_t`
+essentially wraps the file descriptor in such a way that it can be read
+asynchronously.
+
+When the file descriptor has data to read the \ref packet_handler function is
+called by libpcap, which in turn calls \ref ids_pcap_read_packet where the deep
+packet inspection is performed.
+
+See \ref ids_pcap.h
+
+## Client Listener
+
+\ref setup_event_server calls `uv_listen` to create a listening TCP server on
+the event loop that will respond to incoming connections asynchronously.
+
+See \ref ids_server.h
+
+## mDNS Responder
+
+The mDNS responder is implemented by interfacing to the avahi daemon running on
+the same machine. By integrating with avahi, it also uses avahi's event loop
+rather than libuv's. \ref ids_mdns_setup_mdns simply registers a service to
+provide through avahi.
+
+See \ref ids_mdns_avahi.h
+
+## IoC Updates
+
+The update task runs a timer that will periodically check for updates to the
+IoC database. This task is the most complicated in the `nsids` service as it
+requires co-ordination between multiple components.
+
+\ref uv_tls.h provides a way of wrapping a plain `uv_tcp_t` to use OpenSSL for
+TLS, allowing for an asynchronous connection to a remote server. An `SSL_CTX`
+needs to be provided for setting the parameters of the connection. This is done in \ref setup_context, where SSLv2/3 are disabled and other security
+parameters are tweaked.
+
+When the [uv_timer_t](http://docs.libuv.org/en/v1.x/timer.html) expires, the
+function `update_timer_cb` is called, which is responsible for setting up a
+TLS context and looking up the hostname for the update server. It calls
+`hostname_lookup` which calls the libuv function `uv_getaddrinfo` which acts as
+the async version of the syscall of the same name. `on_resolved` is then called
+with the status of the lookup and result data (if any). If the status is non-
+zero then the update is cancelled, otherwise `hostname_tls_connect` is called
+to connect to the remote server with the given `struct sockaddr *` with
+`tls_stream_connect`.
+
+Two callbacks are passed to `tls_stream_connect` for the handshake and read
+data respectively. `update_timer_on_handshake` closes the connection if the
+handshake fails. `update_timer_on_read` gets the decrypted data to the stream
+and passes it into the state machines of the protocol handler specified in
+the `protocol.c` file.
