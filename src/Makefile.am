@@ -64,6 +64,8 @@ nsids_SOURCES = \
 	utils/hat/portable_endian.h \
 	utils/hat/pstdint.h \
 	utils/file_processing.h \
+	utils/logging.h \
+	utils/logging.c \
 	ids_event_list.h \
 	ids_pcap.h \
 	ids_server.h \
