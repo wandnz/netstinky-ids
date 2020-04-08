@@ -31,6 +31,9 @@ drop_privileges(const uid_t newuid, const uid_t newgid)
     uid_t olduid = getuid();
     int res;
 
+    // Already a non-root user
+    if (olduid != 0) return 1;
+
     if (!olduid) setgroups(1, &newgid);
 
     if (newgid != oldgid)

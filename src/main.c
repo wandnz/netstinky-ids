@@ -605,8 +605,15 @@ main(int argc, char **argv)
             && !IGNORE_PCAP_ERRORS) goto done;
 
     // Drop root privileges now that the pcap handle is open
-    if (0 != ch_user(NEW_USER, NEW_GROUP))
+    switch (ch_user(NEW_USER, NEW_GROUP))
+    {
+    case -1:
         goto done;
+    case 1:
+        fprintf(stderr, "Already not-root user\n");
+    case 0:
+        break;
+    }
 
     // Begin event loop setup
     if (NULL == (loop = uv_default_loop()))

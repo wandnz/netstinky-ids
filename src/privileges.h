@@ -23,7 +23,7 @@
  * @param user system username
  * @param group system group-name (set to NULL to not change group)
  *
- * @returns 0 if successful, -1 on error
+ * @returns 0 if successful, -1 on error, 1 if not allowed (not root)
  *
  */
 int
@@ -35,7 +35,7 @@ ch_user(const char *user, const char *group);
  * @param user system username
  * @param group system group-name
  *
- * @returns 0 if successful, -1 on error
+ * @returns 0 if successful, -1 on error, 1 if already not root
  */
 int
 drop_root(const char *user, const char *group);
