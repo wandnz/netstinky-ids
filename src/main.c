@@ -46,6 +46,7 @@
 #include "mdns/mdns_libuv_integration.h"
 #endif
 #include "utils/common.h"
+#include "utils/logging.h"
 #include "ids_event_list.h"
 #include "ids_pcap.h"
 #include "ids_server.h"
@@ -159,10 +160,10 @@ void
 stream_shutdown_cb(uv_shutdown_t *req, int status)
 {
     if (status != 0)
-        fprintf(stderr, "Could not shutdown stream: %s\n",
+        logger(L_ERROR, "Could not shutdown stream: %s",
                 uv_strerror(status));
 
-    printf("Shutdown stream for writing.\n");
+    logger(L_DEBUG, "Shutdown stream for writing.");
     /* Close handle */
     uv_close((uv_handle_t *)req->handle, close_cb);
     free(req);
@@ -190,14 +191,14 @@ void walk_and_close_handle_cb(uv_handle_t *handle, void *arg)
         if (UV_STREAM == handle->type)
         {
             if (0 > (err = uv_read_stop((uv_stream_t *)handle)))
-                fprintf(stderr, "Could not stop reading stream: %s",
+                logger(L_WARN, "Could not stop reading stream: %s",
                         uv_strerror(err));
             if (NULL == (shutdown = malloc(sizeof(*shutdown))))
-                fprintf(stderr, "Could not allocate shutdown request\n");
+                logger(L_ERROR, "Could not allocate shutdown request");
             else
                 if (0 > (err = uv_shutdown(shutdown, (uv_stream_t *)handle, stream_shutdown_cb)))
-                    fprintf(stderr, "Could not shutdown stream: %s\n",
-                            uv_strerror(err));
+                    logger(L_ERROR, "Could not shutdown stream: %s",
+                           uv_strerror(err));
                 else
                     // Successfully started shutdown process of stream
                     return;
@@ -405,19 +406,19 @@ static int setup_stdin_pipe(uv_loop_t *loop)
 
     if (0 > (uv_rc = uv_pipe_init(loop, &stdin_pipe, ipc)))
     {
-        fprintf(stderr, "Could not open stdin pipe: %s\n", uv_strerror(uv_rc));
+        logger(L_ERROR, "Could not open stdin pipe: %s", uv_strerror(uv_rc));
         return NSIDS_UV;
     }
 
     if (0 > (uv_rc = uv_pipe_open(&stdin_pipe, stdin_fd)))
     {
-        fprintf(stderr, "Could not open stdin pipe: %s\n", uv_strerror(uv_rc));
+        logger(L_ERROR, "Could not open stdin pipe: %s", uv_strerror(uv_rc));
         return NSIDS_UV;
     }
 
     if (0 > (uv_rc = uv_read_start((uv_stream_t *) &stdin_pipe, alloc_buffer, read_stdin)))
     {
-        fprintf(stderr, "Could not open stdin pipe: %s\n", uv_strerror(uv_rc));
+        logger(L_ERROR, "Could not open stdin pipe: %s", uv_strerror(uv_rc));
         return NSIDS_UV;
     }
 
@@ -432,13 +433,13 @@ static int setup_stdin_pipe(uv_loop_t *loop)
  */
 void signal_cb(uv_signal_t *handle, int signum)
 {
-    printf("received signal\n");
+    logger(L_DEBUG, "received signal");
     if (signum == SIGINT || signum == SIGTERM)
         uv_stop(handle->loop);
     else if (signum == SIGPIPE)
     {
-        fprintf(stderr, "Received SIGPIPE, probably tried to write to a \
-closed socket\n");
+        logger(L_INFO, "Received SIGPIPE, probably tried to write to a \
+closed socket");
     }
 }
 
@@ -460,13 +461,13 @@ int setup_sigterm_handling(uv_loop_t *loop, uv_signal_t *handle)
 
     if (0 > (uv_rc = uv_signal_init(loop, handle)))
     {
-        fprintf(stderr, "Could not initialize SIGTERM handle: %s\n",
+        logger(L_ERROR, "Could not initialize SIGTERM handle: %s",
                 uv_strerror(uv_rc));
         return NSIDS_UV;
     }
     if (0 > (uv_rc = uv_signal_start(handle, signal_cb, SIGTERM)))
     {
-        fprintf(stderr, "Could not initialize SIGTERM handle: %s\n",
+        logger(L_ERROR, "Could not initialize SIGTERM handle: %s",
                 uv_strerror(uv_rc));
         return NSIDS_UV;
     }
@@ -490,13 +491,13 @@ setup_sigint_handling(uv_loop_t *loop, uv_signal_t *handle)
 
     if (0 > (uv_rc = uv_signal_init(loop, handle)))
     {
-        fprintf(stderr, "Could not initialize SIGINT handle: %s\n",
+        logger(L_ERROR, "Could not initialize SIGINT handle: %s",
                 uv_strerror(uv_rc));
         return NSIDS_UV;
     }
     if (0 > (uv_rc = uv_signal_start(handle, signal_cb, SIGINT)))
     {
-        fprintf(stderr, "Could not initialize SIGINT handle: %s\n",
+        logger(L_ERROR, "Could not initialize SIGINT handle: %s",
                 uv_strerror(uv_rc));
         return NSIDS_UV;
     }
@@ -547,7 +548,7 @@ main(int argc, char **argv)
 
     // Invalid arguments
     if (parse_args(&args, argc, argv)) {
-        fprintf(stderr, "Failed to parse command line arguments\n");
+        logger(L_ERROR, "Failed to parse command line arguments");
         print_usage(argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -559,16 +560,22 @@ main(int argc, char **argv)
         exit(EXIT_SUCCESS);
     }
 
+#ifdef DEBUG
+    set_log_level(L_DEBUG);
+#else
+    set_log_level(L_INFO);
+#endif
+
     // pcap_io_task_setup, configure and add the pcap task to the event
     // loop here.
     event_queue = new_ids_event_list(MAX_EVENTS, MAX_TS);
 
 #ifdef FUZZ_TEST
-    printf("Fuzz testing blacklists...\n");
+    logger(L_DEBUG, "Fuzz testing blacklists...");
     fuzz_test_blacklists(args.ip_filename, args.domain_filename);
     if (!args.fuzz_filename) exit(EXIT_SUCCESS);
 
-    printf("Fuzz testing packet capturing...\n");
+    logger(L_DEBUG, "Fuzz testing packet capturing...");
     fuzz_test_pcap(args.fuzz_filename);
 #endif // FUZZ_TEST
 
@@ -580,11 +587,11 @@ main(int argc, char **argv)
     {
         if (0 > (n_ip_entries = import_feodo_blacklist(args.ip_filename, ip_bl)))
         {
-            fprintf(stderr, "Could not import Feodo blacklist from %s\n", args.ip_filename);
+            logger(L_ERROR, "Could not import Feodo blacklist from %s", args.ip_filename);
             goto done;
         }
         else
-            fprintf(stdout, "Imported %d IP blacklist entries\n", n_ip_entries);
+            logger(L_DEBUG, "Imported %d IP blacklist entries", n_ip_entries);
     }
 
     if (NSIDS_OK != setup_domain_blacklist(&dn_bl)) goto done;
@@ -593,11 +600,11 @@ main(int argc, char **argv)
     {
         if (0 > (n_dn_entries = import_urlhaus_blacklist_file(args.domain_filename, dn_bl)))
         {
-            fprintf(stderr, "Could not import domain blacklist from %s\n", args.domain_filename);
+            logger(L_ERROR, "Could not import domain blacklist from %s", args.domain_filename);
             goto done;
         }
         else
-            fprintf(stdout, "Imported %d domain blacklist entries\n", n_dn_entries);
+            logger(L_DEBUG, "Imported %d domain blacklist entries", n_dn_entries);
     }
 
     // Setup packet capture handle
@@ -610,7 +617,7 @@ main(int argc, char **argv)
     case -1:
         goto done;
     case 1:
-        fprintf(stderr, "Already not-root user\n");
+        logger(L_DEBUG, "Already not-root user");
     case 0:
         break;
     }
@@ -618,7 +625,7 @@ main(int argc, char **argv)
     // Begin event loop setup
     if (NULL == (loop = uv_default_loop()))
     {
-        DPRINT("loop could not be allocated\n");
+        logger(L_ERROR, "loop could not be allocated");
         goto done;
     }
 
@@ -645,13 +652,13 @@ main(int argc, char **argv)
                 args.ssl_no_verify,
                 &dn_bl, &ip_bl))
         {
-            printf("Could not setup updates.\n");
+            logger(L_ERROR, "Could not setup updates.");
             goto done;
         }
 
         if (setup_update_timer(&update_timer, loop, &ids_update_ctx))
         {
-            printf("Could not setup update timer.\n");
+            logger(L_ERROR, "Could not setup update timer.");
             goto done;
         }
     }

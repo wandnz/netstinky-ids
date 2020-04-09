@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 
 #include "utils/common.h"
+#include "utils/logging.h"
 
 #include "dns.h"
 #include "utils/byte_array.h"
@@ -162,13 +163,13 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
         MALLOC_ZERO(pkt);
         if (!pkt)
         {
-            DPRINT("dns_parse(): malloc() failed\n");
+            logger(L_WARN, "dns_parse(): malloc() failed");
             goto error;
         }
 
         if (!(pkt_pos = dns_parse_header(pkt, pkt_pos, packet_end)))
         {
-            DPRINT("dns_parse(): dns_parse_header() failed\n");
+            logger(L_WARN, "dns_parse(): dns_parse_header() failed");
             goto error;
         }
 
@@ -177,7 +178,8 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->questions = dns_parse_question_section(count, &pkt_pos,
                     packet_start, packet_end)))
             {
-                DPRINT("dns_parse(): dns_parse_question_section() failed\n");
+                logger(L_WARN,
+                       "dns_parse(): dns_parse_question_section() failed");
                 goto error;
             }
         }
@@ -187,7 +189,8 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos, packet_start,
                     packet_end)))
             {
-                DPRINT("dns_parse(): dns_parse_answer_section(ancount) failed\n");
+                logger(L_WARN,
+                       "dns_parse(): dns_parse_answer_section(ancount) failed");
                 goto error;
             }
         }
@@ -197,7 +200,8 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
                     packet_start, packet_end)))
             {
-                DPRINT("dns_parse(): dns_parse_answer_section(nscount) failed\n");
+                logger(L_WARN,
+                       "dns_parse(): dns_parse_answer_section(nscount) failed");
                 goto error;
             }
         }
@@ -207,7 +211,8 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
                     packet_start, packet_end)))
             {
-                DPRINT("dns_parse(): dns_parse_answer_section(arcount) failed\n");
+                logger(L_WARN,
+                       "dns_parse(): dns_parse_answer_section(arcount) failed");
                 goto error;
             }
         }
@@ -815,26 +820,28 @@ dns_parse_question(uint8_t **out, const uint8_t *packet_start,
     struct dns_question *qn = new_dns_question();
     if (!qn)
     {
-        DPRINT("dns_parse_question(): new_dns_question() failed\n");
+        logger(L_WARN, "dns_parse_question(): new_dns_question() failed");
         goto error;
     }
 
     qn->qname = dns_parse_domain(out, packet_start, packet_end);
     if (!qn->qname)
     {
-        DPRINT("dns_parse_question(): dns_parse_name() failed\n");
+        logger(L_WARN, "dns_parse_question(): dns_parse_name() failed");
         goto error;
     }
 
     if (!(*out = byte_array_read_uint16(&(qn->qtype), *out, packet_end)))
     {
-        DPRINT("dns_parse_question(): byte_array_read_uint16() failed\n");
+        logger(L_WARN,
+               "dns_parse_question(): byte_array_read_uint16() failed");
         goto error;
     }
 
     if (!(*out = byte_array_read_uint16(&(qn->qclass), *out, packet_end)))
     {
-        DPRINT("dns_parse_question(): byte_array_read_uint16() failed\n");
+        logger(L_WARN,
+               "dns_parse_question(): byte_array_read_uint16() failed");
         goto error;
     }
 
@@ -863,7 +870,8 @@ dns_parse_question_section(uint16_t qn_num, uint8_t **packet_pos,
                 packet_start, packet_end);
         if (!new_qn)
         {
-            DPRINT("dns_parse_question_section(): dns_parse_question() failed\n");
+            logger(L_WARN,
+                   "dns_parse_question_section(): dns_parse_question() failed");
             goto error;
         }
 

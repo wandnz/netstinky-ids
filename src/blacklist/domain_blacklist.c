@@ -14,6 +14,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "utils/logging.h"
 #include "domain_blacklist.h"
 #include "ids_storedvalues.h"
 
@@ -114,7 +115,7 @@ domain_blacklist_is_blacklisted(domain_blacklist *b, const char *domain)
     if (!reversed)
     {
         // This is a serious error since we can't check the blacklist. Definitely log it.
-        fprintf(stderr, "Could not reverse domain name when checking blacklist: %s\n", domain);
+        logger(L_WARN, "Could not reverse domain name when checking blacklist: %s\n", domain);
         return 0;
     }
 

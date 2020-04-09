@@ -17,6 +17,7 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 
+#include "utils/logging.h"
 #include "uv_tls.h"
 
 /**
@@ -66,7 +67,7 @@ tls_stream_close_err_cb(tls_stream_t *stream);
 static void
 keylog_callback(const SSL *ssl, const char *line)
 {
-    fprintf(stderr, "%s\n", line);
+    logger(L_DEBUG, "%s", line);
 }
 #endif
 
@@ -100,7 +101,8 @@ tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
     if (uv_rc < 0)
     {
         // Begin to close the stream, but warn user not to free it
-        fprintf(stderr, "Could not establish a TCP stream: %s\n", uv_strerror(uv_rc));
+        logger(L_ERROR, "Could not establish a TCP stream: %s",
+                uv_strerror(uv_rc));
         err_ret = TLS_STR_NEED_CLOSE;
         stream->tcp.data = stream;
         tls_stream_close(stream, tls_stream_close_err_cb);

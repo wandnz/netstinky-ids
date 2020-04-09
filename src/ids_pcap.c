@@ -31,6 +31,7 @@
 
 #include "error/ids_error.h"
 #include "utils/common.h"
+#include "utils/logging.h"
 #include "dns.h"
 #include "ids_pcap.h"
 
@@ -74,19 +75,19 @@ void packet_handler(unsigned char *user_dat,
                     *ioc_value);
 
             if (!ids_event_list_add_event(event_queue, ev)) {
-                DPRINT("packet_handler: ids_event_list_add() failed\n");
+                logger(L_ERROR, "packet_handler: ids_event_list_add() failed");
                 goto end;
             }
 
-            DPRINT("pcap_io_task_read(): NEW DETECTED INTRUSION\n");
+            logger(L_DEBUG, "pcap_io_task_read(): NEW DETECTED INTRUSION");
             // Don't free domain name because it is added to event list
             return;
 
         } else {
-            DPRINT("Safe!\n");
+            logger(L_DEBUG, "Safe!");
         }
     } else if (result == -1) {
-        DPRINT("pcap_io_task_read(): ids_pcap_read_packet() failed\n");
+        logger(L_ERROR, "pcap_io_task_read(): ids_pcap_read_packet() failed");
     }
 
 end:
@@ -121,12 +122,12 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
     {
         if (!pcap_hdr)
         {
-            DPRINT("ids_pcap_read_packet(): pcap header was NULL\n");
+            logger(L_WARN, "ids_pcap_read_packet(): pcap header was NULL");
             goto error;
         }
         if (pcap_hdr->len < sizeof(*eth_hdr))
         {
-            DPRINT("ids_pcap_read_packet(): pcap length too small to contain ethernet header: %d\n",
+            logger(L_WARN, "ids_pcap_read_packet(): pcap length too small to contain ethernet header: %d",
                     pcap_hdr->len);
             goto error;
         }
@@ -141,7 +142,7 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 
         if (pcap_hdr->len < (sizeof(*eth_hdr) + sizeof(*ip_hdr)))
         {
-            DPRINT("ids_pcap_read_packet(): pcap length too small to contain IP header: %d\n",
+            logger(L_WARN, "ids_pcap_read_packet(): pcap length too small to contain IP header: %d\n",
                     pcap_hdr->len);
             goto error;
         }
@@ -150,21 +151,23 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
         out->dest_ip = ip_hdr->ip_dst.s_addr;
         out->src_ip = ip_hdr->ip_src.s_addr;
 
+        char s_ip[16];
+        char d_ip[16];
+
         switch (ip_hdr->ip_p)
         {
             case IPPROTO_TCP:
                 tcp_hdr = (struct tcphdr *)(pcap_data + sizeof(*eth_hdr) + sizeof(*ip_hdr));
+                
                 out->dest_port = tcp_hdr->th_dport;
                 out->src_port = tcp_hdr->th_sport;
 
-                DPRINT("ids_pcap_read_packet(): TCP %s:%d -> ",
-                    inet_ntoa(ip_hdr->ip_src),
-                    ntohs(tcp_hdr->th_sport)
-                );
-                DPRINT("%s:%d\n",
-                    inet_ntoa(ip_hdr->ip_dst),
-                    ntohs(tcp_hdr->th_dport)
-                );
+                snprintf(s_ip, sizeof(s_ip), "%s", inet_ntoa(ip_hdr->ip_src));
+                snprintf(d_ip, sizeof(d_ip), "%s", inet_ntoa(ip_hdr->ip_dst));
+
+                logger(L_INFO, "ids_pcap_read_packet(): TCP %s:%d -> %s:%d",
+                       s_ip, ntohs(tcp_hdr->th_sport),
+                       d_ip, ntohs(tcp_hdr->th_dport));
 
                 /* Check header is correct */
                 assert((tcp_hdr->th_flags & TH_SYN) && !(tcp_hdr->th_flags & TH_ACK));
@@ -176,14 +179,12 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
                 out->dest_port = udp_hdr->uh_dport;
                 out->src_port = udp_hdr->uh_sport;
 
-                DPRINT("ids_pcap_read_packet(): UDP %s:%d -> ",
-                    inet_ntoa(ip_hdr->ip_src),
-                    ntohs(udp_hdr->uh_sport)
-                );
-                DPRINT("%s:%d\n",
-                    inet_ntoa(ip_hdr->ip_dst),
-                    ntohs(udp_hdr->uh_dport)
-                );
+                snprintf(s_ip, sizeof(s_ip), "%s", inet_ntoa(ip_hdr->ip_src));
+                snprintf(d_ip, sizeof(d_ip), "%s", inet_ntoa(ip_hdr->ip_dst));
+
+                logger(L_INFO, "ids_pcap_read_packet(): TCP %s:%d -> %s:%d",
+                       s_ip, ntohs(udp_hdr->uh_sport),
+                       d_ip, ntohs(udp_hdr->uh_dport));
 
                 payload_pos = (uint8_t *)(pcap_data + (sizeof(*eth_hdr) + sizeof(*ip_hdr) + sizeof(*udp_hdr)));
 
@@ -193,7 +194,8 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
 
                 if (!dns_pkt)
                 {
-                    DPRINT("ids_pcap_read_packet(): dns_parse() failed\n");
+                    logger(L_WARN,
+                        "ids_pcap_read_packet(): dns_parse() failed");
                     goto error;
                 }
 
@@ -203,14 +205,17 @@ ids_pcap_read_packet(const struct pcap_pkthdr *pcap_hdr,
                     /* TODO: Check multiple questions */
                     out->domain = dns_name_to_readable((unsigned char *)
                             dns_pkt->questions->qname);
-                    DPRINT("ids_pcap_read_packet(): domain %s\n", out->domain);
+                    logger(L_DEBUG, "ids_pcap_read_packet(): domain %s",
+                           out->domain);
                 }
 
                 free_dns_packet(&dns_pkt);
                 break;
             default:
                 /* This shouldn't happen */
-                DPRINT("ids_pcap_read_packet(): captured packet with protocol %d\n", ip_hdr->ip_p);
+                logger(L_ERROR,
+                       "ids_pcap_read_packet(): captured packet with protocol %d",
+                       ip_hdr->ip_p);
                 goto error;
         }
     }
@@ -232,7 +237,7 @@ ids_pcap_is_blacklisted(struct ids_pcap_fields *f, ip_blacklist *ip_bl, domain_b
     char *src = strdup(inet_ntoa(src_ip_buf));
 
     /* Can only have one inet_ntoa call per line because it will over-write the buffer */
-    DPRINT("%s -> %s: %s ", src, inet_ntoa(dst_ip_buf), f->domain);
+    logger(L_DEBUG, "%s -> %s: %s ", src, inet_ntoa(dst_ip_buf), f->domain);
     free(src);
 
     if (f->domain)
@@ -266,12 +271,12 @@ int set_filter(pcap_t *pcap, const char *filter, char *err)
     memset(&fp, 0, sizeof(fp));
 
     if (0 != pcap_compile(pcap, &fp, filter, 0, PCAP_NETMASK_UNKNOWN)) {
-        fprintf(stderr, "Could not compile pcap filter: %s\n", pcap_geterr(pcap));
+        logger(L_ERROR, "Could not compile pcap filter: %s", pcap_geterr(pcap));
         goto done;
     }
 
     if (0 != pcap_setfilter(pcap, &fp)) {
-        fprintf(stderr, "Could not set pcap filter: %s\n", pcap_geterr(pcap));
+        logger(L_ERROR, "Could not set pcap filter: %s", pcap_geterr(pcap));
         goto done;
     }
 
@@ -294,7 +299,7 @@ static void pcap_data_cb(uv_poll_t *handle, int status, int events)
     pcap_t *pcap = (pcap_t *)handle->data;
 
     if (status < 0) {
-        fprintf(stderr, "Error while polling fd: %s\n", uv_strerror(status));
+        logger(L_ERROR, "Error while polling fd: %s", uv_strerror(status));
         return;
     }
 
@@ -307,10 +312,10 @@ static void pcap_data_cb(uv_poll_t *handle, int status, int events)
         pkt_num = pcap_dispatch(pcap, cnt, packet_handler, NULL);
 
         if (pkt_num == PCAP_ERROR) {
-            fprintf(stderr, "Error processing packet\n%s\n",
+            logger(L_ERROR, "Error processing packet: %s",
                     pcap_geterr(pcap));
         } else if (pkt_num == PCAP_ERROR_BREAK) {
-            fprintf(stderr, "Pcap requested loop close.\n");
+            logger(L_INFO, "Pcap requested loop close.");
             uv_stop(handle->loop);
         }
     }
@@ -329,14 +334,14 @@ int setup_pcap_handle(uv_loop_t *loop, uv_poll_t *pcap_handle, pcap_t *pcap)
 
     if (0 > (uv_rc = uv_poll_init(loop, pcap_handle, fd)))
     {
-        fprintf(stderr, "Failed to setup pcap event loop handle: %s\n",
+        logger(L_ERROR, "Failed to setup pcap event loop handle: %s",
                 uv_strerror(uv_rc));
         return NSIDS_UV;
     }
 
     if (0 > (uv_rc = uv_poll_start(pcap_handle, UV_READABLE, pcap_data_cb)))
     {
-        fprintf(stderr, "Failed to setup pcap event loop handle: %s\n",
+        logger(L_ERROR, "Failed to setup pcap event loop handle: %s",
                 uv_strerror(uv_rc));
         return NSIDS_UV;
     }
@@ -357,14 +362,14 @@ int configure_pcap(pcap_t **pcap, const char *filter, const char *dev)
     int pcap_fd;
     int pcap_rc;
     if ((*pcap = pcap_create(dev, errbuf)) == NULL) {
-        fprintf(stderr, "Can't open %s: %s\n", dev, errbuf);
+        logger(L_ERROR, "Can't open %s: %s", dev, errbuf);
         goto error;
     }
     if (0 != (pcap_rc = pcap_activate(*pcap))) {
 
         if (pcap_rc > 0)
         {
-            fprintf(stderr, "Pcap handle activated with a warning: %s\n",
+            logger(L_WARN, "Pcap handle activated with a warning: %s",
                 pcap_statustostr(pcap_rc));
         }
         else
@@ -373,11 +378,11 @@ int configure_pcap(pcap_t **pcap, const char *filter, const char *dev)
             if (PCAP_ERROR_NO_SUCH_DEVICE == pcap_rc ||
                     PCAP_ERROR_PERM_DENIED == pcap_rc)
             {
-                fprintf(stderr, "Could not activate pcap handle: %s\n",
+                logger(L_ERROR, "Could not activate pcap handle: %s",
                         pcap_geterr(*pcap));
             }
             else
-                fprintf(stderr, "Could not activate pcap handle: %s\n",
+                logger(L_ERROR, "Could not activate pcap handle: %s",
                         pcap_statustostr(pcap_rc));
 
             goto error;
@@ -389,7 +394,7 @@ int configure_pcap(pcap_t **pcap, const char *filter, const char *dev)
 
     pcap_fd = pcap_get_selectable_fd(*pcap);
     if (pcap_fd == -1) {
-        fprintf(stderr, "pcap_get_sel_fd failed\n");
+        logger(L_ERROR, "pcap_get_sel_fd failed");
         goto error;
     }
 

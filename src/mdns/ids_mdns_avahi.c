@@ -30,6 +30,7 @@
 #include <avahi-common/error.h>
 #include <avahi-common/malloc.h>
 
+#include "utils/logging.h"
 #include "error/ids_error.h"
 
 void create_services(AvahiMdnsContext *mdns);
@@ -73,17 +74,18 @@ static void entry_group_callback(AvahiEntryGroup *g, AvahiEntryGroupState state,
     case AVAHI_ENTRY_GROUP_COLLISION:
         if (!AvahiMdnsContext_use_alternative_service_name(mdns))
         {
-            fprintf(stderr, "Could not use alternative service name for service '%s'\n",
-                    mdns->name);
+            logger(L_ERROR,
+                   "Could not use alternative service name for service '%s'",
+                   mdns->name);
         }
         else
         {
-            fprintf(stderr, "Using alternative service name: '%s'\n", mdns->name);
+            logger(L_WARN, "Using alternative service name: '%s'", mdns->name);
             create_services(mdns);
         }
         break;
     case AVAHI_ENTRY_GROUP_FAILURE:
-        fprintf(stderr, "entry_group_callback: %s\n",
+        logger(L_ERROR, "entry_group_callback: %s",
                 avahi_strerror(avahi_client_errno(avahi_entry_group_get_client(g))));
         avahi_simple_poll_quit(mdns->simple_poll);
         break;
@@ -106,7 +108,7 @@ void create_services(AvahiMdnsContext *mdns)
     if (!mdns->group)
         if (!(mdns->group = avahi_entry_group_new(mdns->client, entry_group_callback, mdns)))
         {
-            fprintf(stderr, "create_services: %s\n",
+            logger(L_ERROR, "create_services: %s",
                     avahi_strerror(avahi_client_errno(mdns->client)));
             goto error;
         }
@@ -118,14 +120,14 @@ void create_services(AvahiMdnsContext *mdns)
         {
             if (AVAHI_ERR_COLLISION == ret)
                 goto collision;
-            fprintf(stderr, "create_services: %s\n", avahi_strerror(ret));
+            logger(L_ERROR, "create_services: %s", avahi_strerror(ret));
             goto error;
         }
     }
 
     if (0 > (ret = avahi_entry_group_commit(mdns->group)))
     {
-        fprintf(stderr, "create_services: %s\n", avahi_strerror(ret));
+        logger(L_ERROR, "create_services: %s", avahi_strerror(ret));
         goto error;
     }
 
@@ -133,7 +135,7 @@ void create_services(AvahiMdnsContext *mdns)
 collision:
     AvahiMdnsContext_use_alternative_service_name(mdns);
 
-    fprintf(stdout, "Renaming service to %s\n", mdns->name);
+    logger(L_WARN, "Renaming service to %s", mdns->name);
     avahi_entry_group_reset(mdns->group);
     create_services(mdns);
     return;
@@ -156,22 +158,22 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
     switch(state)
     {
     case AVAHI_CLIENT_S_RUNNING:
-        printf("AVAHI_CLIENT_S_RUNNING\n");
+        logger(L_DEBUG, "AVAHI_CLIENT_S_RUNNING");
         create_services(mdns);
         break;
     case AVAHI_CLIENT_FAILURE:
-        fprintf(stderr, "client_callback: %s\n", avahi_strerror(avahi_client_errno(c)));
+        logger(L_ERROR, "client_callback: %s", avahi_strerror(avahi_client_errno(c)));
         avahi_simple_poll_quit(mdns->simple_poll);
         break;
     case AVAHI_CLIENT_S_COLLISION:
-        printf("AVAHI_CLIENT_S_COLLISION\n");
+        logger(L_WARN, "AVAHI_CLIENT_S_COLLISION");
         // continue
     case AVAHI_CLIENT_S_REGISTERING:
-        printf("AVAHI_CLIENT_S_REGISTERING\n");
+        logger(L_INFO, "AVAHI_CLIENT_S_REGISTERING");
         if (mdns->group) avahi_entry_group_reset(mdns->group);
         break;
     case AVAHI_CLIENT_CONNECTING:
-        printf("AVAHI_CLIENT_CONNECTING");
+        logger(L_INFO, "AVAHI_CLIENT_CONNECTING");
         break;
     }
 }
@@ -192,7 +194,7 @@ int ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port)
             0, client_callback, mdns, &error);
     if (!mdns->client)
     {
-        fprintf(stderr, "Failed to setup MDNS: %s\n", avahi_strerror(error));
+        logger(L_ERROR, "Failed to setup MDNS: %s", avahi_strerror(error));
         goto error;
     }
 

@@ -14,6 +14,8 @@
 #include <assert.h>
 #include <string.h>
 
+#include "utils/logging.h"
+
 const double ahtable_max_load_factor = 100000.0; /* arbitrary large number => don't resize */
 const size_t ahtable_initial_size = 4096;
 
@@ -339,7 +341,7 @@ static value_t* get_key(ahtable_t* table, const char* key, size_t len, bool inse
 value_t* ahtable_get(ahtable_t* table, const char* key, size_t len)
 {
     if (len > 32767) {
-        fprintf(stderr, "HAT-trie/AH-table cannot store keys longer than 32768\n");
+        logger(L_ERROR, "HAT-trie/AH-table cannot store keys longer than 32768");
         exit(EXIT_FAILURE);
     }
 

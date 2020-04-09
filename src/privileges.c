@@ -22,6 +22,7 @@
 #include <pwd.h>
 #include <grp.h>
 
+#include "utils/logging.h"
 #include "privileges.h"
 
 int
@@ -43,14 +44,14 @@ drop_privileges(const uid_t newuid, const uid_t newgid)
         res = setgid(newgid);
         if (res != 0)
         {
-            fprintf(stderr, "Failed to setgid(): %s\n", strerror(errno));
+            logger(L_ERROR, "Failed to setgid(): %s", strerror(errno));
             return -1;
         }
 #else
         res = setregid(newgid, newgid);
         if (res != 0)
         {
-            fprintf(stderr, "Failed to setregid(): %s\n", strerror(errno));
+            logger(L_ERROR, "Failed to setregid(): %s", strerror(errno));
             return -1;
         }
 #endif
@@ -63,14 +64,14 @@ drop_privileges(const uid_t newuid, const uid_t newgid)
         res = setuid(newuid);
         if (res != 0)
         {
-            fprintf(stderr, "Failed to setuid(): %s\n", strerror(errno));
+            logger(L_ERROR, "Failed to setuid(): %s", strerror(errno));
             return -1;
         }
 #else
         res = setreuid(newuid, newuid);
         if (res != 0)
         {
-            fprintf(stderr, "Failed to setreuid(): %s\n", strerror(errno));
+            logger(L_ERROR, "Failed to setreuid(): %s", strerror(errno));
             return -1;
         }
 #endif
@@ -106,9 +107,9 @@ ch_user(const char *user, const char *group)
         if (grpres == NULL)
         {
             if (s == 0)
-                fprintf(stderr, "gid for group %s not found!\n", group);
+                logger(L_ERROR, "gid for group %s not found!", group);
             else
-                fprintf(stderr, "Failed to look up gid for group %s: %s\n", group,
+                logger(L_ERROR, "Failed to look up gid for group %s: %s", group,
                         strerror(errno));
             return -1;
         }
@@ -118,9 +119,9 @@ ch_user(const char *user, const char *group)
     if (pwdres == NULL)
     {
         if (s == 0)
-            fprintf(stderr, "uid for user %s not found!\n", user);
+            logger(L_ERROR, "uid for user %s not found!", user);
         else
-            fprintf(stderr, "Failed to look up uid for user %s: %s\n", user,
+            logger(L_ERROR, "Failed to look up uid for user %s: %s", user,
                     strerror(errno));
         return -1;
     }

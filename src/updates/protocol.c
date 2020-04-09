@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "utils/logging.h"
 #include "../blacklist/ids_storedvalues.h"
 #include "../blacklist/domain_blacklist.h"
 #include "ids_tls_update.h"
@@ -175,7 +176,7 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
         swap_blacklists(update_ctx);
         break;
     case NS_PROTO_CLOSE:
-        printf("NS_PROTO_CLOSE in on_send\n");
+        logger(L_WARN, "NS_PROTO_CLOSE in on_send");
         break;
     }
 

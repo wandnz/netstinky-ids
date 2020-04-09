@@ -12,6 +12,7 @@
  */
 #include <string.h>
 
+#include "utils/logging.h"
 #include "ids_server.h"
 #include "error/ids_error.h"
 
@@ -152,7 +153,7 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
     size_t buf_sz = ids_event_len(event) + 1;
     if (NULL == (buffer = malloc(buf_sz)))
     {
-        fprintf(stderr, "write_ids_event: could not allocate buffer\n");
+        logger(L_ERROR, "write_ids_event: could not allocate buffer");
         return;
     }
 
@@ -190,7 +191,7 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
     ioc_buf = uv_buf_init(buffer, buf_sz);
     if (NULL == (ioc_req = malloc(sizeof(*ioc_req))))
     {
-        fprintf(stderr, "write_ids_event: could not allocate uv_write_t\n");
+        logger(L_ERROR, "write_ids_event: could not allocate uv_write_t");
         return;
     }
 
@@ -207,7 +208,7 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 
     if (0 > (ret = uv_write(ioc_req, stream, &ioc_buf, 1, ids_server_write_cb)))
     {
-        fprintf(stderr, "write_ids_event: write error occurred\n");
+        logger(L_ERROR, "write_ids_event: write error occurred");
         free(buffer);
         free_usr_data(write_req_data);
         return;
@@ -216,7 +217,7 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
 
 static void write_sock_shutdown(uv_shutdown_t *req, int status) {
     if (status < 0) {
-        fprintf(stderr, "Failed to close write socket");
+        logger(L_WARN, "Failed to close write socket");
     }
     if (req != NULL) {
         uv_stream_t *stream = req->handle;
@@ -254,7 +255,7 @@ void ids_server_write_cb(uv_write_t *req, int status)
     unsigned int buf_idx;
     evs_usr_data_t *usr_data = NULL;
 
-    if (status) fprintf(stderr, "write error: %s\n", uv_strerror(status));
+    if (status) logger(L_ERROR, "write error: %s", uv_strerror(status));
 
     if (!req) return;
 
@@ -293,7 +294,7 @@ static void on_new_connection(uv_stream_t *server, int status)
     uv_tcp_t *client = NULL;
     uv_loop_t *loop;
 
-    printf("new connection\n");
+    logger(L_INFO, "new connection");
     loop = ((uv_handle_t *)server)->loop;
     if (0 > (err = status)) goto msg;
     if (NULL == (client = (uv_tcp_t *)malloc(sizeof(*client)))) goto error;
@@ -310,7 +311,7 @@ static void on_new_connection(uv_stream_t *server, int status)
 
 // For error cases where a specific libuv error message can be printed
 msg:
-    fprintf(stderr, "connection error: %s\n", uv_strerror(err));
+    logger(L_ERROR, "connection error: %s\n", uv_strerror(err));
 error:
     if (client) uv_close((uv_handle_t *)client, (uv_close_cb) on_client_close);
 }
@@ -337,7 +338,7 @@ setup_event_server(uv_loop_t *loop, uv_tcp_t *handle, int port, struct ids_event
 
 error:
 
-    fprintf(stderr, "Could not setup uv_tcp_t handle for server\n");
+    logger(L_ERROR, "Could not setup uv_tcp_t handle for server");
     return -1;
 }
 

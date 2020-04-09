@@ -29,20 +29,6 @@
 #define NSIDS_SSL -6      ///< Error occurred within the SSL code
 #define NSIDS_SIG -7      ///< Error occurred within signal handler code
 
-/** Print an error to stderr, including debug info */
-#define print_error(error) do { \
-    if (error) \
-        fprintf(stderr, "%s %d: (%s) %s\n", __FILE__, __LINE__, __func__, error); \
-    } while (0)
-
-/** Print an error to stderr, including debug info if \p variable is NULL */
-#define print_if_NULL(variable) do { \
-    if (NULL == variable) \
-    { \
-        fprintf(stderr, "%s %d: (%s) %s\n", __FILE__, __LINE__, __func__, #variable); \
-    } \
-    } while (0)
-
 /**
  * @brief Get the libuv error string, or NULL if no error
  *

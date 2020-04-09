@@ -19,6 +19,7 @@
 #include <openssl/ssl.h>
 #include <openssl/x509v3.h>
 
+#include "utils/logging.h"
 #include "ids_tls_update.h"
 
 // 5 minute interval
@@ -48,8 +49,7 @@ verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 
         X509_NAME_oneline(X509_get_subject_name(err_cert), buf, 256);
 
-        fprintf(stderr, "%s for %s\n",
-                 X509_verify_cert_error_string(err), buf);
+        logger(L_DEBUG, "%s for %s\n", X509_verify_cert_error_string(err), buf);
     }
 
     return preverify_ok;
@@ -107,7 +107,8 @@ setup_context(const char *hostname, int ssl_no_verify)
     X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
     if (!X509_VERIFY_PARAM_set1_host(param, hostname, strnlen(hostname, 253)))
     {
-        fprintf(stderr, "Failed to set the hostname as a verification parameter\n");
+        logger(L_ERROR,
+                "Failed to set the hostname as a verification parameter");
         return NULL;
     }
     if (!X509_VERIFY_PARAM_set_flags(param,
@@ -115,7 +116,7 @@ setup_context(const char *hostname, int ssl_no_verify)
             | X509_V_FLAG_TRUSTED_FIRST
             ))
     {
-        fprintf(stderr, "Failed to set the verify parameter flags\n");
+        logger(L_ERROR, "Failed to set the verify parameter flags");
         return NULL;
     }
 
@@ -128,8 +129,9 @@ setup_context(const char *hostname, int ssl_no_verify)
     ssl_err = ERR_get_error();
     if (rc != 1)
     {
-        fprintf(stderr, "Failed to load default verify paths. ssl_err: ");
-        tls_stream_print_err(stderr, ssl_err);
+        char buf[256];
+        ERR_error_string_n(ssl_err, buf, sizeof(buf));
+        logger(L_ERROR, "Failed to load default verify paths. ssl_err: %s");
         return NULL;
     }
 
@@ -228,7 +230,8 @@ perform_protocol_action(tls_stream_t *stream, ns_action_t action)
 {
     int rc;
 
-    print_if_NULL(stream);
+    if (stream == NULL)
+        logger(L_ERROR, "perform_protocol_action(): stream was NULL");
     if (!stream) return -1;
 
     switch (action.type)
@@ -257,7 +260,8 @@ update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
     ns_action_t action;
     ids_update_ctx_t *ctx = NULL;
 
-    print_if_NULL(stream->data);
+    if (stream->data == NULL)
+        logger(L_ERROR, "update_timer_on_write(): stream->data was NULL");
     ctx = stream->data;
 
     // Free buffers
@@ -308,7 +312,8 @@ update_timer_on_read(tls_stream_t *stream, int status, const uv_buf_t *buf)
     ns_action_t action;
     ids_update_ctx_t *ctx = NULL;
 
-    print_if_NULL(stream);
+    if (stream == NULL)
+        logger(L_ERROR, "update_timer_on_read(): stream was NULL");
     if (!stream) return;
 
     if (TLS_STR_OK != status)
@@ -323,10 +328,8 @@ update_timer_on_read(tls_stream_t *stream, int status, const uv_buf_t *buf)
 
     if (!buf->base) return;
 
-#ifdef DEBUG
-    printf("Rx'd buffer of len: %lu\n", buf->len);
-    // fwrite(buf->base, buf->len, 1, stdout);
-#endif
+    logger(L_DEBUG, "Rx'd buffer of len: %lu", buf->len);
+
     rc = ns_cl_proto_on_recv(&action, &ctx->proto.state, stream, buf);
     free(buf->base);
     if (0 != rc)
@@ -355,7 +358,8 @@ update_timer_on_handshake(tls_stream_t *stream, int status)
     int rc;
     ns_action_t action;
 
-    print_if_NULL(stream);
+    if (stream == NULL)
+        logger(L_ERROR, "update_timer_on_handshake(): stream was NULL");
     if (!stream) return;
 
     if (status)
@@ -369,7 +373,7 @@ update_timer_on_handshake(tls_stream_t *stream, int status)
     action = ns_cl_proto_on_handshake(stream->data, stream);
     rc = perform_protocol_action(stream, action);
     if (rc)
-        print_error("Could not perform protocol action");
+        logger(L_WARN, "Could not perform protocol action");
 
     return;
 }
@@ -402,7 +406,7 @@ on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res)
     int rc;
     if (status != 0)
     {
-        fprintf(stderr, "getaddrinfo: %s\n", uv_strerror(status));
+        logger(L_WARN, "getaddrinfo: %s", uv_strerror(status));
     }
 
     /**
@@ -493,7 +497,7 @@ update_timer_cb(uv_timer_t *timer)
     rc = tls_stream_init(&ctx->stream, timer->loop, ctx->ctx);
     if (rc)
     {
-        print_error("Could not initialize TLS stream");
+        logger(L_ERROR, "Could not initialize TLS stream");
         goto error;
     }
     ctx->stream.data = ctx;
@@ -535,7 +539,7 @@ setup_update_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx)
     uv_rc = uv_timer_init(loop, timer);
     if (uv_rc < 0)
     {
-        fprintf(stderr, "Failed to setup update timer handle: %s\n",
+        logger(L_ERROR, "Failed to setup update timer handle: %s",
                 uv_strerror(uv_rc));
         return NSIDS_UV;
     }
@@ -544,7 +548,7 @@ setup_update_timer(uv_timer_t *timer, uv_loop_t *loop, ids_update_ctx_t *ctx)
     uv_rc = uv_timer_start(timer, update_timer_cb, 0, update_interval_ms);
     if (uv_rc < 0)
     {
-        fprintf(stderr, "Failed to setup update timer handle: %s\n",
+        logger(L_ERROR, "Failed to setup update timer handle: %s",
                 uv_strerror(uv_rc));
         teardown_timer(timer);
         return NSIDS_UV;
