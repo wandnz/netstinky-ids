@@ -31,7 +31,7 @@ int
 is_domain_valid(const char *string, size_t domain_len)
 {
     const char *label = NULL;
-    int i;
+    unsigned int i;
 
     if (!string) return -1;
     if (!IN_RANGE(domain_len, MIN_LABEL_LEN, MAX_DOMAIN_LEN - MIN_LABEL_LEN))

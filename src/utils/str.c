@@ -27,7 +27,7 @@ char *empty_string(void)
 int split_string(const char character, const char *input, const size_t length,
                  char **header, char **value)
 {
-    int i;
+    unsigned int i;
     char *header_ptr;
     char *value_ptr;
 
@@ -104,14 +104,14 @@ int trim_trailing_whitespace(char *const str, const size_t str_len)
     /* Regress index past any whitespace characters */
     while (isspace(str[index]) && index >= 0) index--;
 
-    if (index == str_len - 1) {
+    if ((size_t) index == str_len - 1) {
         // There was no whitespace on the end of the string. Do nothing.
         return (int) str_len;
     } else {
         // Set the byte after the current one to a NULL byte to signal the
         // end of the string
         assert(index + 1 > -1);
-        assert(index + 1 < str_len);
+        assert((size_t) (index + 1) < str_len);
         str[index + 1] = '\0';
         return (int) strnlen(str, str_len);
     }

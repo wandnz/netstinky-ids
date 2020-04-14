@@ -60,7 +60,9 @@ uint32_t hash(const char* data, size_t len_)
     switch(len & 3)
     {
         case 3: k1 ^= tail[2] << 16;
+        /* Fallthrough */
         case 2: k1 ^= tail[1] << 8;
+        /* Fallthrough */
         case 1: k1 ^= tail[0];
               k1 *= c1; k1 = rotl32(k1,15); k1 *= c2; h1 ^= k1;
     }

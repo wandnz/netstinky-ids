@@ -20,7 +20,7 @@
 #include <assert.h>
 #include "quicksort.h"
 
-const static unsigned int ALLOC_NUM = 10;   // number of extra element spaces
+static const unsigned int ALLOC_NUM = 10;   // number of extra element spaces
                                             // to add whenever reallocation is
                                             // required
 

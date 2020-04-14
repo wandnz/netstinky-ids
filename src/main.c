@@ -179,7 +179,8 @@ stream_shutdown_cb(uv_shutdown_t *req, int status)
  * @param arg A void pointer to an optional argument (given to the uv_walk
  * function call) that may be NULL
  */
-void walk_and_close_handle_cb(uv_handle_t *handle, void *arg)
+void walk_and_close_handle_cb(uv_handle_t *handle,
+                              void *arg __attribute__((unused)))
 {
     int err = 0;
     uv_shutdown_t *shutdown = NULL;
@@ -373,8 +374,8 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
     return NSIDS_OK;
 }
 
-static void alloc_buffer(uv_handle_t *handle, size_t suggested_size,
-             uv_buf_t *buf)
+static void alloc_buffer(uv_handle_t *handle __attribute__((unused)),
+                        size_t suggested_size, uv_buf_t *buf)
 {
     *buf = uv_buf_init((char *) malloc(suggested_size), (uint) suggested_size);
 }

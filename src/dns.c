@@ -1063,13 +1063,17 @@ uint8_t *
 dns_write_header(const struct dns_packet *packet, uint8_t *buffer_pos,
         const uint8_t *buffer_end)
 {
+    const ssize_t buffer_size = buffer_end - buffer_pos;
     assert(packet);
     assert(buffer_pos);
     assert(buffer_end);
 
     uint8_t *packet_pos = (uint8_t *)buffer_pos;
     struct dns_header h = packet->header;
-    if (buffer_end - buffer_pos >= DNS_HEADER_LEN)
+
+    if (buffer_size < 0)
+        goto error;
+    else if ((size_t) buffer_size >= DNS_HEADER_LEN)
     {
         if (!(packet_pos = byte_array_write_uint16(h.id, packet_pos, buffer_end)))
             goto error;
@@ -1164,7 +1168,7 @@ dns_write_domain(dns_domain_literal domain, uint8_t *pos,
 
     size_t max_len = buffer_end - pos;
     int domain_len = snprintf((char *)pos, max_len, "%s", domain);
-    if (domain_len < 0 || domain_len > max_len) return (NULL);
+    if (domain_len < 0 || (size_t) domain_len > max_len) return (NULL);
 
     /* Include space for NULL terminator */
     return (pos + domain_len + 1);

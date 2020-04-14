@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <sys/types.h>
 #include "byte_array.h"
 
 /* -- PRIVATE FUNCTION DECLARATIONS -- */
@@ -35,13 +36,16 @@ uint8_t *
 byte_array_read_uint16(uint16_t *out, const uint8_t *pos,
         const uint8_t *buffer_end)
 {
+    const ssize_t buffer_size = buffer_end - pos;
     assert(out);
     assert(pos);
     assert(buffer_end);
 
     uint8_t *r = NULL;
     size_t sz = sizeof(*out);
-    if (buffer_end - pos >= sz)
+    if (buffer_size < 0)
+        ; // Fallthrough to return NULL
+    else if ((size_t) buffer_size >= sz)
     {
         *out = byte_array_get_uint16(pos);
         r = (uint8_t *)(pos + sz);
@@ -54,13 +58,16 @@ uint8_t *
 byte_array_read_uint32(uint32_t *out, const uint8_t *pos,
         const uint8_t *buffer_end)
 {
+    const ssize_t buffer_size = buffer_end - pos;
     assert(out);
     assert(pos);
     assert(buffer_end);
 
     uint8_t *r = NULL;
     size_t sz = sizeof(*out);
-    if (buffer_end - pos >= sz)
+    if (buffer_size < 0)
+        ; // Fallthrough to return NULL
+    else if ((size_t) buffer_size >= sz)
     {
         *out = byte_array_get_uint32(pos);
         r = (uint8_t *)(pos + sz);
@@ -73,12 +80,15 @@ uint8_t *
 byte_array_write_uint16(uint16_t value, uint8_t *pos,
         const uint8_t *buffer_end)
 {
+    ssize_t buffer_size = buffer_end - pos;
     assert(pos);
     assert(buffer_end);
 
     uint8_t *r = NULL;
 
-    if (buffer_end - pos >= sizeof(value))
+    if (buffer_size < 0)
+        ; // Fallthrough to return NULL
+    else if ((size_t) buffer_size >= sizeof(value))
         r = byte_array_put_uint16(value, pos);
 
     return (r);
@@ -88,12 +98,13 @@ uint8_t *
 byte_array_write_uint32(uint32_t value, uint8_t *pos,
         const uint8_t *buffer_end)
 {
+    ssize_t buffer_size = buffer_end - pos;
     assert(pos);
     assert(buffer_end);
 
     uint8_t *r = NULL;
 
-    if (buffer_end - pos >= sizeof(value))
+    if ((size_t) buffer_size >= sizeof(value))
         r = byte_array_put_uint32(value, pos);
 
     return (r);

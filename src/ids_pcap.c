@@ -43,7 +43,7 @@ extern ip_blacklist *ip_bl;
 extern domain_blacklist *dn_bl;
 extern struct ids_event_list *event_queue;
 
-void packet_handler(unsigned char *user_dat,
+void packet_handler(unsigned char *user_dat __attribute__((unused)),
                     const struct pcap_pkthdr* pcap_hdr,
                     const unsigned char *packet)
 {

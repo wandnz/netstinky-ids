@@ -268,7 +268,7 @@ sa_free(SortedArray *sa, freeElement e_free)
 {
     assert(sa);
 
-    int i;
+    unsigned int i;
 
     if (sa)
     {

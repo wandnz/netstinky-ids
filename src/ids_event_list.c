@@ -224,7 +224,7 @@ ids_event_time_list_enforce_max_timestamps(struct ids_event_list *list,
     assert(list);
     assert(tm_list);
 
-    int iter;
+    unsigned int iter;
     struct ids_event_ts *tail = tm_list;
 
     /* How many times to follow the next pointer */

@@ -158,34 +158,34 @@ void write_ids_event(uv_stream_t *stream, struct ids_event *event)
     }
 
     ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_ioc, event->ioc);
-    assert(ret < buf_sz - buf_idx);
+    assert((size_t) ret < buf_sz - buf_idx);
     buf_idx += ret;
 
     ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_timestamp,
             (long) event->times_seen->tm_stamp.tv_sec);
-    assert(ret < buf_sz - buf_idx);
+    assert((size_t) ret < buf_sz - buf_idx);
     buf_idx += ret;
 
     ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_event_count,
             event->num_times);
-    assert(ret < buf_sz - buf_idx);
+    assert((size_t) ret < buf_sz - buf_idx);
     buf_idx += ret;
 
     ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_iface, event->iface);
-    assert(ret < buf_sz - buf_idx);
+    assert((size_t) ret < buf_sz - buf_idx);
     buf_idx += ret;
 
     ip.s_addr = event->src_ip;
 
     ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_src_ip,
             inet_ntop(AF_INET, &ip, ip_str, 20));
-    assert(ret < buf_sz - buf_idx);
+    assert((size_t) ret < buf_sz - buf_idx);
     buf_idx += ret;
 
     ret = snprintf(buffer + buf_idx, buf_sz - buf_idx, fmt_src_mac,
             event->mac.m_addr[0], event->mac.m_addr[1], event->mac.m_addr[2], event->mac.m_addr[3],
             event->mac.m_addr[4], event->mac.m_addr[5]);
-    assert(ret < buf_sz - buf_idx);
+    assert((size_t) ret < buf_sz - buf_idx);
     buf_idx += ret;
 
     ioc_buf = uv_buf_init(buffer, buf_sz);
@@ -239,7 +239,8 @@ void write_ids_event_list(uv_stream_t *stream)
     uv_shutdown(req, stream, write_sock_shutdown);
 }
 
-void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+void alloc_buffer(uv_handle_t *handle __attribute__((unused)),
+                  size_t suggested_size, uv_buf_t *buf)
 {
     assert(buf);
     buf->base = malloc(suggested_size);
@@ -349,7 +350,7 @@ event_server_close_cb(uv_tcp_t *handle)
 }
 
 static void
-event_server_shutdown_cb(uv_shutdown_t *req, int status)
+event_server_shutdown_cb(uv_shutdown_t *req, int status __attribute__((unused)))
 {
     // Ignore status and close handle
     uv_close((uv_handle_t *)req->handle, (uv_close_cb)event_server_close_cb);

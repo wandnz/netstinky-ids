@@ -292,7 +292,8 @@ ip_addr_str_to_int(uint32_t *result, char *ip_addr)
 }
 
 int
-insert_blacklist_item(ip_blacklist *bl, char *ip_addr, uint16_t port, char *malware_family)
+insert_blacklist_item(ip_blacklist *bl, char *ip_addr, uint16_t port,
+                      char *malware_family __attribute__((unused)))
 {
     int rc;
     ip_key_value_t item;
@@ -334,7 +335,8 @@ handle_feodo_line(char *line, void *usr_data)
  * character we don't want to bother reading past it.
  */
 void
-getline_feodo_cb(char *line, size_t line_sz, void *user_data)
+getline_feodo_cb(char *line, size_t line_sz __attribute__((unused)),
+                 void *user_data)
 {
     handle_feodo_line(line, user_data);
 }

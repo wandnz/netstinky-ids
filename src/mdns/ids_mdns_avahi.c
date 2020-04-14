@@ -167,7 +167,7 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
         break;
     case AVAHI_CLIENT_S_COLLISION:
         logger(L_WARN, "AVAHI_CLIENT_S_COLLISION");
-        // continue
+        /* fallthrough */
     case AVAHI_CLIENT_S_REGISTERING:
         logger(L_INFO, "AVAHI_CLIENT_S_REGISTERING");
         if (mdns->group) avahi_entry_group_reset(mdns->group);

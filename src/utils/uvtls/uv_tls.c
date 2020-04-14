@@ -65,7 +65,7 @@ tls_stream_close_err_cb(tls_stream_t *stream);
 
 #ifdef HAVE_SSL_CTX_SET_KEYLOG_CALLBACK
 static void
-keylog_callback(const SSL *ssl, const char *line)
+keylog_callback(const SSL *ssl __attribute__((unused)), const char *line)
 {
     logger(L_DEBUG, "%s", line);
 }
@@ -609,11 +609,12 @@ tls_stream_shutdown_tcp(tls_stream_t *stream)
  * The SSL shutdown write is complete.
  */
 static void
-tls_stream_ssl_shutdown_write_cb(tls_stream_t *stream, int status,
+tls_stream_ssl_shutdown_write_cb(tls_stream_t *stream,
+        int status __attribute__((unused)),
         uv_buf_t *bufs, unsigned int nbufs)
 {
     int shutdown_rc;
-    int buf_idx;
+    unsigned int buf_idx;
 
     if (!stream) return;
 
@@ -665,7 +666,8 @@ tls_stream_shutdown(tls_stream_t *stream, tls_str_shutdown_cb cb)
 }
 
 int
-tls_stream_listen(tls_stream_t *stream, int backlog, uv_connection_cb cb)
+tls_stream_listen(tls_stream_t *stream, int backlog __attribute__((unused)),
+                  uv_connection_cb cb)
 {
     int rc;
 
@@ -712,7 +714,8 @@ tls_stream_accept(tls_stream_t *server, tls_stream_t *client,
  * @param buf: The buf structure to contain the new memory and length.
  */
 static void
-tls_stream_alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+tls_stream_alloc_cb(uv_handle_t *handle __attribute__((unused)),
+                    size_t suggested_size, uv_buf_t *buf)
 {
     buf->len = 0;
     buf->base = malloc(suggested_size);
@@ -768,7 +771,7 @@ tls_stream_encrypt_buffer(buf_array_t *encrypted, tls_stream_t *stream,
         const uv_buf_t *plaintext)
 {
     int rc;
-    int bytes_written = 0;
+    unsigned int bytes_written = 0;
     int nwrite;
 
     uv_buf_t enc_buf;
@@ -793,7 +796,7 @@ tls_stream_encrypt_buffer(buf_array_t *encrypted, tls_stream_t *stream,
         rc = buf_array_append(encrypted, &enc_buf);
         if (rc) goto error;
 
-        bytes_written += nwrite;
+        bytes_written += (unsigned int) nwrite;
     }
 
     return TLS_STR_OK;
@@ -1001,7 +1004,8 @@ tls_stream_close_err_cb(tls_stream_t *stream)
  * been closed.
  */
 static void
-tls_stream_close_shutdown_cb(uv_shutdown_t *req, int status)
+tls_stream_close_shutdown_cb(uv_shutdown_t *req,
+                             int status __attribute__((unused)))
 {
     uv_stream_t *handle = NULL;
 

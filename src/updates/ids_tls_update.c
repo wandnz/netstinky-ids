@@ -23,7 +23,7 @@
 #include "ids_tls_update.h"
 
 // 5 minute interval
-const static uint64_t update_interval_ms = 2 * 60 * 1000;
+static const uint64_t update_interval_ms = 2 * 60 * 1000;
 
 static void
 update_timer_cb(uv_timer_t *timer);
@@ -256,7 +256,8 @@ static void
 update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
         unsigned int nbufs)
 {
-    int rc, buf_idx;
+    int rc;
+    unsigned int buf_idx;
     ns_action_t action;
     ids_update_ctx_t *ctx = NULL;
 
@@ -296,7 +297,8 @@ update_timer_on_close(tls_stream_t *stream)
 }
 
 static void
-update_timer_on_shutdown(tls_stream_t *stream, int status)
+update_timer_on_shutdown(tls_stream_t *stream,
+                         int status __attribute__((unused)))
 {
     if (!stream) return;
 

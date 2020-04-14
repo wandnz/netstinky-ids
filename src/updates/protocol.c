@@ -22,8 +22,8 @@
 #include "domain_validation.h"
 
 // Labels for contents of each received line
-const static char *dn_label = "DN_IOC:";
-const static char *ip_label = "IP_IOC:";
+static const char *dn_label = "DN_IOC:";
+static const char *ip_label = "IP_IOC:";
 
 static void
 swap_blacklists(ids_update_ctx_t * const context)
@@ -145,7 +145,7 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 
 int
 ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
-        tls_stream_t *stream, int status)
+        tls_stream_t *stream, int status __attribute__((unused)))
 {
     ids_update_ctx_t *update_ctx = NULL;
 
@@ -219,7 +219,7 @@ parse_ip_line(char *line, ip_key_value_t *ioc)
     // Third token is port
     token = strtok(NULL, delim);
     if (!token) return -1;
-    rc = sscanf(token, "%5d", &port);
+    rc = sscanf(token, "%5u", &port);
     if (rc < 1) return -1;
 
     // Check that there are no extra tokens

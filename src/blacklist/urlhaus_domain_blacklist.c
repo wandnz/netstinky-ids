@@ -94,7 +94,8 @@ handle_urlhaus_line(char *line, void *user_data)
  * character we don't want to bother reading past it.
  */
 static void
-getline_urlhaus_cb(char *line, size_t line_sz, void *user_data)
+getline_urlhaus_cb(char *line, size_t line_sz __attribute__((unused)),
+                   void *user_data)
 {
     handle_urlhaus_line(line, user_data);
 }

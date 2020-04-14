@@ -277,7 +277,7 @@ static void hattrie_split(hattrie_t* T, node_ptr parent, node_ptr node)
     all_m   = (unsigned int) ahtable_size(node.b);
     left_m  = cs[j];
     right_m = all_m - left_m;
-    int d;
+    unsigned int d;
 
     while (j + 1 < node.b->c1) {
         d = abs((int) (left_m + cs[j + 1]) - (int) (right_m - cs[j + 1]));
@@ -719,7 +719,7 @@ void print_node_type(hattrie_iter_t *i)
     assert(i != NULL);
     static size_t level = 0;
     
-    int j;
+    unsigned int j;
     for (j = 0; j < level + 1; j++)
     {
         printf("\t");
@@ -736,7 +736,7 @@ void print_node_type(hattrie_iter_t *i)
     }
     else if (i->stack != NULL) {
         level = i->stack->level;
-        int j;
+        unsigned int j;
         for (j = 0; j < i->stack->level; j++)
         {
             printf("\t");
