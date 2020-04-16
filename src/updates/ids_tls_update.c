@@ -22,8 +22,11 @@
 #include "utils/logging.h"
 #include "ids_tls_update.h"
 
-// 5 minute interval
-static const uint64_t update_interval_ms = 2 * 60 * 1000;
+#ifndef UPDATE_FREQUENCY_MINS
+#define UPDATE_FREQUENCY_MINS 60
+#endif
+
+static const uint64_t update_interval_ms = UPDATE_FREQUENCY_MINS * 60 * 1000;
 
 static void
 update_timer_cb(uv_timer_t *timer);
