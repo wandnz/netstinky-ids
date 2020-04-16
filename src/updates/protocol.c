@@ -120,13 +120,18 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
     case NS_PROTO_IOCS_WAITING:
         // Process IOCs and send confirmation
         parse_rc = parse_ioc_update(buf, stream);
+        if (parse_rc > 0)
+        {
+            // We have more IoCs coming. Don't change state
+            break;
+        }
         action->send_buffer.base = malloc(1500);
         if (!action->send_buffer.base) return -1;
 
         action->type = NS_ACTION_WRITE;
-        if (parse_rc)
+        if (parse_rc == 0)
             rc = snprintf(action->send_buffer.base, 1500, "UPDATE CONFIRMED\n\n");
-        else
+        else if (parse_rc < 0)
             rc = snprintf(action->send_buffer.base, 1500, "ERROR\n\n");
         assert(rc < 1500);
         action->send_buffer.len = rc;
@@ -153,7 +158,11 @@ ns_cl_proto_on_send(ns_action_t *action, ns_cli_state_t *state,
     action->send_buffer.base = NULL;
     action->send_buffer.len = 0;
 
-    if (!state) return -1;
+    if (!state)
+    {
+        logger(L_ERROR, "ns_cl_proto_on_send(): state was NULL");
+        return -1;
+    }
 
     switch(*state)
     {
@@ -290,7 +299,12 @@ process_line(char *line, domain_blacklist **dn, ip_blacklist **ip)
 
     if (!line || !dn || !ip) return -1;
 
-    if (0 == strncmp(dn_label, line, strlen(dn_label)))
+    if (line != NULL && *line == '\0')
+    {
+        // Ignore an empty string (probably a packet boundary)
+        return 0;
+    }
+    else if (0 == strncmp(dn_label, line, strlen(dn_label)))
     {
         rc = parse_dn_line(line, &domain, &domain_value);
         if (rc < 0)
@@ -313,7 +327,10 @@ process_line(char *line, domain_blacklist **dn, ip_blacklist **ip)
         if (rc < 0) return -1;
     }
     else
+    {
+        logger(L_DEBUG, "process_line(): bad line: %s", line);
         return -1;
+    }
 
     return 0;
 }
@@ -349,12 +366,14 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
         }
 
         // Check for end of update (two new-lines in a row)
-        if (*line == '\0' && '\0' == *next_line) {
+        if (*line == '\0' && '\n' == *next_line) {
             free(line);
             return 0;
         }
 
         rc = process_line(line, &update_ctx->new_domain, &update_ctx->new_ip);
+        if (rc < 0)
+            logger(L_WARN, "process_line(): bad line read");
         free(line);
 
     } while (next_line);
