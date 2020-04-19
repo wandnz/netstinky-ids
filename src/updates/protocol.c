@@ -130,9 +130,11 @@ ns_cl_proto_on_recv(ns_action_t *action, ns_cli_state_t *state,
 
         action->type = NS_ACTION_WRITE;
         if (parse_rc == 0)
-            rc = snprintf(action->send_buffer.base, 1500, "UPDATE CONFIRMED\n\n");
-        else if (parse_rc < 0)
-            rc = snprintf(action->send_buffer.base, 1500, "ERROR\n\n");
+            rc = snprintf(action->send_buffer.base, 1500,
+                          "UPDATE CONFIRMED\n\n");
+        else // parse_rc < 0
+            rc = snprintf(action->send_buffer.base, 1500,
+                          "ERROR\n\n");
         assert(rc < 1500);
         action->send_buffer.len = rc;
 
