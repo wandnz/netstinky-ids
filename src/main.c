@@ -564,7 +564,7 @@ main(int argc, char **argv)
 #ifdef DEBUG
     set_log_level(L_DEBUG);
 #else
-    set_log_level(L_INFO);
+    set_log_level(L_WARN);
 #endif
 
     // pcap_io_task_setup, configure and add the pcap task to the event
