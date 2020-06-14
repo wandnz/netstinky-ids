@@ -820,27 +820,27 @@ dns_parse_question(uint8_t **out, const uint8_t *packet_start,
     struct dns_question *qn = new_dns_question();
     if (!qn)
     {
-        logger(L_WARN, "dns_parse_question(): new_dns_question() failed");
+        logger(L_INFO, "dns_parse_question(): new_dns_question() failed");
         goto error;
     }
 
     qn->qname = dns_parse_domain(out, packet_start, packet_end);
     if (!qn->qname)
     {
-        logger(L_WARN, "dns_parse_question(): dns_parse_name() failed");
+        logger(L_INFO, "dns_parse_question(): dns_parse_name() failed");
         goto error;
     }
 
     if (!(*out = byte_array_read_uint16(&(qn->qtype), *out, packet_end)))
     {
-        logger(L_WARN,
+        logger(L_INFO,
                "dns_parse_question(): byte_array_read_uint16() failed");
         goto error;
     }
 
     if (!(*out = byte_array_read_uint16(&(qn->qclass), *out, packet_end)))
     {
-        logger(L_WARN,
+        logger(L_INFO,
                "dns_parse_question(): byte_array_read_uint16() failed");
         goto error;
     }
@@ -870,7 +870,7 @@ dns_parse_question_section(uint16_t qn_num, uint8_t **packet_pos,
                 packet_start, packet_end);
         if (!new_qn)
         {
-            logger(L_WARN,
+            logger(L_INFO,
                    "dns_parse_question_section(): dns_parse_question() failed");
             goto error;
         }

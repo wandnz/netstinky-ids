@@ -87,7 +87,7 @@ void packet_handler(unsigned char *user_dat __attribute__((unused)),
             logger(L_DEBUG, "Safe!");
         }
     } else if (result == -1) {
-        logger(L_ERROR, "pcap_io_task_read(): ids_pcap_read_packet() failed");
+        logger(L_INFO, "pcap_io_task_read(): ids_pcap_read_packet() failed");
     }
 
 end:
