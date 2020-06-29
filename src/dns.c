@@ -169,7 +169,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
 
         if (!(pkt_pos = dns_parse_header(pkt, pkt_pos, packet_end)))
         {
-            logger(L_WARN, "dns_parse(): dns_parse_header() failed");
+            logger(L_INFO, "dns_parse(): dns_parse_header() failed");
             goto error;
         }
 
@@ -178,7 +178,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->questions = dns_parse_question_section(count, &pkt_pos,
                     packet_start, packet_end)))
             {
-                logger(L_WARN,
+                logger(L_INFO,
                        "dns_parse(): dns_parse_question_section() failed");
                 goto error;
             }
@@ -189,7 +189,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos, packet_start,
                     packet_end)))
             {
-                logger(L_WARN,
+                logger(L_INFO,
                        "dns_parse(): dns_parse_answer_section(ancount) failed");
                 goto error;
             }
@@ -200,7 +200,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
                     packet_start, packet_end)))
             {
-                logger(L_WARN,
+                logger(L_INFO,
                        "dns_parse(): dns_parse_answer_section(nscount) failed");
                 goto error;
             }
@@ -211,7 +211,7 @@ dns_parse(uint8_t *packet_start, uint8_t *packet_end)
             if (pkt_pos >= packet_end || !(pkt->answers = dns_parse_answer_section(count, &pkt_pos,
                     packet_start, packet_end)))
             {
-                logger(L_WARN,
+                logger(L_INFO,
                        "dns_parse(): dns_parse_answer_section(arcount) failed");
                 goto error;
             }
