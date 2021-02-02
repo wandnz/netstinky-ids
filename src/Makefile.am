@@ -13,9 +13,9 @@ endif
 # mDNS support
 libmdns_la_SOURCES = \
 	mdns/ids_mdns_avahi.c \
-	mdns/mdns_libuv_integration.c \
+	mdns/uv-watch.c \
 	mdns/ids_mdns_avahi.h \
-	mdns/mdns_libuv_integration.h
+	mdns/uv-watch.h
 libmdns_la_CFLAGS = $(AVAHI_CFLAGS)
 libmdns_la_LIBADD = -luv $(AVAHI_LIBS)
 

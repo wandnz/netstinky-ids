@@ -43,7 +43,6 @@
 #endif
 #ifndef NO_MDNS
 #include "mdns/ids_mdns_avahi.h"
-#include "mdns/mdns_libuv_integration.h"
 #endif
 #include "utils/common.h"
 #include "utils/logging.h"
@@ -110,9 +109,6 @@ domain_blacklist *dn_bl = NULL;             ///< The domain IoC blacklist
 struct ids_event_list *event_queue = NULL;  ///< The buffer of IoC events
 
 // libuv handles
-#ifndef NO_MDNS
-static uv_check_t mdns_handle;
-#endif
 #ifdef DEBUG
 static uv_pipe_t stdin_pipe;
 #endif
@@ -642,9 +638,7 @@ main(int argc, char **argv)
     if (setup_sigpipe()) goto done;
 
 #ifndef NO_MDNS
-    if (ids_mdns_setup_mdns(&mdns, args.server_port)) goto done;
-    if (mdns_setup_event_handle(loop, &mdns_handle, mdns.simple_poll)
-            || mdns_check_start(&mdns_handle)) goto done;
+    if (ids_mdns_setup_mdns(&mdns, loop, args.server_port)) goto done;
 #endif
 #ifndef NO_UPDATES
     if (args.update_server_host)
@@ -676,6 +670,13 @@ main(int argc, char **argv)
     retval = 0;
 
 done:
+#ifndef NO_MDNS
+    // Free mDNS here, as it causes it's libuv handles to be closed as part of
+    // freeing and therefore needs to run the event loop a couple of times
+    // before _all_ memory is freed.
+    if (&mdns)
+        ids_mdns_free_mdns(&mdns);
+#endif
     if (loop)
     {
         uv_walk(loop, walk_and_close_handle_cb, NULL);

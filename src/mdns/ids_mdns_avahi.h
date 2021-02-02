@@ -16,13 +16,10 @@
 #ifndef SRC_IDS_MDNS_H_
 #define SRC_IDS_MDNS_H_
 
-#include <stdbool.h>
-
-#include <poll.h>
-#include <avahi-common/cdecl.h>
 #include <avahi-client/client.h>
 #include <avahi-client/publish.h>
-#include <avahi-common/simple-watch.h>
+
+#include "uv-watch.h"
 
 /** The name of the service to advertise */
 #define MDNS_SVC_NAME "_netstinky._tcp"
@@ -34,7 +31,7 @@
  */
 typedef struct AvahiMdnsContext
 {
-    AvahiSimplePoll *simple_poll;
+    AvahiUvPoll *uv_poll;
     char *name;
     int port;
     AvahiClient *client;
@@ -47,13 +44,7 @@ typedef struct AvahiMdnsContext
  * @param port The TCP port to advertise
  */
 int
-ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port);
-
-/**
- * Perform one non-blocking iteration of the Avahi event loop.
- */
-void
-ids_mdns_walk(AvahiSimplePoll *poll);
+ids_mdns_setup_mdns(AvahiMdnsContext *mdns, uv_loop_t *loop, int port);
 
 /**
  * Free resources needed for MDNS.

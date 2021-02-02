@@ -87,7 +87,6 @@ static void entry_group_callback(AvahiEntryGroup *g, AvahiEntryGroupState state,
     case AVAHI_ENTRY_GROUP_FAILURE:
         logger(L_ERROR, "entry_group_callback: %s",
                 avahi_strerror(avahi_client_errno(avahi_entry_group_get_client(g))));
-        avahi_simple_poll_quit(mdns->simple_poll);
         break;
     case AVAHI_ENTRY_GROUP_UNCOMMITED:
         break;
@@ -102,7 +101,6 @@ static void entry_group_callback(AvahiEntryGroup *g, AvahiEntryGroupState state,
 void create_services(AvahiMdnsContext *mdns)
 {
     int ret;
-    //assert(mdns->client);
 
     // Check if first time running
     if (!mdns->group)
@@ -141,7 +139,7 @@ collision:
     return;
 
 error:
-    avahi_simple_poll_quit(mdns->simple_poll);
+    return;
 }
 
 /**
@@ -163,7 +161,6 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
         break;
     case AVAHI_CLIENT_FAILURE:
         logger(L_ERROR, "client_callback: %s", avahi_strerror(avahi_client_errno(c)));
-        avahi_simple_poll_quit(mdns->simple_poll);
         break;
     case AVAHI_CLIENT_S_COLLISION:
         logger(L_WARN, "AVAHI_CLIENT_S_COLLISION");
@@ -178,7 +175,7 @@ client_callback(AvahiClient *c, AvahiClientState state, void *userdata)
     }
 }
 
-int ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port)
+int ids_mdns_setup_mdns(AvahiMdnsContext *mdns, uv_loop_t *loop, int port)
 {
     assert(mdns);
     assert(port > 0);
@@ -187,10 +184,10 @@ int ids_mdns_setup_mdns(AvahiMdnsContext *mdns, int port)
 
     mdns->name = avahi_strdup("NetStinky");
     mdns->port = port;
-    mdns->simple_poll = avahi_simple_poll_new();
-    if (!mdns->simple_poll) return NSIDS_MEM;
+    mdns->uv_poll = avahi_uv_poll_new(loop);
+    if (!mdns->uv_poll) return NSIDS_MEM;
 
-    mdns->client = avahi_client_new(avahi_simple_poll_get(mdns->simple_poll),
+    mdns->client = avahi_client_new(avahi_uv_poll_get(mdns->uv_poll),
             0, client_callback, mdns, &error);
     if (!mdns->client)
     {
@@ -206,10 +203,10 @@ error:
         avahi_client_free(mdns->client);
         mdns->client = NULL;
     }
-    if (mdns->simple_poll)
+    if (mdns->uv_poll)
     {
-        avahi_simple_poll_free(mdns->simple_poll);
-        mdns->simple_poll = NULL;
+        avahi_uv_poll_free(mdns->uv_poll);
+        mdns->uv_poll = NULL;
     }
     if (mdns->name)
     {
@@ -220,23 +217,13 @@ error:
     return false;
 }
 
-/**
- * Runs a single iteration of the Avahi event loop (non-blocking).
- */
-void ids_mdns_walk(AvahiSimplePoll *poll)
-{
-    assert(poll);
-    int sleep_time = 0;	// 0 means do not block at all
-    avahi_simple_poll_iterate(poll, sleep_time);
-}
-
 void ids_mdns_free_mdns(AvahiMdnsContext *mdns)
 {
     assert(mdns);
 
     // freeing avahi_client will free group
     if (mdns->client) avahi_client_free(mdns->client);
-    if (mdns->simple_poll) avahi_simple_poll_free(mdns->simple_poll);
+    if (mdns->uv_poll) avahi_uv_poll_free(mdns->uv_poll);
     if (mdns->name) avahi_free(mdns->name);
 
     memset(mdns, 0, sizeof(*mdns));
