@@ -264,7 +264,9 @@ int parse_args(struct IdsArgs *args, int argc, char **argv)
         {"help", no_argument, &args->help_flag, 1},
         {"update-host", required_argument, 0, 0},
         {"update-port", required_argument, 0, 0},
+#ifndef NO_UPDATES
         {"ssl-no-verify", no_argument, &args->ssl_no_verify, 1},
+#endif
         {0, 0, 0, 0}
     };
 
