@@ -15,6 +15,11 @@
 
 #include "uv_buf_helper.h"
 
+static int
+is_addr_in(const uv_buf_t *buf, const char *start) {
+    return !(start < buf->base || (buf->base + buf->len) <= start);
+}
+
 int
 uv_buf_read_line(const uv_buf_t *buf, char *start, char **line,
         char **next_start)
@@ -27,8 +32,7 @@ uv_buf_read_line(const uv_buf_t *buf, char *start, char **line,
     // if any other argument is NULL.
     if (!buf || !start || !line) return -1;
 
-    // Check START is within bounds of the buffer.
-    if (buf->base > start || (buf->base + buf->len) <= start) return -1;
+    if (!is_addr_in(buf, start)) return -1;
 
     // Actually the first address that is invalid
     end = buf->base + buf->len;
@@ -39,6 +43,8 @@ uv_buf_read_line(const uv_buf_t *buf, char *start, char **line,
         if ('\n' != *iter) continue;
         *next_start = iter + 1;
         len = *next_start - start;
+        if (*next_start == end)
+            *next_start = NULL;
 
         // Allocate some memory
         *line = malloc(len);

@@ -368,7 +368,7 @@ parse_ioc_update(const uv_buf_t *buf, tls_stream_t *stream)
         }
 
         // Check for end of update (two new-lines in a row)
-        if (*line == '\0' && '\n' == *next_line) {
+        if (line && (*next_line == '\n' || *next_line == '\0')) {
             free(line);
             return 0;
         }
