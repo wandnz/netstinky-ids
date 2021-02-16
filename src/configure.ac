@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script
 
 AC_PREREQ(2.69)
-AC_INIT([nsids], [0.1], [amackint@waikato.ac.nz])
+AC_INIT([nsids], [1.0.1], [amackint@waikato.ac.nz])
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE([1.11 -Wall -Werror foreign subdir-objects])
 
