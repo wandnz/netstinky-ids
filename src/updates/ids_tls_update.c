@@ -15,12 +15,10 @@
 #include <assert.h>
 #include <string.h>
 
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-#include <openssl/x509v3.h>
-
 #include "utils/logging.h"
 #include "ids_tls_update.h"
+
+#include "utils/uvtls/uv_tls.h"
 
 #ifndef UPDATE_FREQUENCY_MINS
 #define UPDATE_FREQUENCY_MINS 60
@@ -38,109 +36,6 @@ static void
 update_timer_on_write(tls_stream_t *stream, int status, uv_buf_t *bufs,
         unsigned int nbufs);
 
-static int
-verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
-{
-    if (!preverify_ok)
-    {
-        char buf[256];
-        X509 *err_cert;
-        int err;
-
-        err_cert = X509_STORE_CTX_get_current_cert(ctx);
-        err = X509_STORE_CTX_get_error(ctx);
-
-        X509_NAME_oneline(X509_get_subject_name(err_cert), buf, 256);
-
-        logger(L_DEBUG, "%s for %s\n", X509_verify_cert_error_string(err), buf);
-    }
-
-    return preverify_ok;
-}
-
-SSL_CTX *
-setup_context(const char *hostname, int ssl_no_verify)
-{
-    SSL_CTX *ctx = NULL;
-    const SSL_METHOD *method;
-    X509_VERIFY_PARAM *param = NULL;
-    long ssl_opts;
-    int rc;
-    unsigned long ssl_err = 0;
-
-    SSL_load_error_strings();
-    SSL_library_init();
-    OpenSSL_add_all_algorithms();
-    ERR_load_BIO_strings();
-    ERR_load_crypto_strings();
-
-#ifdef HAVE_TLS_METHOD
-    method = TLS_method();
-#else
-    method = SSLv23_method();
-#endif
-    if (!method) return NULL;
-
-    ctx = SSL_CTX_new(method);
-    if (!ctx) return NULL;
-
-    ssl_opts = (SSL_OP_ALL
-        | SSL_OP_NO_TICKET
-        | SSL_OP_NO_COMPRESSION
-        | SSL_OP_NO_SSLv2
-        | SSL_OP_NO_SSLv3
-        | SSL_OP_NO_TLSv1
-        | SSL_OP_NO_TLSv1_1)
-        & ~SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG
-        & ~SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS;
-
-/* OpenSSL v1.1.0+ */
-#ifdef HAVE_SSL_CTX_SET_MINMAX_PROTO_VERSION
-    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
-    SSL_CTX_set_max_proto_version(ctx, 0); // Use highest available version
-#endif
-
-    SSL_CTX_set_options(ctx, ssl_opts);
-    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY
-            | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER
-            | SSL_MODE_ENABLE_PARTIAL_WRITE
-            | SSL_MODE_RELEASE_BUFFERS);
-
-    param = SSL_CTX_get0_param(ctx);
-    X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-    if (!X509_VERIFY_PARAM_set1_host(param, hostname, strnlen(hostname, 253)))
-    {
-        logger(L_ERROR,
-                "Failed to set the hostname as a verification parameter");
-        return NULL;
-    }
-    if (!X509_VERIFY_PARAM_set_flags(param,
-            X509_V_FLAG_POLICY_CHECK
-            | X509_V_FLAG_TRUSTED_FIRST
-            ))
-    {
-        logger(L_ERROR, "Failed to set the verify parameter flags");
-        return NULL;
-    }
-
-    SSL_CTX_set_verify(
-            ctx,
-            ssl_no_verify == 0 ? SSL_VERIFY_PEER : SSL_VERIFY_NONE,
-            verify_callback);
-    rc = SSL_CTX_set_default_verify_paths(ctx);
-
-    ssl_err = ERR_get_error();
-    if (rc != 1)
-    {
-        char buf[256];
-        ERR_error_string_n(ssl_err, buf, sizeof(buf));
-        logger(L_ERROR, "Failed to load default verify paths. ssl_err: %s");
-        return NULL;
-    }
-
-    return ctx;
-}
-
 int
 setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
         const char *update_host, const uint16_t update_port,
@@ -155,7 +50,7 @@ setup_update_context(ids_update_ctx_t *update_ctx, uv_loop_t *loop,
     memset(update_ctx, 0, sizeof(*update_ctx));
 
     // Setup SSL context
-    update_ctx->ctx = setup_context(update_host, ssl_no_verify);
+    NetStinky_ssl->init(&update_ctx->ctx, update_host, ssl_no_verify);
     if (NULL == update_ctx->ctx) return NSIDS_SSL;
 
     update_ctx->server_host = update_host;
@@ -214,7 +109,7 @@ teardown_update_context(ids_update_ctx_t *update_ctx)
     update_ctx->proto.state = 0;
 
     if (update_ctx->ctx)
-        SSL_CTX_free(update_ctx->ctx);
+        NetStinky_ssl->cleanup(update_ctx->ctx);
 
     // Check if stream is currently initialized and active
     if (update_ctx->stream.tcp.type == UV_TCP)

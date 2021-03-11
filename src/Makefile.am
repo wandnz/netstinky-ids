@@ -21,6 +21,8 @@ libmdns_la_LIBADD = -luv $(AVAHI_LIBS)
 
 # libuv TLS handle type
 libuvtls_la_SOURCES = \
+	utils/uvtls/backends/openssl.c \
+	utils/uvtls/backends/openssl.h \
 	utils/uvtls/uv_tls.c \
 	utils/uvtls/uv_tls.h
 libuvtls_la_CFLAGS = @OPENSSL_INCLUDES@

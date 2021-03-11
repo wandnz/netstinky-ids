@@ -39,6 +39,9 @@
 #include "blacklist/feodo_ip_blacklist.h"
 
 #ifndef NO_UPDATES
+#include "utils/uvtls/uv_tls.h"
+// TODO: Select which backend to use via configure script
+#include "utils/uvtls/backends/openssl.h"
 #include "updates/ids_tls_update.h"
 #endif
 #ifndef NO_MDNS
@@ -122,6 +125,7 @@ static uv_tcp_t server_handle;
 #ifndef NO_UPDATES
 static ids_update_ctx_t ids_update_ctx;
 static uv_timer_t update_timer;
+const struct NetStinky_ssl *NetStinky_ssl = &NetStinky_ssl_openssl;
 #endif
 
 static void close_cb(uv_handle_t *handle)
@@ -218,6 +222,7 @@ static void free_globals(void) {
 #endif
 #ifndef NO_UPDATES
     teardown_update_context(&ids_update_ctx);
+    NetStinky_ssl->library_close();
 #endif
 }
 
@@ -643,6 +648,7 @@ main(int argc, char **argv)
 #ifndef NO_UPDATES
     if (args.update_server_host)
     {
+        NetStinky_ssl->library_init();
         if (setup_update_context(&ids_update_ctx, loop,
                 args.update_server_host,
                 (const uint16_t) args.update_server_port,

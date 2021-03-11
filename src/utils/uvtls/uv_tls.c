@@ -13,9 +13,8 @@
 #include <config.h>
 
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
-#include <openssl/bio.h>
-#include <openssl/err.h>
 
 #include "utils/logging.h"
 #include "uv_tls.h"
@@ -63,39 +62,22 @@ tls_stream_close_close_cb(uv_handle_t *handle);
 static void
 tls_stream_close_err_cb(tls_stream_t *stream);
 
-#ifdef HAVE_SSL_CTX_SET_KEYLOG_CALLBACK
-static void
-keylog_callback(const SSL *ssl __attribute__((unused)), const char *line)
-{
-    logger(L_DEBUG, "%s", line);
-}
-#endif
-
 int
-tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
+tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, struct ssl_context *ctx)
 {
     int uv_rc;
-    int bio_rc;
 
     assert(stream);
     assert(loop);
     assert(ctx);
 
-    // default error code if going to the fail label
-    int err_ret = TLS_STR_FAIL;
-
     memset(stream, 0, sizeof(*stream));
 
-    stream->ssl = SSL_new(ctx);
-    if (!stream->ssl) return TLS_STR_FAIL;
+    stream->ssl = NetStinky_ssl->alloc(ctx);
+    if (!stream->ssl) return TLS_STR_MEM;
 
-    bio_rc = BIO_new_bio_pair(&stream->internal, 0, &stream->network, 0);
-    if (1 != bio_rc) goto fail;
+    if (NetStinky_ssl->connect(stream) != TLS_STR_OK) return TLS_STR_FAIL;
 
-    SSL_set_bio(stream->ssl, stream->network, stream->network);
-#ifdef HAVE_SSL_CTX_SET_KEYLOG_CALLBACK
-    SSL_CTX_set_keylog_callback(ctx, keylog_callback);
-#endif
 
     uv_rc = uv_tcp_init(loop, &stream->tcp);
     if (uv_rc < 0)
@@ -103,33 +85,24 @@ tls_stream_init(tls_stream_t *stream, uv_loop_t *loop, SSL_CTX *ctx)
         // Begin to close the stream, but warn user not to free it
         logger(L_ERROR, "Could not establish a TCP stream: %s",
                 uv_strerror(uv_rc));
-        err_ret = TLS_STR_NEED_CLOSE;
         stream->tcp.data = stream;
         tls_stream_close(stream, tls_stream_close_err_cb);
-        goto fail;
+        return TLS_STR_FAIL;
     }
 
     stream->tcp.data = stream;
     stream->handshake_complete = 0;
 
     return TLS_STR_OK;
-
-fail:
-    if (stream->internal) BIO_free(stream->internal);
-    if (stream->network) BIO_free(stream->network);
-    if (stream->ssl) SSL_free(stream->ssl);
-    return err_ret;
 }
 
 int
 tls_stream_fini(tls_stream_t *stream)
 {
     int ret = TLS_STR_OK;
+    struct ssl_connection *conn = stream->ssl;
 
-    // One of the BIOs is freed implicitly by SSL_free
-    SSL_free(stream->ssl);
-    BIO_free(stream->internal);
-
+    NetStinky_ssl->session_free(conn);
     memset(stream, 0, sizeof(*stream));
 
     return ret;
@@ -162,14 +135,15 @@ tls_stream_read_pending(uv_buf_t *buf, tls_stream_t *stream)
     // Default value is NULL buf with 0 len.
     memset(buf, 0, sizeof(*buf));
 
-    pending = BIO_pending(stream->internal);
+    pending = NetStinky_ssl->data_pending(stream);
+
     if (!pending) return TLS_STR_OK;
     if (pending < 0) return TLS_STR_FAIL;
 
     buf->base = malloc(pending);
     if (!buf->base) return TLS_STR_MEM;
 
-    nread = BIO_read(stream->internal, buf->base, pending);
+    nread = NetStinky_ssl->read(stream, buf->base, pending);
     if (nread < pending)
     {
         // Read failed, undo all changes
@@ -196,7 +170,7 @@ tls_stream_send_pending(tls_stream_t *stream, tls_str_write_cb cb)
 
     if (!stream) return TLS_STR_FAIL;
 
-    pending = BIO_pending(stream->internal);
+    pending = NetStinky_ssl->data_pending(stream);
     if (pending <= 0) return TLS_STR_OK;
 
     buf.base = malloc(pending);
@@ -207,7 +181,7 @@ tls_stream_send_pending(tls_stream_t *stream, tls_str_write_cb cb)
     }
     buf.len = pending;
 
-    read = BIO_read(stream->internal, buf.base, buf.len);
+    read = NetStinky_ssl->read(stream, buf.base, buf.len);
     if (read != pending) goto fail;
 
     req = malloc(sizeof(*req));
@@ -272,7 +246,7 @@ tls_stream_handshake_write_cb(tls_stream_t *stream, int status, uv_buf_t *buf,
     }
 
     // Check if finished, then notify user of success
-    if (SSL_is_init_finished(stream->ssl) && !stream->handshake_complete)
+    if (NetStinky_ssl->is_init_finished(stream) && !stream->handshake_complete)
     {
         stream->on_handshake(stream, status);
         stream->handshake_complete = 1;
@@ -288,41 +262,11 @@ tls_stream_handshake_write_cb(tls_stream_t *stream, int status, uv_buf_t *buf,
 static int
 tls_stream_do_handshake(tls_stream_t *stream)
 {
-    int ssl_rc, rc;
-    int ssl_err;
+    int rc;
+    int ret;
 
-    int ret;	// return code from this function
-
-    // Because we are not blocking we need to check the return code even in
-    // case of error, because it might be expected behaviour.
-    ssl_rc = SSL_do_handshake(stream->ssl);
-    ssl_err = SSL_get_error(stream->ssl, ssl_rc);
-
-    /*
-     * SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE mean that the handshake
-     * hasn't failed but must continue after a new read or write.
-     */
-    if (SSL_ERROR_NONE == ssl_err)
-        ret = TLS_STR_OK;
-    else if (SSL_ERROR_WANT_READ == ssl_err)
-    {
-        // Don't send anything
-        ret = TLS_STR_HANDSHAKE_INCOMPLETE;
-    }
-    else if (SSL_ERROR_WANT_WRITE == ssl_err)
-    {
-        // Continue through to sending data
-        ret = TLS_STR_HANDSHAKE_INCOMPLETE;
-    }
-    else
-    {
-        unsigned long err;
-        while( (err = ERR_get_error()) != 0)
-        {
-            tls_stream_print_err(stderr, err);
-        }
+    if ((ret = NetStinky_ssl->do_handshake(stream)) == TLS_STR_FAIL)
         return TLS_STR_FAIL;
-    }
 
     rc = tls_stream_send_pending(stream, tls_stream_handshake_write_cb);
     if (rc) return TLS_STR_FAIL;
@@ -337,7 +281,7 @@ tls_stream_check_handshake(tls_stream_t *stream)
     int handshake_rc;
 
     // Do handshake if still required
-    if (0 == SSL_is_init_finished(stream->ssl))
+    if (0 == NetStinky_ssl->is_init_finished(stream))
     {
         handshake_rc = tls_stream_do_handshake(stream);
         if (TLS_STR_OK == handshake_rc && !stream->handshake_complete)
@@ -371,7 +315,8 @@ tls_stream_check_handshake(tls_stream_t *stream)
 static int
 tls_stream_decrypt_data(tls_stream_t *stream, uv_buf_t *decrypted)
 {
-    int nread, ssl_err;
+    int nread;
+    int rc;
     if (!stream || !decrypted) return TLS_STR_FAIL;
 
     memset(decrypted, 0, sizeof(*decrypted));
@@ -383,7 +328,11 @@ tls_stream_decrypt_data(tls_stream_t *stream, uv_buf_t *decrypted)
 
     // Create new buffer for decrypted data.
     decrypted->base = malloc(DEFAULT_BUF_SZ);
-    nread = SSL_read(stream->ssl, decrypted->base, DEFAULT_BUF_SZ);
+
+    // TODO: I think this may be the source of my bugs. Returning 0 from this
+    // function could either mean "we read 0 bytes" or "we tried to read and
+    // got an error, but the error was SSL_ERROR_NONE"
+    rc = NetStinky_ssl->recv(stream, decrypted->base, DEFAULT_BUF_SZ, &nread);
     if (nread < 0)
     {
         decrypted->len = 0;
@@ -392,10 +341,7 @@ tls_stream_decrypt_data(tls_stream_t *stream, uv_buf_t *decrypted)
     }
     else decrypted->len = nread;
 
-    ssl_err = SSL_get_error(stream->ssl, nread);
-    if (ssl_err != 0 && ssl_err != 2) return TLS_STR_FAIL;
-
-    return TLS_STR_OK;
+    return rc;
 }
 
 static int
@@ -420,13 +366,13 @@ tls_stream_decrypt_buffer(uv_buf_t *decrypted, tls_stream_t *stream, ssize_t nre
 
     while (total_written < nread)
     {
-        nwrite = BIO_write(stream->internal, buf->base + total_written,
+        nwrite = NetStinky_ssl->write(stream, buf->base + total_written,
                 nread - total_written);
         if (nwrite <= 0) goto error;
 
         total_written += nwrite;
 
-        if (!SSL_is_init_finished(stream->ssl))
+        if (!NetStinky_ssl->is_init_finished(stream))
         {
             // If error occurs in handshake, on_handshake_cb will be called
 
@@ -524,7 +470,6 @@ tls_stream_connect_cb(uv_connect_t *req, int status)
         return;
     }
 
-    SSL_set_connect_state(stream->ssl);
     rc = tls_stream_do_handshake(stream);
     if (rc != TLS_STR_OK && rc != TLS_STR_HANDSHAKE_INCOMPLETE)
         stream->on_handshake(stream, rc);
@@ -647,7 +592,7 @@ tls_stream_shutdown(tls_stream_t *stream, tls_str_shutdown_cb cb)
 
     // TODO: I do not perform a bidirectional shutdown as it doesn't look like
     // it is required by the standard. Double check.
-    shutdown_rc = SSL_shutdown(stream->ssl);
+    shutdown_rc = NetStinky_ssl->shut_down(stream);
     if (shutdown_rc < 0)
     {
         // Error shutting down SSL, immediately shutdown tcp handle
@@ -695,7 +640,7 @@ tls_stream_accept(tls_stream_t *server, tls_stream_t *client,
     rc = uv_accept((uv_stream_t *)&server->tcp, (uv_stream_t *)&client->tcp);
     if (rc) return -1;
 
-    SSL_set_accept_state(client->ssl);
+    // SSL_set_accept_state(client->ssl);
 
     rc = tls_stream_read_start(client, tls_stream_on_read_cb);
     if (rc) return -1;
@@ -784,7 +729,7 @@ tls_stream_encrypt_buffer(buf_array_t *encrypted, tls_stream_t *stream,
     // Write chunks of uv_buffer into SSL_buffer
     while (bytes_written < plaintext->len)
     {
-        nwrite = SSL_write(stream->ssl, plaintext->base + bytes_written,
+        nwrite = NetStinky_ssl->send(stream, plaintext->base + bytes_written,
                 plaintext->len - bytes_written);
         if (nwrite <= 0) goto error;
 
@@ -1237,12 +1182,4 @@ free_write_cb_data(write_cb_data_t *data)
     if (!data) return;
 
     free(data);
-}
-
-void
-tls_stream_print_err(FILE *fp, unsigned long code)
-{
-    char buf[256];
-    ERR_error_string_n(code, buf, sizeof(buf));
-    fprintf(fp, "%s\n", buf);
 }

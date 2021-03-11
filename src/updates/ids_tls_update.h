@@ -76,8 +76,8 @@ typedef struct
     const char *server_host;
     /** Port of the update server */
     uint16_t server_port;
-    /** OpenSSL SSL_CTX object to use when starting connections */
-    SSL_CTX *ctx;
+    /** SSL/TLS library context object to use when starting connections */
+    struct ssl_context *ctx;
     /** The active TLS stream for communicating with the remote server */
     tls_stream_t stream;
     /** The current state of the client protocol state-machine */
