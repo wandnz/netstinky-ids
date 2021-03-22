@@ -42,7 +42,8 @@ apt-get -y install avahi-daemon libavahi-common-dev \
     libavahi-client-dev
 ```
 
-For live updates on the blacklists, you will need `openssl`
+For live updates on the blacklists, you will need `openssl` version 1.1.0 or
+later.
 ```
 apt-get update
 apt-get -y install libssl-dev

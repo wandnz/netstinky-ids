@@ -152,13 +152,8 @@ setup_context(const char *hostname, int ssl_no_verify)
 static int
 openssl_library_init(void)
 {
-    int rc = 0;
-    SSL_load_error_strings();
-    rc |= SSL_library_init();
-    rc |= OpenSSL_add_all_algorithms();
-    ERR_load_BIO_strings();
-    ERR_load_crypto_strings();
-    return rc;
+    // OpenSSL > 1.1.0 automatically inits itself on first use
+    return 0;
 }
 
 
@@ -293,14 +288,7 @@ openssl_is_init_finished(tls_stream_t *stream)
 static void
 openssl_library_close(void)
 {
-    // EVP_cleanup();
-    // ERR_free_strings();
-    // CRYPTO_cleanup_all_ex_data();
-    // ENGINE_cleanup();
-    // CONF_modules_unload(1);
-    // CONF_modules_free();
-    // sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
-    // RAND_cleanup();
+    // Openssl > 1.1.0 automatically frees itself
 }
 
 static void

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script
 
 AC_PREREQ(2.69)
-AC_INIT([nsids], [1.0.1], [amackint@waikato.ac.nz])
+AC_INIT([nsids], [1.0.2], [amackint@waikato.ac.nz])
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE([1.11 -Wall -Werror foreign subdir-objects])
 
@@ -170,6 +170,23 @@ AS_IF([test "x$updates" != xno],
     AM_CONDITIONAL(ENABLE_UPDATES, false)
     AC_DEFINE(NO_UPDATES, [1], [Define to disable online updates])
   ])
+
+if test "x$have_openssl" = xyes; then
+  AC_MSG_CHECKING([for OpenSSL version >= 1.1.0])
+  AC_EGREP_CPP(yes,
+  [#include <openssl/crypto.h>
+   #if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+   yes
+   #endif
+  ],
+  [
+    AC_MSG_RESULT(yes)
+  ],
+  [
+    AC_MSG_RESULT(no)
+    AC_MSG_FAILURE([OpenSSL version too old])
+  ])
+fi
 
 if test "x$debug" != xno && test "x$have_openssl" = xyes; then
    AC_MSG_CHECKING([for SSL_CTX_set_keylog_callback])
