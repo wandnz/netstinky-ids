@@ -382,7 +382,7 @@ tls_stream_decrypt_buffer(uv_buf_t *decrypted, tls_stream_t *stream, ssize_t nre
         }
 
         rc = tls_stream_decrypt_data(stream, &temp_buf);
-        if (TLS_STR_OK != rc)
+        if (rc < 0)
         {
             ret = rc;
             goto error;
